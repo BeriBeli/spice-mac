@@ -139,6 +139,27 @@ glib/spice headers (`clang -fsyntax-only`, exit 0).
 - **EOL deps.** UTM sysroots pin older libraries (e.g. OpenSSL 1.1.1b); acceptable
   for personal use, but they carry their own CVEs.
 
+## USB redirection
+
+USB redirect is available under **Connection ▸ USB Devices**, but macOS gates it:
+`LIBUSB_ERROR_ACCESS` ("could not claim interface") means a **built-in kernel
+driver already owns the device**. macOS auto-binds drivers to mass storage, HID
+(keyboards/mice), USB audio, serial/CDC, iOS devices and hubs, and the device
+must be *captured* away from that driver to redirect it — which requires one of:
+
+- **Root.** The only entitlement-free path on a personal/ad-hoc build. Launch via
+  `./scripts/run-as-root.sh <file>.vv` (the bundled libusb supports macOS device
+  capture). Running a GUI as root is discouraged; capture is whole-device; HID may
+  not detach even as root.
+- **`com.apple.vm.device-access`** — an Apple-*restricted* entitlement (needs a
+  provisioning profile + Apple approval and Developer ID signing; **ad-hoc
+  signatures can't carry it**). This is what UTM's official builds use.
+
+`com.apple.security.device.usb` and Hardened Runtime do **not** help (sandbox-only
+/ no-op). **Driverless devices** (vendor-specific class `0xFF`, FTDI on macOS 12+,
+many JTAG/printer dongles) redirect **without root** — check with
+`ioreg -p IOUSB -l | grep IOUSBHostInterface` (no class-driver client bound → OK).
+
 ## Licensing
 
 - App code in this repo: see `LICENSE`.
