@@ -2,6 +2,15 @@
 
 import PackageDescription
 
+// spice-mac fork addition: suppress upstream CocoaSpice's benign ObjC warnings so
+// the host app gets a clean build. No source/logic change.
+let quietWarnings = [
+    "-Wno-objc-duplicate-category-definition",
+    "-Wno-objc-designated-initializers",
+    "-Wno-incomplete-implementation",
+    "-Wno-return-type",
+]
+
 let package = Package(
     name: "CocoaSpice",
     platforms: [
@@ -25,13 +34,17 @@ let package = Package(
             name: "CocoaSpiceRenderer",
             dependencies: [],
             resources: [
-                .process("CSShaders.metal")]),
+                .process("CSShaders.metal")],
+            // spice-mac: silence upstream's benign ObjC warnings for a clean build.
+            cSettings: [
+                .unsafeFlags(quietWarnings)]),
         .target(
             name: "CocoaSpice",
             dependencies: ["CocoaSpiceRenderer"],
             exclude: ["ExternalHeaders"],
             cSettings: [
                 .define("WITH_USB_SUPPORT"),
+                .unsafeFlags(quietWarnings),
                 .headerSearchPath("ExternalHeaders"),
                 .headerSearchPath("ExternalHeaders/glib-2.0"),
                 .headerSearchPath("ExternalHeaders/gstreamer-1.0"),
