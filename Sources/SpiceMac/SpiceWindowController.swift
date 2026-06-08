@@ -69,7 +69,11 @@ final class SpiceWindowController: NSWindowController, NSWindowDelegate, NSMenuI
 
     private func wireClient() {
         client.onDisplayCreated = { [weak self] display in self?.attachDisplay(display) }
-        client.onDisplayUpdated = { [weak self] display in self?.resizeToDisplay(display.displaySize) }
+        // NB: do NOT resize the window when the guest resolution changes. The view
+        // re-fits the viewport via its displaySize KVO, so the window stays the
+        // user's size. Resizing here would chase the guest size and, combined with
+        // requestResolution, oscillate (the guest reconfigures → window resizes →
+        // we request a new resolution → …).
         client.onDisplayDestroyed = { [weak self] _ in self?.displayView.detach() }
         client.onInputAvailable = { [weak self] input in
             guard let self else { return }
@@ -153,7 +157,18 @@ final class SpiceWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         display.requestResolution(displayView.convertToBacking(displayView.bounds))
     }
 
-    func windowDidResize(_ notification: Notification) {
+    // Request a matching guest resolution only at DISCRETE moments — never on the
+    // continuous windowDidResize, which (during a live drag, or when a programmatic
+    // resize fires it) creates the resize↔request oscillation.
+    func windowDidEndLiveResize(_ notification: Notification) {
+        requestResolutionForCurrentSize()
+    }
+
+    func windowDidEnterFullScreen(_ notification: Notification) {
+        requestResolutionForCurrentSize()
+    }
+
+    func windowDidExitFullScreen(_ notification: Notification) {
         requestResolutionForCurrentSize()
     }
 
