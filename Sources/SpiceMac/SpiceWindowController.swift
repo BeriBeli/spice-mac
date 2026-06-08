@@ -80,7 +80,6 @@ final class SpiceWindowController: NSWindowController, NSWindowDelegate, NSMenuI
             self.displayView.router.input = input
             self.displayView.router.requestMouseMode(server: false)
             self.window?.makeFirstResponder(self.displayView)
-            spiceInputLog("onInputAvailable wired; firstResponder set on displayView")
         }
         client.onInputUnavailable = { [weak self] _ in self?.displayView.router.input = nil }
 

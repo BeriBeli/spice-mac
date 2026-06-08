@@ -185,9 +185,7 @@ final class SpiceDisplayView: MTKView {
     override var canBecomeKeyView: Bool { true }
 
     override func becomeFirstResponder() -> Bool {
-        let ok = super.becomeFirstResponder()
-        spiceInputLog("becomeFirstResponder -> \(ok)")
-        return ok
+        super.becomeFirstResponder()
     }
 
     // Grab keyboard focus as soon as we're placed in a window.
@@ -239,17 +237,13 @@ final class SpiceDisplayView: MTKView {
     override func mouseEntered(with event: NSEvent) { updateHostCursorVisibility() }
     override func mouseExited(with event: NSEvent) { showHostCursor() }
 
-    override func keyDown(with event: NSEvent) {
-        spiceInputLog("keyDown keyCode=\(event.keyCode) isFirstResponder=\(window?.firstResponder === self) hasInput=\(router.input != nil)")
-        router.keyDown(event)
-    }
+    override func keyDown(with event: NSEvent) { router.keyDown(event) }
     override func keyUp(with event: NSEvent) { router.keyUp(event) }
     override func flagsChanged(with event: NSEvent) { router.flagsChanged(event) }
 
     override func mouseDown(with event: NSEvent) {
         // Clicking the guest should also take keyboard focus.
         if window?.firstResponder !== self { window?.makeFirstResponder(self) }
-        spiceInputLog("mouseDown hasInput=\(router.input != nil)")
         router.mouseButton(event, pressed: true)
     }
     override func mouseUp(with event: NSEvent) { router.mouseButton(event, pressed: false) }

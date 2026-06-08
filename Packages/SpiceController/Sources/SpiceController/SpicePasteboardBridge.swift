@@ -83,8 +83,7 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
         guard let nsType = Self.nsType(type) else { return }
         onMain {
             self.pasteboard.clearContents()
-            let ok = self.pasteboard.setData(data, forType: nsType)
-            spiceClipboardLog("setData type=\(type.rawValue) bytes=\(data.count) ok=\(ok) cc=\(self.pasteboard.changeCount)")
+            _ = self.pasteboard.setData(data, forType: nsType)
             self.markSelfWrite()
         }
     }
@@ -98,8 +97,7 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
     public func setString(_ string: String) {
         onMain {
             self.pasteboard.clearContents()
-            let ok = self.pasteboard.setString(string, forType: .string)
-            spiceClipboardLog("setString len=\(string.count) ok=\(ok) cc=\(self.pasteboard.changeCount) preview=\(string.prefix(24))")
+            _ = self.pasteboard.setString(string, forType: .string)
             self.markSelfWrite()
         }
     }
@@ -108,7 +106,6 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
     public func clearContents() {
         onMain {
             self.pasteboard.clearContents()
-            spiceClipboardLog("clearContents cc=\(self.pasteboard.changeCount)")
             self.markSelfWrite()
         }
     }
