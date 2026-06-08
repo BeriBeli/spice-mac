@@ -71,6 +71,9 @@ SPICEMAC_SYSROOT_URL="https://…/Sysroot-macos-arm64.tgz" \
 SPICEMAC_SYSROOT_SHA256="…" \
   ./scripts/fetch-sysroot.sh
 
+# 1b. Replace the EOL bundled OpenSSL 1.1.1b with 1.1.1w (recommended; see SECURITY.md)
+./scripts/upgrade-openssl.sh
+
 # 2. Build and assemble SpiceMac.app
 ./scripts/build-app.sh            # → build/SpiceMac.app
 
@@ -163,10 +166,12 @@ many JTAG/printer dongles) redirect **without root** — check with
 ## Security
 
 See [SECURITY.md](SECURITY.md). In short: the app code is sound (no RCE/memory-
-corruption; TLS fails closed), but it bundles an **EOL native stack** (OpenSSL
-1.1.1b etc.) that should be refreshed before wider distribution, clipboard sharing
-is on by default (toggle in the Connection menu), and `run-as-root.sh` runs the
-whole parser surface as root — fine for personal use against trusted VMs.
+corruption; TLS fails closed). The bundled **OpenSSL is upgraded to 1.1.1w**
+(`scripts/upgrade-openssl.sh`, fixes CVE-2022-0778), though the rest of the native
+stack is still old and should be refreshed (OpenSSL 3.x) before wider
+distribution. Clipboard sharing is on by default (toggle in the Connection menu),
+and `run-as-root.sh` runs the whole parser surface as root — fine for personal use
+against trusted VMs.
 
 ## Licensing
 

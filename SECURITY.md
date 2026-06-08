@@ -41,18 +41,22 @@ gate any wider distribution.
   certificate-subject verification but supplies no CA.
 - **Mandatory sysroot integrity** — `fetch-sysroot.sh` refuses an unverified URL
   download unless `SPICEMAC_SYSROOT_SHA256` is pinned.
+- **OpenSSL upgraded 1.1.1b → 1.1.1w** — `scripts/upgrade-openssl.sh` builds the
+  final 1.1.1 release from (SHA-256-verified) source and drops it into
+  `Frameworks/` (ABI-compatible; no spice-gtk rebuild). This fixes the reachable
+  **CVE-2022-0778** handshake DoS and every other 1.1.1 CVE through Sept 2023.
 
 ## Residual risks (not fixed in code)
 
-1. **EOL native stack (highest real risk).** The bundled UTM sysroot ships
-   **OpenSSL 1.1.1b (Feb 2019)**, spice-gtk 0.42, glib, gstreamer 1.19.1,
-   usbredir. OpenSSL 1.1.1b is reachable on the TLS path and is vulnerable to
-   **CVE-2022-0778** (BN_mod_sqrt infinite loop) — a crafted server/MITM cert can
-   hang the client during the handshake (DoS, not a verification bypass or RCE).
-   The EOL crypto/parser stack is also where any future server-reachable
-   memory-safety bug would land. **Action:** rebuild the sysroot against a
-   supported OpenSSL (3.x, or ≥ 1.1.1w) with matching spice-gtk/glib/gstreamer,
-   pin the versions + SHA256, and gate wider distribution on the refresh.
+1. **EOL native stack.** The bundled UTM sysroot still ships spice-gtk 0.42, glib,
+   gstreamer 1.19.1, usbredir — and the OpenSSL **1.1.1** branch (now 1.1.1w via
+   `scripts/upgrade-openssl.sh`). The known reachable **CVE-2022-0778** handshake
+   DoS is **fixed** by the 1.1.1w upgrade, but 1.1.1 is itself EOL (no *future*
+   fixes), and the rest of the stack is old and is the parser for all
+   hostile-server data — where any future server-reachable memory-safety bug would
+   land. **Action (for wider distribution):** rebuild the sysroot against a
+   supported **OpenSSL 3.x** (requires rebuilding spice-gtk) with current
+   glib/gstreamer/usbredir, pin the versions + SHA256.
 
 2. **Running as root for USB.** `scripts/run-as-root.sh` runs the *entire* GUI —
    including the SPICE/glib/gstreamer/OpenSSL/usbredir parsers that consume
