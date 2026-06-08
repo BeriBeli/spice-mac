@@ -5,14 +5,21 @@ virtual-machine consoles from `.vv` connection files, built on a forked
 [CocoaSpice](https://github.com/utmapp/CocoaSpice) (the Metal-rendered SPICE layer
 UTM uses). Apple-Silicon only.
 
-> **Status: builds and runs.** On Xcode 26.5 + the UTM arm64 sysroot, `swift build`
-> links the whole app with zero undefined symbols, and `SpiceMac.app` launches and
-> loads the full native SPICE stack at runtime — glib/spice-client-glib start, the
-> GLib worker runs, libusb/usbredir enumerate host USB devices, and a SPICE main
-> channel connects (verified with a dead-host `.vv`). Not yet exercised: a live
-> connection to a real Proxmox VM and on-screen display rendering (need a real
-> SPICE server). The `.vv` parser and keyboard map are additionally unit-tested
-> (28 dependency-free checks).
+> **Status: working** against a real Proxmox VE VM (Xcode 26.5 + the UTM arm64
+> sysroot). Verified end-to-end: Metal display with aspect-fit scaling and live
+> resize; keyboard including ⌘/modifiers; mouse with the guest cursor aligned to
+> the macOS pointer; bidirectional clipboard; and audio (needs a SPICE audio
+> device on the VM). USB redirection is plumbed via the Connection menu. The `.vv`
+> parser and keyboard map are also unit-tested (28 dependency-free checks).
+>
+> | Feature | Status |
+> |---|---|
+> | Display (Metal) + aspect-fit scaling + live resize | ✅ |
+> | Keyboard incl. ⌘ / modifiers (self-healing on missed key-up) | ✅ |
+> | Mouse + cursor alignment; optional hide-Mac-cursor | ✅ |
+> | Clipboard (Mac↔VM, both directions) | ✅ |
+> | Audio (guest needs a SPICE audio device) | ✅ |
+> | USB redirection | plumbed |
 
 ## Why this exists
 
@@ -124,6 +131,9 @@ glib/spice headers (`clang -fsyntax-only`, exit 0).
 - **Inverted TLS verification.** Trust the self-signed PVE cluster CA and match
   `cert-subject`; normal hostname/pubkey checks fail by design.
 - **Guest agent required** for clipboard + dynamic resolution.
+- **Audio needs a SPICE audio device on the VM** — most Proxmox VMs ship without
+  one, so there's no playback channel. Add **Hardware ▸ Audio Device** (e.g.
+  `ich9-intel-hda`, backend **SPICE**) and reboot the guest.
 - **`pveproxy` gating.** `/etc/default/pveproxy` `ALLOW_FROM`/cipher rules can
   reset port 3128 even with a valid ticket.
 - **EOL deps.** UTM sysroots pin older libraries (e.g. OpenSSL 1.1.1b); acceptable
