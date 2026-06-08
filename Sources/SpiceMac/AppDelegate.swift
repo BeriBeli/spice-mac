@@ -1,0 +1,77 @@
+import AppKit
+import VVConfig
+import SpiceController
+
+/// App entry: builds the menu and opens Proxmox `.vv` SPICE files (via
+/// double-click, File ▸ Open, or drag-and-drop), spawning a window per session.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+
+    private var windowControllers: [SpiceWindowController] = []
+    private var didOpenAny = false
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.mainMenu = MainMenu.build()
+        NSApp.activate(ignoringOtherApps: true)
+
+        // If launched without a document, prompt to open one.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.didOpenAny else { return }
+            self.presentOpenPanel()
+        }
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        true
+    }
+
+    // Modern multi-URL open (double-click / drag onto the app / `open file.vv`).
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls { openVV(at: url) }
+    }
+
+    // MARK: - Opening
+
+    @objc func openDocument(_ sender: Any?) {
+        presentOpenPanel()
+    }
+
+    private func presentOpenPanel() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = VVDocument.contentTypes
+        panel.allowedFileTypes = ["vv"] // fallback for older systems
+        panel.prompt = "Open"
+        panel.message = "Open a Proxmox SPICE connection file (.vv)"
+        if panel.runModal() == .OK, let url = panel.url {
+            openVV(at: url)
+        }
+    }
+
+    private func openVV(at url: URL) {
+        didOpenAny = true
+        do {
+            let config = try VVConfig(contentsOf: url)
+            let params = try SpiceConnectionParameters(from: config)
+            let client = SpiceClient(parameters: params)
+            let controller = SpiceWindowController(client: client, sourceURL: url)
+            controller.onClose = { [weak self, weak controller] in
+                self?.windowControllers.removeAll { $0 === controller }
+            }
+            windowControllers.append(controller)
+            controller.showWindow(nil)
+            client.connect()
+        } catch {
+            presentError(error, url: url)
+        }
+    }
+
+    private func presentError(_ error: Error, url: URL) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Could not open “\(url.lastPathComponent)”"
+        alert.informativeText = (error as? CustomStringConvertible)?.description ?? error.localizedDescription
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+}

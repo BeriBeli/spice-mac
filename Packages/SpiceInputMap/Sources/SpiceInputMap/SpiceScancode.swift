@@ -41,6 +41,24 @@ public enum SpiceScancode {
         table[keyCode]
     }
 
+    /// Re-encode a canonical (`0xE000`-prefixed) scancode into the form CocoaSpice's
+    /// `-[CSInput sendKey:code:]` expects: that API marks an extended key with the
+    /// high bit `0x100` (i.e. `0x100 | makeByte`) rather than the wire prefix
+    /// `0xE0`. Plain keys are returned as their bare make byte.
+    ///
+    /// Per CSInput.h: `if ((scancode & 0xFF00) == 0xE000) scancode = 0x100 | (scancode & 0xFF);`
+    public static func cocoaSpiceEncoded(_ code: Int) -> Int {
+        if isExtended(code) { return 0x100 | (code & 0xFF) }
+        return code & 0xFF
+    }
+
+    /// Convenience: map a macOS virtual key code straight to the CocoaSpice
+    /// `sendKey:code:` scancode, or `nil` if unmapped.
+    public static func cocoaSpiceCode(forMacVirtualKey keyCode: UInt16) -> Int? {
+        guard let c = setOne(forMacVirtualKey: keyCode) else { return nil }
+        return cocoaSpiceEncoded(c)
+    }
+
     private static let E = extendedPrefix
 
     /// macOS virtual key code → set-1 scancode. US/ANSI layout.

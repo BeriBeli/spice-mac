@@ -91,6 +91,20 @@ t.test("make/break byte expansion") {
     t.expectEqual(SpiceScancode.breakBytes(0xE04D), [0xE0, 0xCD])
 }
 
+t.test("CocoaSpice 0x100 extended encoding (CSInput.sendKey:code:)") {
+    // Plain keys: bare make byte.
+    t.expectEqual(SpiceScancode.cocoaSpiceEncoded(0x01), 0x01)        // Esc
+    t.expectEqual(SpiceScancode.cocoaSpiceEncoded(0x1E), 0x1E)        // A
+    // Extended keys: 0xE0NN -> 0x1NN.
+    t.expectEqual(SpiceScancode.cocoaSpiceEncoded(0xE04D), 0x14D)     // Right arrow
+    t.expectEqual(SpiceScancode.cocoaSpiceEncoded(0xE01D), 0x11D)     // Right Ctrl
+    t.expectEqual(SpiceScancode.cocoaSpiceEncoded(0xE01C), 0x11C)     // Keypad Enter
+    // End-to-end from a mac key code.
+    t.expectEqual(SpiceScancode.cocoaSpiceCode(forMacVirtualKey: MacVirtualKey.rightArrow), 0x14D)
+    t.expectEqual(SpiceScancode.cocoaSpiceCode(forMacVirtualKey: MacVirtualKey.escape), 0x01)
+    t.expect(SpiceScancode.cocoaSpiceCode(forMacVirtualKey: 0xFE) == nil, "unmapped -> nil")
+}
+
 t.test("unmapped keys return nil") {
     t.expect(code(0xFE) == nil, "0xFE should be unmapped")
 }

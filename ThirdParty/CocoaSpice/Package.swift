@@ -14,6 +14,11 @@ let package = Package(
         .library(
             name: "CocoaSpiceNoUsb",
             targets: ["CocoaSpiceNoUsb"]),
+        // spice-mac fork addition: expose the renderer so a Swift host app can
+        // `import CocoaSpiceRenderer` to construct CSMetalRenderer.
+        .library(
+            name: "CocoaSpiceRenderer",
+            targets: ["CocoaSpiceRenderer"]),
     ],
     targets: [
         .target(

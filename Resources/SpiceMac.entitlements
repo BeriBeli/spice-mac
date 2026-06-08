@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      Entitlements for a hardened-runtime / sandboxed build. For a quick personal
+      ad-hoc build, build-app.sh signs WITHOUT the sandbox and these are not
+      required. Enable the sandbox key below if distributing more strictly.
+    -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+
+    <!-- USB redirection (libusb / usbredir). Required under the sandbox. -->
+    <key>com.apple.security.device.usb</key>
+    <true/>
+
+    <!-- Reading user-selected .vv files when sandboxed. -->
+    <key>com.apple.security.files.user-selected.read-only</key>
+    <true/>
+
+    <!--
+      The bundled SPICE dylibs are not individually notarized by us; allow loading
+      them under hardened runtime. (Prefer signing each framework instead for a
+      stricter build.)
+    -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>
