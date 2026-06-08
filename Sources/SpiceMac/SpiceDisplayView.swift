@@ -56,7 +56,11 @@ final class SpiceDisplayView: MTKView {
         delegate = nil
         renderer = nil
         attachedDisplay = nil
-        router.input = nil
+        // NB: do NOT clear router.input here. The inputs channel is independent of
+        // the display; its lifecycle is driven by spiceInput{Available,Unavailable}.
+        // attachDisplay() calls detach() on every (re)attach (e.g. when the agent
+        // connects and the display reconfigures), so clearing input here would
+        // silently kill keyboard/mouse while the input channel is still alive.
     }
 
     // MARK: - Responder
