@@ -73,16 +73,20 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
         return pasteboard.data(forType: nsType)
     }
 
+    // Guest→host writes arrive on the GLib worker thread. NSPasteboard writes must
+    // happen on the main thread to take effect (and to avoid racing the poller's
+    // self-write tracking). CocoaSpice also does NOT clear the pasteboard first,
+    // and setData/setString silently no-op without a preceding clearContents.
+
     @objc(setData:forType:)
     public func setData(_ data: Data, for type: CSPasteboardType) {
         guard let nsType = Self.nsType(type) else { return }
-        // CocoaSpice's guest→host path does NOT clear the pasteboard first, and
-        // NSPasteboard.setData/forType: silently fails unless the pasteboard was
-        // cleared/prepared. So clear here. (Multi-type guest grabs keep the last
-        // type, which is fine for the common single-type case.)
-        pasteboard.clearContents()
-        pasteboard.setData(data, forType: nsType)
-        markSelfWrite()
+        onMain {
+            self.pasteboard.clearContents()
+            let ok = self.pasteboard.setData(data, forType: nsType)
+            spiceClipboardLog("setData type=\(type.rawValue) bytes=\(data.count) ok=\(ok) cc=\(self.pasteboard.changeCount)")
+            self.markSelfWrite()
+        }
     }
 
     @objc(string)
@@ -92,15 +96,25 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
 
     @objc(setString:)
     public func setString(_ string: String) {
-        pasteboard.clearContents()
-        pasteboard.setString(string, forType: .string)
-        markSelfWrite()
+        onMain {
+            self.pasteboard.clearContents()
+            let ok = self.pasteboard.setString(string, forType: .string)
+            spiceClipboardLog("setString len=\(string.count) ok=\(ok) cc=\(self.pasteboard.changeCount) preview=\(string.prefix(24))")
+            self.markSelfWrite()
+        }
     }
 
     @objc(clearContents)
     public func clearContents() {
-        pasteboard.clearContents()
-        markSelfWrite()
+        onMain {
+            self.pasteboard.clearContents()
+            spiceClipboardLog("clearContents cc=\(self.pasteboard.changeCount)")
+            self.markSelfWrite()
+        }
+    }
+
+    private func onMain(_ work: @escaping () -> Void) {
+        if Thread.isMainThread { work() } else { DispatchQueue.main.async(execute: work) }
     }
 
     /// Map a SPICE pasteboard type to the closest `NSPasteboard` UTI type.

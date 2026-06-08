@@ -19,6 +19,6 @@ echo "In the guest: move the mouse, click, and type a few keys. Then press Cmd-Q
 # if/when the inputs channel is torn down or migrated).
 SPICEMAC_INPUT_DEBUG=1 SPICE_DEBUG=1 G_MESSAGES_DEBUG=all "$APP" "$VV" 2>&1 \
     | tee "$LOG" \
-    | grep -iE "\[SpiceInput\]|inputs channel|zap|switching|migrat|reset|error" || true
+    | grep -iE "\[SpiceInput\]|\[SpiceClipboard\]|inputs channel|clipboard|zap|switching|migrat|reset|error" || true
 echo ""
 echo "Full log: $LOG  (channel events: grep -iE 'inputs|zap|switch|migrat' \"$LOG\")"
