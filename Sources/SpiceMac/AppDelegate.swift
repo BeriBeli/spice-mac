@@ -75,7 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "Could not open “\(url.lastPathComponent)”"
-        alert.informativeText = (error as? CustomStringConvertible)?.description ?? error.localizedDescription
+        alert.informativeText = String(describing: error)
         alert.addButton(withTitle: "OK")
         alert.runModal()
     }

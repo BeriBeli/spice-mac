@@ -5,12 +5,14 @@ virtual-machine consoles from `.vv` connection files, built on a forked
 [CocoaSpice](https://github.com/utmapp/CocoaSpice) (the Metal-rendered SPICE layer
 UTM uses). Apple-Silicon only.
 
-> **Status.** The protocol/codec/rendering stack is reused from CocoaSpice +
-> spice-gtk. This repo provides: the `.vv` parser and keyboard mapping (pure
-> Swift, **unit-tested here**), the CocoaSpice **Proxmox fork** (verified to
-> type-check against the real glib/spice headers), the **AppKit/Metal app shell**,
-> and the **dependency/build scripts**. Building the GUI app additionally needs
-> full Xcode and the native SPICE frameworks (see *Build*).
+> **Status: builds and runs.** On Xcode 26.5 + the UTM arm64 sysroot, `swift build`
+> links the whole app with zero undefined symbols, and `SpiceMac.app` launches and
+> loads the full native SPICE stack at runtime — glib/spice-client-glib start, the
+> GLib worker runs, libusb/usbredir enumerate host USB devices, and a SPICE main
+> channel connects (verified with a dead-host `.vv`). Not yet exercised: a live
+> connection to a real Proxmox VM and on-screen display rendering (need a real
+> SPICE server). The `.vv` parser and keyboard map are additionally unit-tested
+> (28 dependency-free checks).
 
 ## Why this exists
 
@@ -48,9 +50,11 @@ adds exactly one method, `-[CSConnection setProxy:ca:certSubject:]`
 ## Requirements
 
 - Apple Silicon Mac, macOS 12+.
-- **Full Xcode** to build the app (CocoaSpice's renderer compiles a `.metal`
-  shader, which needs the Metal toolchain that ships only with Xcode).
-- The native SPICE frameworks staged under `Frameworks/`.
+- **Full Xcode** (build with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`).
+- The **Metal toolchain component** — on Xcode 26 it is a separate download:
+  `xcodebuild -downloadComponent MetalToolchain`. Needed because SwiftPM does not
+  compile `.metal` resources; `build-app.sh` compiles the shader into the bundle.
+- The native SPICE frameworks staged under `Frameworks/` (see *Dependencies*).
 
 ## Build
 
