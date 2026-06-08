@@ -62,8 +62,19 @@ final class SpiceDisplayView: MTKView {
     // MARK: - Responder
 
     override var acceptsFirstResponder: Bool { true }
-    override func becomeFirstResponder() -> Bool { true }
     override var canBecomeKeyView: Bool { true }
+
+    override func becomeFirstResponder() -> Bool {
+        let ok = super.becomeFirstResponder()
+        spiceInputLog("becomeFirstResponder -> \(ok)")
+        return ok
+    }
+
+    // Grab keyboard focus as soon as we're placed in a window.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window != nil { window?.makeFirstResponder(self) }
+    }
 
     override func resignFirstResponder() -> Bool {
         // Flush held keys/modifiers/buttons so nothing stays latched in the guest
@@ -72,11 +83,19 @@ final class SpiceDisplayView: MTKView {
         return super.resignFirstResponder()
     }
 
-    override func keyDown(with event: NSEvent) { router.keyDown(event) }
+    override func keyDown(with event: NSEvent) {
+        spiceInputLog("keyDown keyCode=\(event.keyCode) isFirstResponder=\(window?.firstResponder === self) hasInput=\(router.input != nil)")
+        router.keyDown(event)
+    }
     override func keyUp(with event: NSEvent) { router.keyUp(event) }
     override func flagsChanged(with event: NSEvent) { router.flagsChanged(event) }
 
-    override func mouseDown(with event: NSEvent) { router.mouseButton(event, pressed: true) }
+    override func mouseDown(with event: NSEvent) {
+        // Clicking the guest should also take keyboard focus.
+        if window?.firstResponder !== self { window?.makeFirstResponder(self) }
+        spiceInputLog("mouseDown hasInput=\(router.input != nil)")
+        router.mouseButton(event, pressed: true)
+    }
     override func mouseUp(with event: NSEvent) { router.mouseButton(event, pressed: false) }
     override func rightMouseDown(with event: NSEvent) { router.mouseButton(event, pressed: true) }
     override func rightMouseUp(with event: NSEvent) { router.mouseButton(event, pressed: false) }

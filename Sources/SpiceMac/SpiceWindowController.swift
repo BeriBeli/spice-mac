@@ -62,6 +62,7 @@ final class SpiceWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         ])
 
         window.contentView = containerView
+        window.initialFirstResponder = displayView
     }
 
     // MARK: - Client wiring
@@ -71,8 +72,11 @@ final class SpiceWindowController: NSWindowController, NSWindowDelegate, NSMenuI
         client.onDisplayUpdated = { [weak self] display in self?.resizeToDisplay(display.displaySize) }
         client.onDisplayDestroyed = { [weak self] _ in self?.displayView.detach() }
         client.onInputAvailable = { [weak self] input in
-            self?.displayView.router.input = input
-            self?.displayView.router.requestMouseMode(server: false)
+            guard let self else { return }
+            self.displayView.router.input = input
+            self.displayView.router.requestMouseMode(server: false)
+            self.window?.makeFirstResponder(self.displayView)
+            spiceInputLog("onInputAvailable wired; firstResponder set on displayView")
         }
         client.onInputUnavailable = { [weak self] _ in self?.displayView.router.input = nil }
 
@@ -156,6 +160,7 @@ final class SpiceWindowController: NSWindowController, NSWindowDelegate, NSMenuI
     // MARK: - Window lifecycle
 
     func windowDidBecomeKey(_ notification: Notification) {
+        window?.makeFirstResponder(displayView)
         client.usbManager?.delegate = self
         refreshUSBMenu()
     }

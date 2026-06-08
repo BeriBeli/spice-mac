@@ -47,8 +47,15 @@ public final class SpiceInputRouter {
     }
 
     private func sendKey(_ keyCode: UInt16, pressed: Bool) {
-        guard let input,
-              let code = SpiceScancode.cocoaSpiceCode(forMacVirtualKey: keyCode) else { return }
+        guard let input else {
+            spiceInputLog("key dropped (no input channel) keyCode=\(keyCode)")
+            return
+        }
+        guard let code = SpiceScancode.cocoaSpiceCode(forMacVirtualKey: keyCode) else {
+            spiceInputLog("key dropped (unmapped) keyCode=\(keyCode)")
+            return
+        }
+        spiceInputLog("send key 0x\(String(code, radix: 16)) pressed=\(pressed)")
         // Swift imports CSInput's -sendKey:code: as send(_:code:).
         input.send(pressed ? .press : .release, code: Int32(code))
     }
@@ -73,9 +80,13 @@ public final class SpiceInputRouter {
     // MARK: - Mouse
 
     public func mouseButton(_ event: NSEvent, pressed: Bool) {
-        guard let input else { return }
+        guard let input else {
+            spiceInputLog("mouse button dropped (no input channel)")
+            return
+        }
         let b = Self.button(for: event.buttonNumber)
         if pressed { buttonMask.insert(b) } else { buttonMask.remove(b) }
+        spiceInputLog("mouse button \(event.buttonNumber) pressed=\(pressed)")
         input.sendMouseButton(b, mask: buttonMask, pressed: pressed)
     }
 
@@ -85,7 +96,9 @@ public final class SpiceInputRouter {
             input.sendMouseMotion(buttonMask,
                                   relativePoint: CGPoint(x: event.deltaX, y: event.deltaY))
         } else {
-            input.sendMousePosition(buttonMask, absolutePoint: absolutePoint(event, in: view))
+            let p = absolutePoint(event, in: view)
+            spiceInputLog("mouse move abs=(\(Int(p.x)),\(Int(p.y))) server=\(input.serverModeCursor)")
+            input.sendMousePosition(buttonMask, absolutePoint: p)
         }
     }
 

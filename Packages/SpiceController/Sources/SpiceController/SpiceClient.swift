@@ -153,6 +153,7 @@ extension SpiceClient: CSConnectionDelegate {
 
     public func spiceInputAvailable(_ connection: CSConnection, input: CSInput) {
         onMain {
+            spiceInputLog("spiceInputAvailable: inputs channel ready")
             self.primaryInput = input
             self.onInputAvailable?(input)
         }
