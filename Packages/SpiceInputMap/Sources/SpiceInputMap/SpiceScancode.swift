@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import Foundation
 
 /// Translates macOS virtual key codes (`NSEvent.keyCode`) to IBM PC **set-1**

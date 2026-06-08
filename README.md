@@ -175,10 +175,17 @@ against trusted VMs.
 
 ## Licensing
 
-- App code in this repo: see `LICENSE`.
-- `ThirdParty/CocoaSpice`: Apache-2.0 (vendored fork; `LICENSE` retained).
-- The native SPICE stack it links (glib/gstreamer/spice-gtk) is LGPL — honored by
-  dynamic linking; offer the object files if you redistribute a built app.
+- SpiceMac's own code: **MIT** (see [LICENSE](LICENSE)).
+- `ThirdParty/CocoaSpice`: **Apache-2.0** (vendored fork; `LICENSE` retained, changes in
+  [FORK-NOTES.md](ThirdParty/CocoaSpice/FORK-NOTES.md)).
+- The native SPICE stack (fetched at build time, bundled into a built `.app`) is mostly
+  **LGPL-2.1+** (glib/spice-gtk/gstreamer/libusb/usbredir/…), with **OpenSSL** (OpenSSL/
+  SSLeay) and **MIT/BSD** (pixman, opus, libffi, libjpeg-turbo). Full attribution +
+  the LGPL written offer: [THIRD-PARTY-LICENSES.txt](THIRD-PARTY-LICENSES.txt).
+- The GStreamer plugins are **statically** linked, so LGPL §6(a) (rebuildable open app
+  source) applies. The build bundles only the runtime closure — the upstream sysroot's
+  **GPL-2.0 QEMU** frameworks are *not* shipped. If you distribute a built `.app`, honor
+  the LGPL source/relink obligations above.
 
 ## Layout
 

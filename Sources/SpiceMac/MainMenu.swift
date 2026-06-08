@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import AppKit
 
 /// Builds the application main menu programmatically (no nib). Connection-specific

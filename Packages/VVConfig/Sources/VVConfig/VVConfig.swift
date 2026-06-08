@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import Foundation
 
 /// A parsed virt-viewer connection file (`.vv`), as emitted by Proxmox VE's

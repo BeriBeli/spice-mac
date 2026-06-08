@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import Foundation
 
 /// macOS hardware-independent virtual key codes (`kVK_*` from Carbon `HIToolbox`),

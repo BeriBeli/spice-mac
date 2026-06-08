@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import AppKit
 import Combine
 import CocoaSpice

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import Foundation
 
 /// The connection knobs a SPICE client needs, derived from a `VVConfig`.

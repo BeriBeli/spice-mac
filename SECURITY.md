@@ -76,5 +76,10 @@ gate any wider distribution.
 
 ## Reporting
 
-This is a personal/open-source project — open an issue, or for a real
-vulnerability contact the maintainer privately before public disclosure.
+This is a personal/open-source project. For a suspected vulnerability, please
+**report privately before public disclosure** via GitHub's
+[private vulnerability reporting](https://github.com/Ching367436/spice-mac/security/advisories/new)
+(Security ▸ Report a vulnerability), or contact the maintainer **Ching367436**
+through [GitHub](https://github.com/Ching367436). For non-sensitive bugs, open a
+regular issue. There is no formal SLA, but reports are reviewed as soon as
+practical. Please don't include a live `.vv` ticket/CA in any report.
