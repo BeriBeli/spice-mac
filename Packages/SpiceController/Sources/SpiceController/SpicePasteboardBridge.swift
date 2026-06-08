@@ -76,8 +76,11 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
     @objc(setData:forType:)
     public func setData(_ data: Data, for type: CSPasteboardType) {
         guard let nsType = Self.nsType(type) else { return }
-        // Assumes -clearContents was already sent for this guest→host update
-        // (CocoaSpice clears before pushing new contents).
+        // CocoaSpice's guest→host path does NOT clear the pasteboard first, and
+        // NSPasteboard.setData/forType: silently fails unless the pasteboard was
+        // cleared/prepared. So clear here. (Multi-type guest grabs keep the last
+        // type, which is fine for the common single-type case.)
+        pasteboard.clearContents()
         pasteboard.setData(data, forType: nsType)
         markSelfWrite()
     }
@@ -89,6 +92,7 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
 
     @objc(setString:)
     public func setString(_ string: String) {
+        pasteboard.clearContents()
         pasteboard.setString(string, forType: .string)
         markSelfWrite()
     }
