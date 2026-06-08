@@ -55,25 +55,71 @@ public final class SpiceInputRouter {
     // MARK: - Keyboard
 
     public func keyDown(_ event: NSEvent) {
+        // Recover any modifier that was released while we weren't getting events
+        // (e.g. a ⌘-combo the system intercepted) before sending the key.
+        reconcileModifiers(event.modifierFlags)
         // Auto-repeats are forwarded as additional presses, which the guest expects.
         sendKey(event.keyCode, pressed: true)
     }
 
     public func keyUp(_ event: NSEvent) {
+        reconcileModifiers(event.modifierFlags)
         sendKey(event.keyCode, pressed: false)
     }
 
-    /// macOS reports modifier presses/releases as `flagsChanged` without telling
-    /// us the direction, so we toggle on a held-set keyed by the modifier's
-    /// virtual key code (which distinguishes left/right modifiers).
+    /// macOS reports a modifier transition via `flagsChanged` but not its
+    /// direction. Rather than blind-toggle a held-set (which permanently inverts
+    /// after a single missed key-up — the classic stuck-⌘ bug), drive press/release
+    /// from the authoritative `event.modifierFlags`, then reconcile every other
+    /// held modifier so a stuck one self-corrects on the next event.
     public func flagsChanged(_ event: NSEvent) {
         let kc = event.keyCode
-        if heldModifiers.contains(kc) {
+        if let flag = Self.modifierFlag(for: kc) {
+            let isDown = event.modifierFlags.contains(flag)
+            if isDown && !heldModifiers.contains(kc) {
+                heldModifiers.insert(kc)
+                sendKey(kc, pressed: true)
+            } else if !isDown && heldModifiers.contains(kc) {
+                heldModifiers.remove(kc)
+                sendKey(kc, pressed: false)
+            }
+            // (isDown && held) or (!isDown && !held): no transition for this key.
+            // The rare shared-flag case (both L+R of a class) is handled by the
+            // reconcile below when the class flag finally clears.
+        } else {
+            // Non-hold modifier (e.g. Caps Lock): toggle.
+            if heldModifiers.contains(kc) {
+                heldModifiers.remove(kc); sendKey(kc, pressed: false)
+            } else {
+                heldModifiers.insert(kc); sendKey(kc, pressed: true)
+            }
+        }
+        reconcileModifiers(event.modifierFlags)
+    }
+
+    /// Release any held modifier whose macOS flag is no longer set — recovers from
+    /// a missed key-up so a modifier never stays "stuck down" on the guest.
+    private func reconcileModifiers(_ flags: NSEvent.ModifierFlags) {
+        let stuck = heldModifiers.filter { kc in
+            guard let flag = Self.modifierFlag(for: kc) else { return false }
+            return !flags.contains(flag)
+        }
+        for kc in stuck {
             heldModifiers.remove(kc)
             sendKey(kc, pressed: false)
-        } else {
-            heldModifiers.insert(kc)
-            sendKey(kc, pressed: true)
+        }
+    }
+
+    /// The device-independent modifier flag for a modifier key code, or nil for
+    /// keys that aren't a pressable modifier (Caps Lock is a lock, not a hold).
+    private static func modifierFlag(for keyCode: UInt16) -> NSEvent.ModifierFlags? {
+        switch keyCode {
+        case MacVirtualKey.command, MacVirtualKey.rightCommand:   return .command
+        case MacVirtualKey.shift, MacVirtualKey.rightShift:       return .shift
+        case MacVirtualKey.control, MacVirtualKey.rightControl:   return .control
+        case MacVirtualKey.option, MacVirtualKey.rightOption:     return .option
+        case MacVirtualKey.function:                              return .function
+        default:                                                  return nil
         }
     }
 
