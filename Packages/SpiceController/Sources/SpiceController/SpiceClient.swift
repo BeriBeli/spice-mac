@@ -42,6 +42,10 @@ public final class SpiceClient: NSObject, ObservableObject {
 
     private let parameters: SpiceConnectionParameters
     private let pasteboard: SpicePasteboardBridge
+    /// Whether a connection attempt has already been made. The Proxmox ticket is
+    /// single-use, so we never silently reconnect with the same parameters — the
+    /// user must open a fresh `.vv`.
+    private var didAttemptConnect = false
 
     public init(parameters: SpiceConnectionParameters,
                 pasteboard: SpicePasteboardBridge = SpicePasteboardBridge()) {
@@ -57,9 +61,16 @@ public final class SpiceClient: NSObject, ObservableObject {
 
     // MARK: - Lifecycle
 
-    /// Build the connection and start connecting. Safe to call once.
+    /// Build the connection and start connecting. Safe to call once; subsequent
+    /// calls are ignored (the SPICE ticket is single-use). Always runs on the main
+    /// queue so observable state is mutated there.
     public func connect() {
-        guard connection == nil else { return }
+        onMain { self.performConnect() }
+    }
+
+    private func performConnect() {
+        guard connection == nil, !didAttemptConnect else { return }
+        didAttemptConnect = true
 
         let main = CSMain.shared
         if !main.running {
@@ -108,7 +119,7 @@ public final class SpiceClient: NSObject, ObservableObject {
 
     /// Request disconnect. Final teardown is reported via `spiceDisconnected:`.
     public func disconnect() {
-        connection?.disconnect()
+        onMain { self.connection?.disconnect() }
     }
 
     private func onMain(_ work: @escaping () -> Void) {

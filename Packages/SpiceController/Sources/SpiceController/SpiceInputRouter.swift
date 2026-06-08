@@ -52,9 +52,19 @@ public final class SpiceInputRouter {
         input.sendKey(pressed ? .press : .release, code: Int32(code))
     }
 
-    /// Release any keys/modifiers we believe are held (call on focus loss).
+    /// Release everything we believe is held — keys, modifiers, and mouse buttons.
+    /// Call on focus loss so a modifier/button held during Cmd-Tab or click-away
+    /// does not stay latched in the guest (and does not desync on return).
     public func releaseAll() {
-        input?.releaseKeys()
+        if let input {
+            // releaseKeys() flushes keyboard/modifier keys, but NOT mouse buttons,
+            // so release any latched buttons explicitly first.
+            for b in [CSInputButton.left, .right, .middle, .side, .extra] where buttonMask.contains(b) {
+                buttonMask.remove(b)
+                input.sendMouseButton(b, mask: buttonMask, pressed: false)
+            }
+            input.releaseKeys()
+        }
         heldModifiers.removeAll()
         buttonMask = []
     }
@@ -83,9 +93,12 @@ public final class SpiceInputRouter {
         let dy = event.scrollingDeltaY
         if event.hasPreciseScrollingDeltas {
             input.sendMouseScroll(.smooth, buttonMask: buttonMask, dy: dy)
-        } else if dy > 0 {
-            input.sendMouseScroll(.up, buttonMask: buttonMask, dy: 0)
         } else if dy < 0 {
+            // Match the smooth path's sign convention (CSInput maps negative dy to
+            // scroll-up, positive to scroll-down) so a wheel and a trackpad send the
+            // same guest direction for the same physical gesture.
+            input.sendMouseScroll(.up, buttonMask: buttonMask, dy: 0)
+        } else if dy > 0 {
             input.sendMouseScroll(.down, buttonMask: buttonMask, dy: 0)
         }
     }
@@ -97,15 +110,21 @@ public final class SpiceInputRouter {
 
     // MARK: - Helpers
 
+    /// Map a view-local event location to integer guest pixels. Assumes the
+    /// rendered framebuffer fills `view.bounds` (no aspect-fit letterboxing).
     private func absolutePoint(_ event: NSEvent, in view: NSView) -> CGPoint {
         let local = view.convert(event.locationInWindow, from: nil)
         let bounds = view.bounds
-        guard bounds.width > 0, bounds.height > 0 else { return .zero }
         let size = displaySizeProvider?() ?? bounds.size
+        guard bounds.width > 0, bounds.height > 0, size.width > 0, size.height > 0 else { return .zero }
         // AppKit's origin is bottom-left; the SPICE guest framebuffer is top-left.
         let nx = max(0, min(1, local.x / bounds.width))
         let ny = max(0, min(1, 1.0 - local.y / bounds.height))
-        return CGPoint(x: nx * size.width, y: ny * size.height)
+        // spice_inputs_channel_position takes integer pixels; floor and clamp to
+        // the last valid column/row so the far edge does not overshoot by one.
+        let px = min(size.width - 1, (nx * size.width).rounded(.down))
+        let py = min(size.height - 1, (ny * size.height).rounded(.down))
+        return CGPoint(x: max(0, px), y: max(0, py))
     }
 
     private static func button(for buttonNumber: Int) -> CSInputButton {

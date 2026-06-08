@@ -108,7 +108,8 @@ final class SpiceWindowController: NSWindowController, NSWindowDelegate {
             client.usbManager?.delegate = self
             refreshUSBMenu()
         case .disconnected:
-            showStatus("Disconnected.")
+            // The SPICE ticket is single-use, so reconnecting needs a fresh file.
+            showStatus("Disconnected.\nOpen a fresh .vv file to reconnect.")
         case .failed(let message):
             showStatus("Connection failed.\n\(message)")
         }
@@ -143,7 +144,9 @@ final class SpiceWindowController: NSWindowController, NSWindowDelegate {
 
     private func requestResolutionForCurrentSize() {
         guard client.supportsDynamicResolution, let display = displayView.attachedDisplay else { return }
-        display.requestResolution(displayView.bounds)
+        // requestResolution expects guest pixels; convert points→backing pixels so
+        // Retina displays request full resolution rather than half.
+        display.requestResolution(displayView.convertToBacking(displayView.bounds))
     }
 
     func windowDidResize(_ notification: Notification) {
@@ -157,7 +160,14 @@ final class SpiceWindowController: NSWindowController, NSWindowDelegate {
         refreshUSBMenu()
     }
 
+    func windowDidResignKey(_ notification: Notification) {
+        // Release any held input so it does not stay latched in the guest when the
+        // user switches away.
+        displayView.router.releaseAll()
+    }
+
     func windowWillClose(_ notification: Notification) {
+        displayView.router.releaseAll()
         client.disconnect()
         displayView.detach()
         onClose?()
@@ -211,7 +221,9 @@ final class SpiceWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func refreshUSBMenu() {
-        guard let menu = MainMenu.usbSubmenu else { return }
+        // The USB submenu is shared app-wide; only the key window owns it, so
+        // background windows' USB delegate callbacks don't retarget its items.
+        guard window?.isKeyWindow == true, let menu = MainMenu.usbSubmenu else { return }
         menu.removeAllItems()
         guard let usb = client.usbManager else {
             menu.addItem(disabledItem("Not connected"))

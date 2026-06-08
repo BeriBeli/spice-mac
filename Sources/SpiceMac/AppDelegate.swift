@@ -39,8 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.allowedContentTypes = VVDocument.contentTypes
-        panel.allowedFileTypes = ["vv"] // fallback for older systems
+        let types = VVDocument.contentTypes
+        if !types.isEmpty { panel.allowedContentTypes = types }
         panel.prompt = "Open"
         panel.message = "Open a Proxmox SPICE connection file (.vv)"
         if panel.runModal() == .OK, let url = panel.url {

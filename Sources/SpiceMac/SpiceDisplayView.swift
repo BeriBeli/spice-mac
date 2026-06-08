@@ -65,6 +65,13 @@ final class SpiceDisplayView: MTKView {
     override func becomeFirstResponder() -> Bool { true }
     override var canBecomeKeyView: Bool { true }
 
+    override func resignFirstResponder() -> Bool {
+        // Flush held keys/modifiers/buttons so nothing stays latched in the guest
+        // when focus leaves (e.g. Cmd-Tab); also avoids the on-return modifier desync.
+        router.releaseAll()
+        return super.resignFirstResponder()
+    }
+
     override func keyDown(with event: NSEvent) { router.keyDown(event) }
     override func keyUp(with event: NSEvent) { router.keyUp(event) }
     override func flagsChanged(with event: NSEvent) { router.flagsChanged(event) }

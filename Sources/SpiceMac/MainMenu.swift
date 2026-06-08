@@ -57,7 +57,6 @@ enum MainMenu {
         let usbItem = NSMenuItem(title: "USB Devices", action: nil, keyEquivalent: "")
         let usbMenu = NSMenu(title: "USB Devices")
         usbItem.submenu = usbMenu
-        usbItem.tag = usbMenuTag
         usbSubmenu = usbMenu
         connMenu.addItem(usbItem)
 
@@ -81,9 +80,6 @@ enum MainMenu {
 
         return mainMenu
     }
-
-    /// Tag used to find the USB submenu item so the window controller can refresh it.
-    static let usbMenuTag = 7001
 
     /// The USB submenu, populated dynamically by the front `SpiceWindowController`.
     static weak var usbSubmenu: NSMenu?
