@@ -112,7 +112,7 @@ adds exactly one method, `-[CSConnection setProxy:ca:certSubject:]`
 
 ```sh
 # 1. Stage the native SPICE frameworks (arm64). No args, no GitHub auth — fetches
-#    the pinned, checksummed sysroot from this repo's releases (OpenSSL already 1.1.1w).
+#    the pinned, checksummed sysroot from this repo's releases (OpenSSL already 3.5.6 LTS).
 ./scripts/fetch-sysroot.sh
 
 # 2. Build and assemble SpiceMac.app
@@ -129,7 +129,7 @@ spice-client-glib, libusb, …). `scripts/fetch-sysroot.sh` stages them. By defa
 downloads a **pinned, SHA-256-checksummed** tarball published on this repo's
 [releases](https://github.com/Ching367436/spice-mac/releases/tag/sysroot-arm64-v1) —
 the 26-framework + 19-plugin build/runtime closure (LGPL/MIT/BSD/OpenSSL only, **no
-GPL**, OpenSSL already 1.1.1w). So a fresh clone builds with no extra setup, and the
+GPL**, OpenSSL already 3.5.6 LTS). So a fresh clone builds with no extra setup, and the
 script fails closed on a checksum mismatch.
 
 Alternatives (rarely needed):
@@ -137,7 +137,7 @@ Alternatives (rarely needed):
 - **Your own tarball:** set `SPICEMAC_SYSROOT_URL` (+ `SPICEMAC_SYSROOT_SHA256`).
 - **A fresh UTM CI build:** `SPICEMAC_SYSROOT_FROM_GH=1 ./scripts/fetch-sysroot.sh`
   (needs `gh auth login`; UTM artifacts expire ~90 days). That sysroot ships the EOL
-  OpenSSL 1.1.1b, so follow it with `./scripts/upgrade-openssl.sh` (→ 1.1.1w; see
+  OpenSSL 1.1.1b, so follow it with `./scripts/upgrade-openssl.sh` (→ 3.5.6 LTS; see
   [SECURITY.md](SECURITY.md)).
 - **From source:** UTM's `scripts/build_dependencies.sh -p macos -a arm64` +
   `pack_dependencies.sh`.
@@ -187,8 +187,10 @@ glib/spice headers (`clang -fsyntax-only`, exit 0).
   `ich9-intel-hda`, backend **SPICE**) and reboot the guest.
 - **`pveproxy` gating.** `/etc/default/pveproxy` `ALLOW_FROM`/cipher rules can
   reset port 3128 even with a valid ticket.
-- **EOL deps.** UTM sysroots pin older libraries (e.g. OpenSSL 1.1.1b); acceptable
-  for personal use, but they carry their own CVEs.
+- **Older deps.** The pinned sysroot ships **OpenSSL 3.5.6 (LTS)**, but the rest of
+  the stack (spice-gtk, glib, gstreamer) is still the older UTM build; acceptable for
+  personal use, but it carries its own CVEs. (A raw UTM sysroot still has OpenSSL
+  1.1.1b — run `upgrade-openssl.sh`.)
 
 ## USB redirection
 
@@ -219,12 +221,11 @@ many JTAG/printer dongles) redirect **without root** — check with
 ## Security
 
 See [SECURITY.md](SECURITY.md). In short: the app code is sound (no RCE/memory-
-corruption; TLS fails closed). The bundled **OpenSSL is upgraded to 1.1.1w**
-(`scripts/upgrade-openssl.sh`, fixes CVE-2022-0778), though the rest of the native
-stack is still old and should be refreshed (OpenSSL 3.x) before wider
-distribution. Clipboard sharing is on by default (toggle in the Connection menu),
-and `run-as-root.sh` runs the whole parser surface as root — fine for personal use
-against trusted VMs.
+corruption; TLS fails closed). The bundled **OpenSSL is 3.5.6 (LTS, maintained to
+2030)** — the server-facing TLS stack is current — though the rest of the native
+stack (spice-gtk/glib/gstreamer) is still the older UTM build. Clipboard sharing is
+on by default (toggle in the Connection menu), and `run-as-root.sh` runs the whole
+parser surface as root — fine for personal use against trusted VMs.
 
 ## Sponsoring
 

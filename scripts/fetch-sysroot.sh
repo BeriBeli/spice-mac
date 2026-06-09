@@ -15,7 +15,7 @@
 #      $SPICEMAC_SYSROOT_SHA256 to verify it).
 #   2) DEFAULT (no env needed): the pinned, checksummed sysroot published on this
 #      repo's releases (DEFAULT_SYSROOT_URL below) — the 26-framework + 19-plugin
-#      build/runtime closure, OpenSSL already 1.1.1w, no GPL. This is what makes a
+#      build/runtime closure, OpenSSL already 3.5.6 (LTS), no GPL. This is what makes a
 #      fresh clone build without `gh`/UTM. Re-pin: upload a new tarball, bump
 #      DEFAULT_SYSROOT_URL/_SHA256.
 #   3) $SPICEMAC_SYSROOT_FROM_GH=1 — gh download of a fresh UTM CI
@@ -33,9 +33,9 @@ UTM_REPO="${SPICEMAC_UTM_REPO:-utmapp/UTM}"
 SYSROOT_ARTIFACT="${SPICEMAC_SYSROOT_ARTIFACT:-Sysroot-macos-arm64}"
 
 # Pinned default sysroot (this repo's release). The 26-framework + 19-plugin
-# closure SpiceMac links/embeds; LGPL/MIT/BSD/OpenSSL only (no GPL); OpenSSL 1.1.1w.
-DEFAULT_SYSROOT_URL="https://github.com/Ching367436/spice-mac/releases/download/sysroot-arm64-v1/spice-sysroot-macos-arm64.tgz"
-DEFAULT_SYSROOT_SHA256="381f76f686c47e99bd347cd086b24096deae4e5d613d0ad1571fab8257f0f4d8"
+# closure SpiceMac links/embeds; LGPL/MIT/BSD/OpenSSL only (no GPL); OpenSSL 3.5.6 (LTS).
+DEFAULT_SYSROOT_URL="https://github.com/Ching367436/spice-mac/releases/download/sysroot-arm64-v2/spice-sysroot-macos-arm64.tgz"
+DEFAULT_SYSROOT_SHA256="a7435e48731861b6babc6ea7804b9bdc801c7e03e808b460492cb6fab299d03f"
 
 # Static GStreamer plugin archives CocoaSpice registers — must match Package.swift.
 GST_PLUGINS=(adder app audioconvert audiorate audioresample audiotestsrc autodetect

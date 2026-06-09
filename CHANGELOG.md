@@ -6,6 +6,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.6] — 2026-06-09
+
+### Security
+
+- **OpenSSL upgraded to 3.5.6 (LTS, maintained to 2030)**, retiring the EOL 1.1.1
+  branch — the server-facing TLS stack is now current. It's built under the old
+  `ssl.1.1`/`crypto.1.1` install names so spice-gtk (compiled against 1.1.1) loads it
+  unchanged, and `upgrade-openssl.sh` verifies all ~72 of spice-gtk's OpenSSL symbols
+  resolve in 3.x before swapping (then a real TLS connection was confirmed). The
+  pinned default sysroot (`sysroot-arm64-v2`) ships 3.5.6, so a fresh clone is current
+  with no extra step.
+
 ## [0.1.5] — 2026-06-09
 
 ### Changed
@@ -142,7 +154,8 @@ CocoaSpice.
   QEMU frameworks are no longer shipped (app size 443 MB → 23 MB).
 - See [SECURITY.md](SECURITY.md) for the threat model and residual risks.
 
-[Unreleased]: https://github.com/Ching367436/spice-mac/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/Ching367436/spice-mac/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/Ching367436/spice-mac/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/Ching367436/spice-mac/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/Ching367436/spice-mac/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/Ching367436/spice-mac/compare/v0.1.2...v0.1.3

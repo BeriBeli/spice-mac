@@ -44,22 +44,27 @@ gate any wider distribution.
 - **Mandatory sysroot integrity** — `fetch-sysroot.sh` downloads a **pinned,
   SHA-256-checksummed** sysroot by default and refuses any URL download whose digest
   doesn't match (a custom `SPICEMAC_SYSROOT_URL` still requires `SPICEMAC_SYSROOT_SHA256`).
-- **OpenSSL upgraded 1.1.1b → 1.1.1w** — `scripts/upgrade-openssl.sh` builds the
-  final 1.1.1 release from (SHA-256-verified) source and drops it into
-  `Frameworks/` (ABI-compatible; no spice-gtk rebuild). This fixes the reachable
-  **CVE-2022-0778** handshake DoS and every other 1.1.1 CVE through Sept 2023.
+- **OpenSSL upgraded to 3.5.6 (LTS, maintained to 2030)** — `scripts/upgrade-openssl.sh`
+  builds OpenSSL 3.5 from (SHA-256-verified) source and installs it under the old
+  `ssl.1.1`/`crypto.1.1` names (a "masquerade"), so spice-gtk — compiled against
+  1.1.1 — loads it without a rebuild. Safe here because all ~72 OpenSSL symbols
+  spice-client-glib imports are stable public-API functions present in 3.x (no data
+  symbols; spice-gtk uses opaque pointers), and the script **verifies every one
+  resolves** before swapping. This retires the EOL 1.1.1 branch entirely (previously
+  1.1.1w, which only fixed CVE-2022-0778 up to its EOL). The pinned default sysroot
+  ships 3.5.6, so a fresh build is current without the extra step.
 
 ## Residual risks (not fixed in code)
 
-1. **EOL native stack.** The bundled UTM sysroot still ships spice-gtk 0.42, glib,
-   gstreamer 1.19.1, usbredir — and the OpenSSL **1.1.1** branch (now 1.1.1w via
-   `scripts/upgrade-openssl.sh`). The known reachable **CVE-2022-0778** handshake
-   DoS is **fixed** by the 1.1.1w upgrade, but 1.1.1 is itself EOL (no *future*
-   fixes), and the rest of the stack is old and is the parser for all
-   hostile-server data — where any future server-reachable memory-safety bug would
-   land. **Action (for wider distribution):** rebuild the sysroot against a
-   supported **OpenSSL 3.x** (requires rebuilding spice-gtk) with current
-   glib/gstreamer/usbredir, pin the versions + SHA256.
+1. **Older native stack (OpenSSL now current).** **OpenSSL is on the supported
+   3.5 LTS branch** (maintained to 2030) — the server-facing TLS stack, the most
+   exposed component, is no longer EOL. The rest of the bundled UTM sysroot is still
+   old: spice-gtk 0.42, glib ~2.69, gstreamer 1.19.1, usbredir. These parse all
+   hostile-server data, so any future server-reachable memory-safety bug there would
+   land unpatched. **Action (for wider distribution):** refresh the sysroot to a
+   newer UTM build (current spice-gtk/glib/gstreamer/usbredir), pin the versions +
+   SHA256. (OpenSSL 3.5 is delivered via the masquerade in `upgrade-openssl.sh` and
+   baked into the pinned sysroot — no spice-gtk rebuild needed for that part.)
 
 2. **Running as root for USB.** `scripts/run-as-root.sh` runs the *entire* app —
    including the SPICE/TLS/glib/gstreamer/clipboard/agent parsers that consume
