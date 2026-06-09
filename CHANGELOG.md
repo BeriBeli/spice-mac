@@ -6,6 +6,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+
+- **Hardened the `.vv` parser** (the one attacker-influenced file the app opens):
+  a **1 MiB file-size cap** + UTF-8 enforcement in `VVConfig(contentsOf:)`,
+  **control-character stripping** from values (a `NUL` in `host`/`proxy` would
+  otherwise survive Swift validation but truncate inside the C SPICE stack — a
+  smuggle), **port-range validation** (only 1–65535; junk/negative/overflow become
+  "absent"), and leading-BOM tolerance. Added a deterministic **20k-iteration
+  fuzzer** + edge-case tests (`vvcheck`, now 24 checks) proving the parser never
+  crashes on arbitrary input.
+
 ## [0.1.6] — 2026-06-09
 
 ### Security

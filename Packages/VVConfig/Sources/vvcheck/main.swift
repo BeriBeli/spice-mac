@@ -20,6 +20,18 @@ tls-port=61000
 ca=-----BEGIN CERTIFICATE-----\\nMIIDsampleBase64Line1\\nMIIDsampleBase64Line2\\n-----END CERTIFICATE-----\\n
 """
 
+/// Deterministic PRNG (xorshift64*) so the fuzzer is reproducible — a failing input
+/// can be reproduced by re-running, unlike a system RNG.
+struct SeededRNG: RandomNumberGenerator {
+    private var state: UInt64
+    init(seed: UInt64) { state = seed == 0 ? 0x9E37_79B9_7F4A_7C15 : seed }
+    mutating func next() -> UInt64 {
+        state ^= state >> 12; state ^= state << 25; state ^= state >> 27
+        return state &* 0x2545_F491_4F6C_DD1D
+    }
+    mutating func int(_ upper: Int) -> Int { upper <= 0 ? 0 : Int(next() % UInt64(upper)) }
+}
+
 let t = TestRunner()
 print("VVConfig checks")
 
@@ -164,6 +176,117 @@ t.test("missing host throws .missingHost") {
 t.test("raw preserves unknown/future keys") {
     let cfg = try VVConfig.parse("[virt-viewer]\ntype=spice\nhost=x\nport=5900\nsome-future-key=42\n")
     t.expectEqual(cfg.raw["some-future-key"], "42")
+}
+
+// MARK: - Hardening (the .vv is an attacker-influenced file)
+
+t.test("ports outside 1…65535 (or junk) become nil, not a bogus port") {
+    for bad in ["0", "-1", "65536", "70000", "abc", "5900x", "99999999999999999999", " "] {
+        let cfg = try VVConfig.parse("[virt-viewer]\ntype=spice\nhost=x\nport=\(bad)\ntls-port=\(bad)\n")
+        t.expectNil(cfg.port)
+        t.expectNil(cfg.tlsPort)
+    }
+    for (s, n) in [("1", 1), ("65535", 65535), ("5900", 5900)] {
+        let cfg = try VVConfig.parse("[virt-viewer]\ntype=spice\nhost=x\nport=\(s)\n")
+        t.expectEqual(cfg.port, n)
+    }
+    // An out-of-range port with no tls-port is therefore "no port" → missingPort.
+    let cfg = try VVConfig.parse("[virt-viewer]\ntype=spice\nhost=x\nport=70000\n")
+    t.expectThrows(VVConfigError.missingPort) { try cfg.validate() }
+}
+
+t.test("control characters (incl. NUL) are stripped from values — no C-string smuggle") {
+    let cfg = try VVConfig.parse("[virt-viewer]\ntype=spice\nhost=good\u{0}evil.example\nport=5900\n")
+    let h = try t.unwrap(cfg.host)
+    t.expect(!h.unicodeScalars.contains("\u{0}"), "NUL must be stripped")
+    // Swift and the C SPICE stack now see the SAME string (no value before the NUL).
+    t.expectEqual(h, "goodevil.example")
+    let cfg2 = try VVConfig.parse("[virt-viewer]\ntype=spice\nhost=x\nport=5900\npassword=a\u{1}\u{7F}\u{9F}b\n")
+    t.expectEqual(cfg2.password, "ab")
+}
+
+t.test("a leading UTF-8 BOM does not hide the [virt-viewer] section") {
+    let cfg = try VVConfig.parse("\u{FEFF}[virt-viewer]\ntype=spice\nhost=bom.example\nport=5900\n")
+    t.expectEqual(cfg.host, "bom.example")
+}
+
+t.test("empty / whitespace / section-only inputs throw missingGroup, never crash") {
+    for s in ["", "   ", "\n\n\n", "# only a comment\n", "[virt-viewer]\n",
+              "[virt-viewer]\n# only comments\n", "[other]\nhost=x\n", "\u{FEFF}"] {
+        t.expectThrows(VVConfigError.missingGroup) { _ = try VVConfig.parse(s) }
+    }
+}
+
+t.test("malformed headers and key/value lines don't crash; '=' handling is correct") {
+    for s in ["[]\nhost=x\n", "[\nhost=x\n", "]\nhost=x\n", "[[]]\n=\n=v\nk=\n",
+              "[virt-viewer]\n===\nhost=a=b=c\nport=5900\n"] {
+        _ = try? VVConfig.parse(s)   // must not crash; result irrelevant
+    }
+    let cfg = try VVConfig.parse("[virt-viewer]\ntype=spice\nhost=a=b=c\nport=5900\nempty=\n")
+    t.expectEqual(cfg.host, "a=b=c")          // split on the FIRST '=' only
+    t.expectEqual(cfg.raw["empty"], "")       // empty value kept
+}
+
+t.test("duplicate keys: last value wins") {
+    let cfg = try VVConfig.parse("[virt-viewer]\ntype=spice\nhost=first\nhost=second\nport=5900\n")
+    t.expectEqual(cfg.host, "second")
+}
+
+t.test("a very long value within the size cap does not crash") {
+    let big = String(repeating: "A", count: 200_000)
+    let cfg = try VVConfig.parse("[virt-viewer]\ntype=spice\nhost=\(big)\nport=5900\n")
+    t.expectEqual(cfg.host?.count, 200_000)
+}
+
+t.test("init(contentsOf:) caps file size, rejects non-UTF-8, and parses a normal file") {
+    let dir = FileManager.default.temporaryDirectory
+    let big = dir.appendingPathComponent("vv-big-\(UUID().uuidString).vv")
+    let bin = dir.appendingPathComponent("vv-bin-\(UUID().uuidString).vv")
+    let ok  = dir.appendingPathComponent("vv-ok-\(UUID().uuidString).vv")
+    defer { for u in [big, bin, ok] { try? FileManager.default.removeItem(at: u) } }
+
+    try String(repeating: "x", count: VVConfig.maxFileBytes + 4096).write(to: big, atomically: true, encoding: .utf8)
+    t.expectThrows(VVConfigError.fileTooLarge) { _ = try VVConfig(contentsOf: big) }
+
+    try Data([0xFF, 0xFE, 0x00, 0x80, 0x81]).write(to: bin)   // invalid UTF-8
+    t.expectThrows(VVConfigError.notUTF8) { _ = try VVConfig(contentsOf: bin) }
+
+    try proxmoxSample.write(to: ok, atomically: true, encoding: .utf8)
+    let cfg = try VVConfig(contentsOf: ok)
+    t.expectEqual(cfg.tlsPort, 61000)
+}
+
+t.test("fuzz: 20k arbitrary/mutated inputs never crash the parser or downstream") {
+    var rng = SeededRNG(seed: 0x5C0FFEE_C0FFEE)
+    let alphabet = Array("[]=\n\r#;: .\\\t/=abcDEF012-_pvespiceproxy host port tls ca\u{0}\u{1}\u{7F}éあ🔒")
+    let valid = Array(proxmoxSample)
+    for i in 0..<20_000 {
+        let s: String
+        if i % 3 == 0 {                              // random soup
+            var soup = ""
+            for _ in 0..<rng.int(220) { soup.append(alphabet[rng.int(alphabet.count)]) }
+            s = soup
+        } else {                                     // mutate a real Proxmox file
+            var chars = valid
+            for _ in 0..<(1 + rng.int(8)) where !chars.isEmpty {
+                let idx = rng.int(chars.count)
+                switch rng.int(3) {
+                case 0: chars.remove(at: idx)
+                case 1: chars.insert(alphabet[rng.int(alphabet.count)], at: idx)
+                default: chars[idx] = alphabet[rng.int(alphabet.count)]
+                }
+            }
+            s = String(chars)
+        }
+        // Crashing (fatalError / force-unwrap / out-of-bounds) would abort the process
+        // and this test would never report — so reaching the end IS the assertion.
+        if let cfg = try? VVConfig.parse(s) {
+            _ = cfg.isProxmox
+            try? cfg.validate()
+            _ = try? SpiceConnectionParameters(from: cfg)
+        }
+    }
+    t.expect(true, "completed 20k fuzz iterations without crashing")
 }
 
 t.finishAndExit()

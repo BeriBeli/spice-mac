@@ -92,6 +92,10 @@ public enum VVConfigError: Error, Equatable, CustomStringConvertible {
     case missingPort
     /// No `host` value was present.
     case missingHost
+    /// The file is larger than `VVConfig.maxFileBytes` — almost certainly not a `.vv`.
+    case fileTooLarge
+    /// The file is not valid UTF-8 text.
+    case notUTF8
 
     public var description: String {
         switch self {
@@ -103,6 +107,10 @@ public enum VVConfigError: Error, Equatable, CustomStringConvertible {
             return "Connection file has neither 'tls-port' nor 'port'."
         case .missingHost:
             return "Connection file is missing 'host'."
+        case .fileTooLarge:
+            return "Connection file is too large to be a .vv (over \(VVConfig.maxFileBytes / 1024) KiB)."
+        case .notUTF8:
+            return "Connection file is not valid UTF-8 text."
         }
     }
 }
@@ -110,6 +118,10 @@ public enum VVConfigError: Error, Equatable, CustomStringConvertible {
 extension VVConfig {
     /// The INI group virt-viewer files use.
     static let groupName = "virt-viewer"
+
+    /// Largest `.vv` we'll read from disk. Real files are a few KB; anything past
+    /// this is malformed or hostile, so we reject it rather than read it into memory.
+    public static let maxFileBytes = 1 << 20  // 1 MiB
 
     /// Parse `.vv` text. Tolerant of the quirks real Proxmox files exhibit:
     /// CRLF line endings, `#`/`;` comments, blank lines, surrounding whitespace,
@@ -119,10 +131,13 @@ extension VVConfig {
         var raw: [String: String] = [:]
         var inGroup = false
 
-        // Normalize line endings first. NB: Swift treats "\r\n" as a single grapheme
-        // cluster, so splitting on the Character "\n" would NOT split a CRLF file —
-        // collapse CRLF and lone CR to LF before splitting.
-        let normalized = text
+        // Drop a leading UTF-8 BOM (some editors add one) so it doesn't hide the
+        // first `[virt-viewer]` header, then normalize line endings. NB: Swift treats
+        // "\r\n" as a single grapheme cluster, so splitting on the Character "\n"
+        // would NOT split a CRLF file — collapse CRLF and lone CR to LF before splitting.
+        var stripped = text
+        if stripped.hasPrefix("\u{FEFF}") { stripped.removeFirst() }
+        let normalized = stripped
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
 
@@ -143,10 +158,13 @@ extension VVConfig {
 
             guard inGroup else { continue }
 
-            // key=value — split on the FIRST '=' only.
+            // key=value — split on the FIRST '=' only. Strip control characters from
+            // both: a NUL in a value would survive Swift checks but TRUNCATE the
+            // string when handed to the C SPICE stack (g_object_set), letting a
+            // crafted `host=good\0evil` smuggle a different target past validation.
             guard let eq = trimmed.firstIndex(of: "=") else { continue }
-            let key = trimmed[trimmed.startIndex..<eq].trimmingCharacters(in: .whitespaces).lowercased()
-            let value = String(trimmed[trimmed.index(after: eq)...]).trimmingCharacters(in: .whitespaces)
+            let key = stripControlCharacters(trimmed[trimmed.startIndex..<eq].trimmingCharacters(in: .whitespaces)).lowercased()
+            let value = stripControlCharacters(String(trimmed[trimmed.index(after: eq)...]).trimmingCharacters(in: .whitespaces))
             if key.isEmpty { continue }
             raw[key] = value
         }
@@ -160,8 +178,8 @@ extension VVConfig {
         var cfg = VVConfig(raw: raw)
         cfg.type = raw["type"]
         cfg.host = raw["host"]
-        cfg.port = raw["port"].flatMap { Int($0) }
-        cfg.tlsPort = raw["tls-port"].flatMap { Int($0) }
+        cfg.port = parsePort(raw["port"])
+        cfg.tlsPort = parsePort(raw["tls-port"])
         cfg.password = raw["password"]
         cfg.hostSubject = raw["host-subject"]
         cfg.caCertificate = raw["ca"].map(expandEscapedNewlines)
@@ -175,10 +193,32 @@ extension VVConfig {
         return cfg
     }
 
-    /// Parse a `.vv` file from disk.
+    /// Parse a `.vv` file from disk. Reads at most `maxFileBytes` so a hostile or
+    /// accidental huge file can't exhaust memory, and rejects non-UTF-8 input.
     public init(contentsOf url: URL) throws {
-        let text = try String(contentsOf: url, encoding: .utf8)
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        // Read one byte past the cap: if we get more than the cap, it's too large.
+        let data = (try handle.read(upToCount: VVConfig.maxFileBytes + 1)) ?? Data()
+        guard data.count <= VVConfig.maxFileBytes else { throw VVConfigError.fileTooLarge }
+        guard let text = String(data: data, encoding: .utf8) else { throw VVConfigError.notUTF8 }
         self = try VVConfig.parse(text)
+    }
+
+    /// Remove control characters (NUL, other C0/C1, DEL) from a parsed token. They
+    /// have no legitimate place in a `.vv` field and NUL in particular would truncate
+    /// the value inside the C SPICE stack.
+    static func stripControlCharacters(_ s: String) -> String {
+        guard s.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { return s }
+        return String(String.UnicodeScalarView(s.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) }))
+    }
+
+    /// Parse a TCP port, accepting only the valid range 1…65535. Out-of-range,
+    /// negative, zero, or non-numeric values become `nil` (treated as absent) rather
+    /// than flowing downstream as a bogus port.
+    static func parsePort(_ s: String?) -> Int? {
+        guard let s, let n = Int(s), (1...65535).contains(n) else { return nil }
+        return n
     }
 
     /// Validate that this config is a usable SPICE connection. Throws a

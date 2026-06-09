@@ -41,6 +41,11 @@ gate any wider distribution.
   default on) so it can be disabled for untrusted VMs.
 - **TLS fail-closed guard** — refuse to connect if a `.vv` requests
   certificate-subject verification but supplies no CA.
+- **Hardened `.vv` parser** — the connection file is attacker-influenced, so the
+  parser caps file size (1 MiB) + enforces UTF-8, strips control characters from
+  values (a `NUL` would otherwise truncate the value inside the C SPICE stack),
+  and range-checks ports. A deterministic 20k-iteration fuzzer + edge-case tests
+  (`swift run vvcheck`) assert it never crashes on arbitrary input.
 - **Mandatory sysroot integrity** — `fetch-sysroot.sh` downloads a **pinned,
   SHA-256-checksummed** sysroot by default and refuses any URL download whose digest
   doesn't match (a custom `SPICEMAC_SYSROOT_URL` still requires `SPICEMAC_SYSROOT_SHA256`).
