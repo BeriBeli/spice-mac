@@ -11,11 +11,16 @@
 # CocoaSpice's gst_ios_init.m registers.
 #
 # Sources, in order of preference:
-#   1) $SPICEMAC_SYSROOT_URL  — direct URL to a (re-hosted, pinned) sysroot tarball.
-#      Set $SPICEMAC_SYSROOT_SHA256 to verify it.
-#   2) gh download of a UTM CI "Sysroot-macos-arm64" artifact (needs `gh auth login`;
-#      artifacts expire, so pin/re-host one for reproducibility). Override the
-#      artifact id with $SPICEMAC_SYSROOT_ARTIFACT_ID, else the latest by name.
+#   1) $SPICEMAC_SYSROOT_URL — direct URL to a sysroot tarball (set
+#      $SPICEMAC_SYSROOT_SHA256 to verify it).
+#   2) DEFAULT (no env needed): the pinned, checksummed sysroot published on this
+#      repo's releases (DEFAULT_SYSROOT_URL below) — the 26-framework + 19-plugin
+#      build/runtime closure, OpenSSL already 1.1.1w, no GPL. This is what makes a
+#      fresh clone build without `gh`/UTM. Re-pin: upload a new tarball, bump
+#      DEFAULT_SYSROOT_URL/_SHA256.
+#   3) $SPICEMAC_SYSROOT_FROM_GH=1 — gh download of a fresh UTM CI
+#      "Sysroot-macos-arm64" artifact (needs `gh auth login`; artifacts expire).
+#      Override the id with $SPICEMAC_SYSROOT_ARTIFACT_ID, else latest by name.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -26,6 +31,11 @@ trap 'rm -rf "$WORK"' EXIT
 
 UTM_REPO="${SPICEMAC_UTM_REPO:-utmapp/UTM}"
 SYSROOT_ARTIFACT="${SPICEMAC_SYSROOT_ARTIFACT:-Sysroot-macos-arm64}"
+
+# Pinned default sysroot (this repo's release). The 26-framework + 19-plugin
+# closure SpiceMac links/embeds; LGPL/MIT/BSD/OpenSSL only (no GPL); OpenSSL 1.1.1w.
+DEFAULT_SYSROOT_URL="https://github.com/Ching367436/spice-mac/releases/download/sysroot-arm64-v1/spice-sysroot-macos-arm64.tgz"
+DEFAULT_SYSROOT_SHA256="381f76f686c47e99bd347cd086b24096deae4e5d613d0ad1571fab8257f0f4d8"
 
 # Static GStreamer plugin archives CocoaSpice registers — must match Package.swift.
 GST_PLUGINS=(adder app audioconvert audiorate audioresample audiotestsrc autodetect
@@ -113,7 +123,15 @@ from_gh() {
 
 main() {
     log "target: $FRAMEWORKS_DIR (arm64)"
-    if [ -n "${SPICEMAC_SYSROOT_URL:-}" ]; then from_url "$SPICEMAC_SYSROOT_URL"; else from_gh; fi
+    if [ -n "${SPICEMAC_SYSROOT_URL:-}" ]; then
+        from_url "$SPICEMAC_SYSROOT_URL"
+    elif [ "${SPICEMAC_SYSROOT_FROM_GH:-}" = "1" ]; then
+        from_gh
+    else
+        log "using pinned default sysroot (set SPICEMAC_SYSROOT_FROM_GH=1 for a fresh UTM build)"
+        SPICEMAC_SYSROOT_SHA256="$DEFAULT_SYSROOT_SHA256"
+        from_url "$DEFAULT_SYSROOT_URL"
+    fi
     log "done. Build with: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./scripts/build-app.sh"
 }
 

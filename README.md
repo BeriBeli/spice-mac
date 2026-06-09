@@ -111,16 +111,12 @@ adds exactly one method, `-[CSConnection setProxy:ca:certSubject:]`
 ## Build
 
 ```sh
-# 1. Stage the native SPICE dependency frameworks (arm64). See "Dependencies".
-SPICEMAC_SYSROOT_URL="https://…/Sysroot-macos-arm64.tgz" \
-SPICEMAC_SYSROOT_SHA256="…" \
-  ./scripts/fetch-sysroot.sh
-
-# 1b. Replace the EOL bundled OpenSSL 1.1.1b with 1.1.1w (recommended; see SECURITY.md)
-./scripts/upgrade-openssl.sh
+# 1. Stage the native SPICE frameworks (arm64). No args, no GitHub auth — fetches
+#    the pinned, checksummed sysroot from this repo's releases (OpenSSL already 1.1.1w).
+./scripts/fetch-sysroot.sh
 
 # 2. Build and assemble SpiceMac.app
-./scripts/build-app.sh            # → build/SpiceMac.app
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./scripts/build-app.sh   # → build/SpiceMac.app
 
 # 3. Run
 open build/SpiceMac.app
@@ -129,15 +125,22 @@ open build/SpiceMac.app
 ### Dependencies
 
 CocoaSpice does **not** bundle the native libraries it links (glib, gstreamer,
-spice-client-glib, libusb, …). `scripts/fetch-sysroot.sh` stages them from a
-prebuilt UTM "Sysroot" of `@rpath`-relocatable frameworks:
+spice-client-glib, libusb, …). `scripts/fetch-sysroot.sh` stages them. By default it
+downloads a **pinned, SHA-256-checksummed** tarball published on this repo's
+[releases](https://github.com/Ching367436/spice-mac/releases/tag/sysroot-arm64-v1) —
+the 26-framework + 19-plugin build/runtime closure (LGPL/MIT/BSD/OpenSSL only, **no
+GPL**, OpenSSL already 1.1.1w). So a fresh clone builds with no extra setup, and the
+script fails closed on a checksum mismatch.
 
-- Preferred: set `SPICEMAC_SYSROOT_URL` (+ `SPICEMAC_SYSROOT_SHA256`) to a pinned,
-  re-hosted sysroot tarball.
-- Or: `gh auth login`, then run the script to pull a UTM CI `Sysroot-macos-arm64`
-  artifact (these expire ~90 days, so pin and re-host one).
-- Fallback: build from source with UTM's `scripts/build_dependencies.sh -p macos
-  -a arm64` and `pack_dependencies.sh`.
+Alternatives (rarely needed):
+
+- **Your own tarball:** set `SPICEMAC_SYSROOT_URL` (+ `SPICEMAC_SYSROOT_SHA256`).
+- **A fresh UTM CI build:** `SPICEMAC_SYSROOT_FROM_GH=1 ./scripts/fetch-sysroot.sh`
+  (needs `gh auth login`; UTM artifacts expire ~90 days). That sysroot ships the EOL
+  OpenSSL 1.1.1b, so follow it with `./scripts/upgrade-openssl.sh` (→ 1.1.1w; see
+  [SECURITY.md](SECURITY.md)).
+- **From source:** UTM's `scripts/build_dependencies.sh -p macos -a arm64` +
+  `pack_dependencies.sh`.
 
 The vendored `ThirdParty/CocoaSpice/Sources/CocoaSpice/ExternalHeaders/` provides
 the matching build-time headers; keep the sysroot version in sync with them.

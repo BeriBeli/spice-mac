@@ -39,8 +39,9 @@ gate any wider distribution.
   default on) so it can be disabled for untrusted VMs.
 - **TLS fail-closed guard** — refuse to connect if a `.vv` requests
   certificate-subject verification but supplies no CA.
-- **Mandatory sysroot integrity** — `fetch-sysroot.sh` refuses an unverified URL
-  download unless `SPICEMAC_SYSROOT_SHA256` is pinned.
+- **Mandatory sysroot integrity** — `fetch-sysroot.sh` downloads a **pinned,
+  SHA-256-checksummed** sysroot by default and refuses any URL download whose digest
+  doesn't match (a custom `SPICEMAC_SYSROOT_URL` still requires `SPICEMAC_SYSROOT_SHA256`).
 - **OpenSSL upgraded 1.1.1b → 1.1.1w** — `scripts/upgrade-openssl.sh` builds the
   final 1.1.1 release from (SHA-256-verified) source and drops it into
   `Frameworks/` (ABI-compatible; no spice-gtk rebuild). This fixes the reachable

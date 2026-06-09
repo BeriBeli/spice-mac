@@ -31,8 +31,7 @@ The full app needs **Xcode** (Metal toolchain), the **Metal toolchain component*
 (`xcodebuild -downloadComponent MetalToolchain`), and the native SPICE frameworks:
 
 ```sh
-SPICEMAC_SYSROOT_URL=… SPICEMAC_SYSROOT_SHA256=… ./scripts/fetch-sysroot.sh
-./scripts/upgrade-openssl.sh          # OpenSSL 1.1.1b → 1.1.1w (see SECURITY.md)
+./scripts/fetch-sysroot.sh            # pinned, checksummed sysroot (no args/auth)
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./scripts/build-app.sh
 ```
 

@@ -6,6 +6,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Reproducible builds** — `fetch-sysroot.sh` now downloads a **pinned,
+  SHA-256-checksummed** native-dependency tarball from the repo's releases by
+  default (the 26-framework + 19-plugin closure; LGPL/MIT/BSD/OpenSSL only, no GPL;
+  OpenSSL already 1.1.1w). A fresh clone builds with **no `gh`/UTM artifact and no
+  extra env vars** — fixing the prior reliance on UTM CI artifacts that expire ~90
+  days. A fresh UTM build is still available via `SPICEMAC_SYSROOT_FROM_GH=1`.
+
 ## [0.1.2] — 2026-06-09
 
 ### Added
