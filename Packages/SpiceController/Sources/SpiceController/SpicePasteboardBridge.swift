@@ -76,8 +76,12 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
 
     // Guest→host writes arrive on the GLib worker thread. NSPasteboard writes must
     // happen on the main thread to take effect (and to avoid racing the poller's
-    // self-write tracking). CocoaSpice also does NOT clear the pasteboard first,
-    // and setData/setString silently no-op without a preceding clearContents.
+    // self-write tracking). These do NOT clearContents per write: a single guest
+    // grab clears the pasteboard once (CSSession's cs_clipboard_grab), then its
+    // representations arrive as separate calls and ACCUMULATE here — so a copied
+    // spreadsheet cell's text and image both land, instead of the last one
+    // clobbering the rest. NSPasteboard only needs the one preceding clearContents
+    // (done at grab time) for these setData/setString calls to take effect.
 
     /// Cap on guest→host clipboard payloads, to bound what a hostile guest can
     /// push onto the host pasteboard.
@@ -87,7 +91,6 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
     public func setData(_ data: Data, for type: CSPasteboardType) {
         guard let nsType = Self.nsType(type), data.count <= Self.maxClipboardBytes else { return }
         onMain {
-            self.pasteboard.clearContents()
             _ = self.pasteboard.setData(data, forType: nsType)
             self.markSelfWrite()
         }
@@ -105,7 +108,6 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
         // clipboard with garbage). Also cap the size.
         guard let string, string.utf8.count <= Self.maxClipboardBytes else { return }
         onMain {
-            self.pasteboard.clearContents()
             _ = self.pasteboard.setString(string, forType: .string)
             self.markSelfWrite()
         }

@@ -64,6 +64,18 @@ on a rebase:
     (`_CSRendererSourceData initWithRenderSource:` returns nil when vertices are
     missing, which otherwise drops the first blit) — this covers the case where a
     renderer/device *is* already attached when the surface is (re)created.
+- **`Sources/CocoaSpice/CSSession.m`** (`cs_clipboard_grab`) — **guest→host
+  clipboard lost all but one representation.** A guest grab is a single clipboard
+  offering that can carry several types at once (a copied spreadsheet cell =
+  UTF8 text + a bitmap image); CocoaSpice requests every advertised type, and each
+  arrives in a separate `cs_clipboard_got_from_guest` call. The macOS pasteboard
+  bridge cleared the pasteboard on *every* write, so the types clobbered each other
+  and only the last survived (often the image) — pasting the cell's text on the Mac
+  got nothing. Fix: `cs_clipboard_grab` now takes ownership of the host pasteboard
+  **once** (`[pasteboardDelegate clearContents]`) when the grab arrives, and the
+  bridge's `setData:`/`setString:` no longer clear per write, so the representations
+  accumulate. (Pairs with the bridge change in
+  `Packages/SpiceController/Sources/SpiceController/SpicePasteboardBridge.swift`.)
 
 ## Updating upstream
 

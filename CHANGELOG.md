@@ -6,6 +6,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Copying a spreadsheet cell in the guest now pastes onto the Mac.** A guest
+  copy offers several clipboard representations at once (a cell = UTF-8 text + a
+  bitmap image); the guest→host bridge cleared the Mac pasteboard on every write,
+  so the representations clobbered each other and only the last survived — usually
+  the image, leaving nothing to paste as text. The bridge now clears once per
+  guest grab and accumulates the rest, so the cell's text (and image) both land.
+  Plain-text copy was unaffected because it's a single type. (Fork change — see
+  `ThirdParty/CocoaSpice/FORK-NOTES.md`.)
+
 ### Security
 
 - **Hardened the `.vv` parser** (the one attacker-influenced file the app opens):

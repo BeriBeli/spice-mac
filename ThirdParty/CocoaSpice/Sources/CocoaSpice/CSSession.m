@@ -202,6 +202,15 @@ static gboolean cs_clipboard_grab(SpiceMainChannel *main, guint selection,
         return TRUE;
     }
 
+    // spice-mac (fix): a guest grab is ONE new clipboard offering that may carry
+    // several representations at once (e.g. a copied spreadsheet cell = UTF8 text
+    // + a bitmap image). Take ownership of the host pasteboard exactly once here;
+    // the per-type data that arrives next (cs_clipboard_got_from_guest) is then
+    // ACCUMULATED onto it. Previously each arriving type cleared the pasteboard
+    // before writing, so a multi-format guest copy lost all but the last type
+    // (commonly the image), and pasting the cell's text on the Mac got nothing.
+    [self.pasteboardDelegate clearContents];
+
     g_object_ref(main);
     [CSMain.sharedInstance asyncWith:^{
         for (int n = 0; n < ntypes; ++n) {
