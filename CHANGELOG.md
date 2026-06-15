@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.7] — 2026-06-15
+
 ### Fixed
 
 - **Copying a spreadsheet cell in the guest now pastes onto the Mac.** A guest
@@ -176,7 +178,8 @@ CocoaSpice.
   QEMU frameworks are no longer shipped (app size 443 MB → 23 MB).
 - See [SECURITY.md](SECURITY.md) for the threat model and residual risks.
 
-[Unreleased]: https://github.com/Ching367436/spice-mac/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/Ching367436/spice-mac/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/Ching367436/spice-mac/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/Ching367436/spice-mac/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/Ching367436/spice-mac/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/Ching367436/spice-mac/compare/v0.1.3...v0.1.4
