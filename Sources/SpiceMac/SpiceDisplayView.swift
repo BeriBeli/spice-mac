@@ -18,16 +18,21 @@ final class SpiceDisplayView: MTKView {
     /// change after the agent connects / a mode switch).
     private var displaySizeObservation: NSKeyValueObservation?
 
-    /// Whether we've hidden the macOS cursor (so only the guest cursor shows).
-    /// Tracked so hide/unhide stay balanced and the cursor can't get stuck hidden.
-    private var hostCursorHidden = false
+    /// Whether this view currently installs a transparent cursor rect. Cursor
+    /// rects are scoped to `bounds`, unlike NSCursor.hide(), which hides the
+    /// cursor globally and can leave it invisible if an exit event is missed.
+    private var usesHiddenHostCursorRect = false
+
+    /// A transparent AppKit cursor used only inside this display's cursor rect.
+    private static let hiddenHostCursor = NSCursor(
+        image: NSImage(size: NSSize(width: 1, height: 1)),
+        hotSpot: .zero)
 
     /// Observer for the "Hide Mac Cursor" preference toggling at runtime.
     private var hideCursorPrefObserver: NSObjectProtocol?
 
-    /// Observer that restores the macOS cursor when the app deactivates (⌘-Tab,
-    /// ⌘H, …) — those don't fire mouseExited/resignFirstResponder, so without this
-    /// a hidden cursor could stay hidden system-wide.
+    /// Observer that removes the transparent cursor rect when the app deactivates
+    /// (⌘-Tab, ⌘H, …), since those transitions may not fire mouseExited.
     private var appResignObserver: NSObjectProtocol?
 
     init() {
@@ -61,12 +66,12 @@ final class SpiceDisplayView: MTKView {
         }
         appResignObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.showHostCursor()
+            self?.restoreHostCursor()
         }
     }
 
     deinit {
-        showHostCursor()
+        restoreHostCursor()
         for observer in [hideCursorPrefObserver, appResignObserver].compactMap({ $0 }) {
             NotificationCenter.default.removeObserver(observer)
         }
@@ -103,7 +108,7 @@ final class SpiceDisplayView: MTKView {
     }
 
     func detach() {
-        showHostCursor()
+        restoreHostCursor()
         if let attachedDisplay, let renderer {
             attachedDisplay.removeRenderer(renderer)
         }
@@ -203,7 +208,7 @@ final class SpiceDisplayView: MTKView {
         // Flush held keys/modifiers/buttons so nothing stays latched in the guest
         // when focus leaves (e.g. Cmd-Tab); also avoids the on-return modifier desync.
         router.releaseAll()
-        showHostCursor()
+        restoreHostCursor()
         return super.resignFirstResponder()
     }
 
@@ -220,23 +225,35 @@ final class SpiceDisplayView: MTKView {
     }
 
     func updateHostCursorVisibility() {
-        if shouldHideHostCursor { hideHostCursor() } else { showHostCursor() }
+        let shouldUseHiddenRect = shouldHideHostCursor
+        guard shouldUseHiddenRect != usesHiddenHostCursorRect else { return }
+        usesHiddenHostCursorRect = shouldUseHiddenRect
+        window?.invalidateCursorRects(for: self)
+        if !shouldUseHiddenRect {
+            // Make restoration immediate on focus loss; the app under the pointer
+            // can replace this with its own cursor on the same/next event.
+            NSCursor.arrow.set()
+        }
     }
 
-    private func hideHostCursor() {
-        guard !hostCursorHidden else { return }
-        NSCursor.hide()
-        hostCursorHidden = true
+    /// Remove this view's transparent cursor rect unconditionally when the mouse
+    /// or key-window ownership moves elsewhere.
+    func restoreHostCursor() {
+        guard usesHiddenHostCursorRect else { return }
+        usesHiddenHostCursorRect = false
+        window?.invalidateCursorRects(for: self)
+        NSCursor.arrow.set()
     }
 
-    private func showHostCursor() {
-        guard hostCursorHidden else { return }
-        NSCursor.unhide()
-        hostCursorHidden = false
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        if usesHiddenHostCursorRect {
+            addCursorRect(bounds, cursor: Self.hiddenHostCursor)
+        }
     }
 
     override func mouseEntered(with event: NSEvent) { updateHostCursorVisibility() }
-    override func mouseExited(with event: NSEvent) { showHostCursor() }
+    override func mouseExited(with event: NSEvent) { restoreHostCursor() }
 
     override func keyDown(with event: NSEvent) { router.keyDown(event) }
     override func keyUp(with event: NSEvent) { router.keyUp(event) }
