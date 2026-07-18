@@ -6,6 +6,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`delete-this-file=0` now preserves the `.vv` file.** An explicit
+  `delete-this-file` directive takes precedence over the app's "Move .vv to
+  Trash" preference; the preference is used only when the directive is absent.
+
 ## [0.1.7] — 2026-06-15
 
 ### Fixed

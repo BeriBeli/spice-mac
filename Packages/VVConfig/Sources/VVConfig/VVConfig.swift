@@ -205,6 +205,13 @@ extension VVConfig {
         self = try VVConfig.parse(text)
     }
 
+    /// Resolve the file's deletion directive against an application default.
+    /// An explicit `delete-this-file=0` or `=1` in the `.vv` always wins; the
+    /// fallback is used only when the key is absent or has an unrecognised value.
+    public func shouldDeleteThisFile(fallback: Bool) -> Bool {
+        deleteThisFile ?? fallback
+    }
+
     /// Remove control characters (NUL, other C0/C1, DEL) from a parsed token. They
     /// have no legitimate place in a `.vv` field and NUL in particular would truncate
     /// the value inside the C SPICE stack.

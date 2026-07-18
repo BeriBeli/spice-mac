@@ -103,7 +103,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             // it carries the cluster CA, so move it to the Trash once we've used it to
             // connect. The file content is already in memory, so this can't affect the
             // live connection. Only reached on a successful parse (failures go to catch).
-            if Preferences.trashConnectionFileAfterUse {
+            // A directive in the connection file is authoritative. The app
+            // preference is only the fallback for files that omit it.
+            if config.shouldDeleteThisFile(fallback: Preferences.trashConnectionFileAfterUse) {
                 trashConnectionFile(at: url)
             }
         } catch {

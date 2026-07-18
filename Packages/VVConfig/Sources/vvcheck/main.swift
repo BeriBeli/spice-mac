@@ -50,6 +50,16 @@ t.test("parses all Proxmox fields") {
     t.expectEqual(cfg.deleteThisFile, true)
 }
 
+t.test("delete-this-file overrides the application fallback") {
+    let keep = try VVConfig.parse("[virt-viewer]\ndelete-this-file=0\n")
+    let remove = try VVConfig.parse("[virt-viewer]\ndelete-this-file=1\n")
+    let unspecified = try VVConfig.parse("[virt-viewer]\ntype=spice\n")
+    t.expect(!keep.shouldDeleteThisFile(fallback: true), "explicit 0 must preserve the file")
+    t.expect(remove.shouldDeleteThisFile(fallback: false), "explicit 1 must remove the file")
+    t.expect(unspecified.shouldDeleteThisFile(fallback: true), "missing key should use fallback")
+    t.expect(!unspecified.shouldDeleteThisFile(fallback: false), "missing key should use fallback")
+}
+
 t.test("host-subject keeps its '=' signs (split on first '=' only)") {
     let cfg = try VVConfig.parse(proxmoxSample)
     t.expectEqual(cfg.hostSubject,
