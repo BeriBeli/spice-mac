@@ -17,8 +17,9 @@
 #ifndef CocoaSpiceRenderer_h
 #define CocoaSpiceRenderer_h
 
-#include "CSMetalRenderer.h"
 #include "CSRenderSource.h"
+#include "CSRenderer.h"
+#include "CSMetalRenderer.h"
 #include "CSShaderTypes.h"
 
 #endif /* CocoaSpiceRenderer_h */

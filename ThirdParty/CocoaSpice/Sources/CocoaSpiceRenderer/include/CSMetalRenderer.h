@@ -17,8 +17,9 @@
 @import MetalKit;
 @import CoreGraphics;
 
+#import "CSRenderer.h"
+
 @protocol CSRenderSource;
-@protocol CSRenderer;
 
 NS_ASSUME_NONNULL_BEGIN
 

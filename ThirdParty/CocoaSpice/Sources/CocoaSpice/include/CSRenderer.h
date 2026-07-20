@@ -14,51 +14,6 @@
 // limitations under the License.
 //
 
-#import <Foundation/Foundation.h>
-@import Metal;
-
-@protocol CSRenderSource;
-
-NS_ASSUME_NONNULL_BEGIN
-
-typedef void (^completionCallback_t)(void);
-
-@protocol CSRenderer <NSObject>
-
-/// A Metal device linked to a renderer
-@property (nonatomic, readonly) id<MTLDevice> device;
-
-/// Set by the caller to the offset in the render surface where the display will be drawn to
-@property (nonatomic, readwrite) CGPoint viewportOrigin;
-
-/// Set by the caller to a scale factor of the display that is drawn
-@property (nonatomic, readwrite) CGFloat viewportScale;
-
-/// Update the existing texture with pixel data and invalidate
-/// - Parameters:
-///   - renderSource: Source to render
-///   - sourceBuffer: Buffer to draw to the source texture
-///   - region: Region in the source texture to draw to
-///   - sourceOffset: Offset in the source buffer to copy from
-///   - sourceBytesPerRow: Stride of the source buffer
-///   - completion: Block to run after the texture is rendered
-- (void)renderSouce:(id<CSRenderSource>)renderSource
-         copyBuffer:(id<MTLBuffer>)sourceBuffer
-             region:(MTLRegion)region
-       sourceOffset:(NSUInteger)sourceOffset
-  sourceBytesPerRow:(NSUInteger)sourceBytesPerRow
-         completion:(nullable completionCallback_t)completion;
-
-/// Mark source pending to be rendered
-/// - Parameters:
-///   - renderSource: Source to render
-///   - completion: Block to run when draw completed
-- (void)invalidateRenderSource:(id<CSRenderSource>)renderSource
-                              withCompletion:(nullable completionCallback_t)completion;
-
-/// Clear the render source
-- (void)disableRender;
-
-@end
-
-NS_ASSUME_NONNULL_END
+// Compatibility forwarding header. CSRenderer belongs to the lower-level
+// renderer target because its API only depends on Metal and CSRenderSource.
+@import CocoaSpiceRenderer;
