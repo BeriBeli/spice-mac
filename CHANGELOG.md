@@ -8,9 +8,6 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- **Computer Use and other CGEvent-injected keys now carry their modifiers to the
-  guest.** Synthetic key events are wrapped in balanced modifier chords, while
-  hardware input stays on the existing physical-scancode path.
 - **`delete-this-file=0` now preserves the `.vv` file.** An explicit
   `delete-this-file` directive takes precedence over the app's "Move .vv to
   Trash" preference; the preference is used only when the directive is absent.
