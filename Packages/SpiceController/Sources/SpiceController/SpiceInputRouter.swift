@@ -177,13 +177,13 @@ public final class SpiceInputRouter {
         guard let input else { return }
         let dy = event.scrollingDeltaY
         if event.hasPreciseScrollingDeltas {
-            input.sendMouseScroll(.smooth, buttonMask: buttonMask, dy: dy)
-        } else if dy < 0 {
-            // Match the smooth path's sign convention (CSInput maps negative dy to
-            // scroll-up, positive to scroll-down) so a wheel and a trackpad send the
-            // same guest direction for the same physical gesture.
-            input.sendMouseScroll(.up, buttonMask: buttonMask, dy: 0)
+            // AppKit and CSInput use opposite delta conventions. Preserve AppKit's
+            // system-adjusted direction (including the user's Natural scrolling
+            // preference), then translate it at the CocoaSpice boundary.
+            input.sendMouseScroll(.smooth, buttonMask: buttonMask, dy: -dy)
         } else if dy > 0 {
+            input.sendMouseScroll(.up, buttonMask: buttonMask, dy: 0)
+        } else if dy < 0 {
             input.sendMouseScroll(.down, buttonMask: buttonMask, dy: 0)
         }
     }
