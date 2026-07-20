@@ -4,6 +4,7 @@ import MetalKit
 import CocoaSpice
 import CocoaSpiceRenderer
 import SpiceController
+import SpiceCursorLogic
 
 /// The Metal-backed view that renders one SPICE display and is the keyboard/mouse
 /// first responder. CocoaSpice draws into it via a `CSMetalRenderer` set as the
@@ -18,22 +19,19 @@ final class SpiceDisplayView: MTKView {
     /// change after the agent connects / a mode switch).
     private var displaySizeObservation: NSKeyValueObservation?
 
-    /// Whether this view currently installs a transparent cursor rect. Cursor
-    /// rects are scoped to `bounds`, unlike NSCursor.hide(), which hides the
-    /// cursor globally and can leave it invisible if an exit event is missed.
-    private var usesHiddenHostCursorRect = false
+    /// Tracks late cursor-channel attachment and subsequent shape/mode changes.
+    private var displayCursorObservation: NSKeyValueObservation?
+    private var cursorSnapshotObservation: NSKeyValueObservation?
+    private weak var attachedCursor: CSCursor?
 
-    /// A transparent AppKit cursor used only inside this display's cursor rect.
-    private static let hiddenHostCursor = NSCursor(
+    /// The AppKit cursor installed over the SPICE display. In client/absolute
+    /// mode this is built from the guest-provided shape; in server/relative mode
+    /// it is transparent while CocoaSpice renders the server-positioned overlay.
+    private var displayCursor: NSCursor?
+
+    private static let transparentCursor = NSCursor(
         image: NSImage(size: NSSize(width: 1, height: 1)),
         hotSpot: .zero)
-
-    /// Observer for the "Hide Mac Cursor" preference toggling at runtime.
-    private var hideCursorPrefObserver: NSObjectProtocol?
-
-    /// Observer that removes the transparent cursor rect when the app deactivates
-    /// (⌘-Tab, ⌘H, …), since those transitions may not fire mouseExited.
-    private var appResignObserver: NSObjectProtocol?
 
     init() {
         // CSMetalRenderer reads `mtkView.device` at init, so the device must exist
@@ -59,22 +57,6 @@ final class SpiceDisplayView: MTKView {
         preferredFramesPerSecond = 60
         wantsLayer = true
         layer?.isOpaque = true
-
-        hideCursorPrefObserver = NotificationCenter.default.addObserver(
-            forName: .hideHostCursorChanged, object: nil, queue: .main) { [weak self] _ in
-            self?.updateHostCursorVisibility()
-        }
-        appResignObserver = NotificationCenter.default.addObserver(
-            forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.restoreHostCursor()
-        }
-    }
-
-    deinit {
-        restoreHostCursor()
-        for observer in [hideCursorPrefObserver, appResignObserver].compactMap({ $0 }) {
-            NotificationCenter.default.removeObserver(observer)
-        }
     }
 
     func attachDisplay(_ display: CSDisplay) {
@@ -85,10 +67,8 @@ final class SpiceDisplayView: MTKView {
         self.renderer = renderer
         display.addRenderer(renderer)
         router.displaySizeProvider = { [weak display] in display?.displaySize ?? .zero }
-        // In client mouse mode we must position the guest cursor overlay ourselves.
-        router.cursorMover = { [weak display] point in display?.cursor?.move(to: point) }
         // The input router maps a view point -> guest pixel using the SAME fit math
-        // the renderer uses, so the guest cursor lands under the macOS pointer.
+        // the renderer uses, so guest input lands under the native macOS pointer.
         router.viewportInfoProvider = { [weak self] in
             guard let info = self?.viewportInfo() else { return nil }
             return SpiceInputRouter.ViewportInfo(
@@ -105,10 +85,15 @@ final class SpiceDisplayView: MTKView {
             [weak self] _, _ in
             DispatchQueue.main.async { self?.updateViewport() }
         }
+        displayCursorObservation = display.observe(\.cursor, options: [.initial, .new]) {
+            [weak self] _, change in
+            DispatchQueue.main.async { self?.attachCursor(change.newValue ?? nil) }
+        }
     }
 
     func detach() {
-        restoreHostCursor()
+        attachCursor(nil)
+        displayCursorObservation = nil
         if let attachedDisplay, let renderer {
             attachedDisplay.removeRenderer(renderer)
         }
@@ -171,6 +156,7 @@ final class SpiceDisplayView: MTKView {
         guard let renderer, let info = viewportInfo() else { return }
         renderer.viewportScale = info.scale
         renderer.viewportOrigin = .zero
+        refreshCursorPresentation()
     }
 
     // Recompute on any geometry change. `drawableSize` tracks `bounds * backingScale`,
@@ -208,52 +194,100 @@ final class SpiceDisplayView: MTKView {
         // Flush held keys/modifiers/buttons so nothing stays latched in the guest
         // when focus leaves (e.g. Cmd-Tab); also avoids the on-return modifier desync.
         router.releaseAll()
-        restoreHostCursor()
+        restoreSystemCursor()
         return super.resignFirstResponder()
     }
 
-    // MARK: - Host cursor visibility (optional, gated on Preferences.hideHostCursor)
+    // MARK: - Native guest cursor
 
-    /// Hide the macOS cursor only when the user opted in, the window is key, and the
-    /// guest is in client (absolute) mouse mode (where the guest cursor overlay
-    /// tracks the pointer). In server mode we keep the host cursor visible.
-    private var shouldHideHostCursor: Bool {
-        Preferences.hideHostCursor
-            && window?.isKeyWindow == true
-            && router.input != nil
-            && router.input?.serverModeCursor == false
-    }
-
-    func updateHostCursorVisibility() {
-        let shouldUseHiddenRect = shouldHideHostCursor
-        guard shouldUseHiddenRect != usesHiddenHostCursorRect else { return }
-        usesHiddenHostCursorRect = shouldUseHiddenRect
-        window?.invalidateCursorRects(for: self)
-        if !shouldUseHiddenRect {
-            // Make restoration immediate on focus loss; the app under the pointer
-            // can replace this with its own cursor on the same/next event.
-            NSCursor.arrow.set()
+    private func attachCursor(_ cursor: CSCursor?) {
+        guard attachedCursor !== cursor else { return }
+        attachedCursor?.isInhibited = false
+        cursorSnapshotObservation = nil
+        attachedCursor = cursor
+        cursorSnapshotObservation = cursor?.observe(\.snapshot, options: [.initial, .new]) {
+            [weak self, weak cursor] _, change in
+            guard let snapshot = change.newValue else { return }
+            DispatchQueue.main.async {
+                guard let self, self.attachedCursor === cursor else { return }
+                self.refreshCursorPresentation(using: snapshot)
+            }
         }
+        if cursor == nil { refreshCursorPresentation() }
     }
 
-    /// Remove this view's transparent cursor rect unconditionally when the mouse
-    /// or key-window ownership moves elsewhere.
-    func restoreHostCursor() {
-        guard usesHiddenHostCursorRect else { return }
-        usesHiddenHostCursorRect = false
+    /// Keep exactly one cursor visible. Absolute mode uses an AppKit-native cursor
+    /// made from the SPICE shape and inhibits the Metal overlay. Relative mode
+    /// keeps the server-positioned overlay and makes the scoped AppKit cursor
+    /// transparent.
+    func refreshCursorPresentation() {
+        guard let cursor = attachedCursor else {
+            displayCursor = nil
+            window?.invalidateCursorRects(for: self)
+            return
+        }
+
+        refreshCursorPresentation(using: cursor.snapshot)
+    }
+
+    private func refreshCursorPresentation(using snapshot: CSCursorSnapshot) {
+        guard let cursor = attachedCursor else { return }
+        let serverMode = snapshot.serverModeCursor
+        let hidden = snapshot.cursorHidden
+        let hasCustomShape = snapshot.cursorImageData != nil
+        let decision = SpiceCursorLogic.presentationDecision(
+            serverMode: serverMode,
+            hidden: hidden,
+            hasCustomShape: hasCustomShape,
+            windowActive: window?.isKeyWindow == true)
+        cursor.isInhibited = decision.inhibitOverlay
+        switch decision.hostCursor {
+        case .transparent:
+            displayCursor = Self.transparentCursor
+        case .custom:
+            displayCursor = makeNativeCursor(from: snapshot) ?? .arrow
+        case .systemDefault:
+            displayCursor = .arrow
+        }
         window?.invalidateCursorRects(for: self)
+    }
+
+    func restoreSystemCursor() {
         NSCursor.arrow.set()
+    }
+
+    private func makeNativeCursor(from snapshot: CSCursorSnapshot) -> NSCursor? {
+        let width = Int(snapshot.cursorSize.width)
+        let height = Int(snapshot.cursorSize.height)
+        guard width > 0, height > 0,
+              let data = snapshot.cursorImageData,
+              let image = SpiceCursorLogic.makeNativeCursorImage(width: width, height: height, data: data)
+        else { return nil }
+
+        // Match the renderer's guest-pixel-to-point scale so cursor size remains
+        // aligned with a fitted or Retina-backed guest display.
+        let pointScale: CGFloat
+        if let info = viewportInfo(), info.backingScale > 0 {
+            pointScale = info.scale / info.backingScale
+        } else {
+            pointScale = 1
+        }
+        let imageSize = NSSize(width: CGFloat(width) * pointScale,
+                               height: CGFloat(height) * pointScale)
+        let nativeImage = NSImage(cgImage: image, size: imageSize)
+        let hotSpot = NSPoint(
+            x: min(max(0, snapshot.cursorHotspot.x), CGFloat(width - 1)) * pointScale,
+            y: min(max(0, snapshot.cursorHotspot.y), CGFloat(height - 1)) * pointScale
+        )
+        return NSCursor(image: nativeImage, hotSpot: hotSpot)
     }
 
     override func resetCursorRects() {
         super.resetCursorRects()
-        if usesHiddenHostCursorRect {
-            addCursorRect(bounds, cursor: Self.hiddenHostCursor)
+        if let displayCursor {
+            addCursorRect(bounds, cursor: displayCursor)
         }
     }
-
-    override func mouseEntered(with event: NSEvent) { updateHostCursorVisibility() }
-    override func mouseExited(with event: NSEvent) { restoreHostCursor() }
 
     override func keyDown(with event: NSEvent) { router.keyDown(event) }
     override func keyUp(with event: NSEvent) { router.keyUp(event) }
@@ -271,7 +305,6 @@ final class SpiceDisplayView: MTKView {
     override func otherMouseUp(with event: NSEvent) { router.mouseButton(event, pressed: false) }
 
     override func mouseMoved(with event: NSEvent) {
-        updateHostCursorVisibility()
         router.mouseMoved(event, in: self)
     }
     override func mouseDragged(with event: NSEvent) { router.mouseMoved(event, in: self) }
@@ -285,7 +318,7 @@ final class SpiceDisplayView: MTKView {
         for area in trackingAreas { removeTrackingArea(area) }
         let area = NSTrackingArea(
             rect: bounds,
-            options: [.activeInKeyWindow, .inVisibleRect, .mouseMoved, .mouseEnteredAndExited],
+            options: [.activeInKeyWindow, .inVisibleRect, .mouseMoved],
             owner: self, userInfo: nil)
         addTrackingArea(area)
     }

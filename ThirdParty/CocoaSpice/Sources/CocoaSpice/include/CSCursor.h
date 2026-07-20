@@ -21,14 +21,41 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+/// An immutable, coherent view of the guest cursor at one revision.
+///
+/// The snapshot object is published atomically by `CSCursor`, so consumers must
+/// retain and use one instance rather than reading live cursor fields separately.
+@interface CSCursorSnapshot : NSObject
+
+/// Current cursor pixels in normalized premultiplied RGBA byte order, or nil
+/// when the guest requests its default cursor.
+@property (nonatomic, nullable, readonly, copy) NSData *cursorImageData;
+
+/// Pixel size and hot spot for `cursorImageData`.
+@property (nonatomic, readonly) CGSize cursorSize;
+@property (nonatomic, readonly) CGPoint cursorHotspot;
+
+/// Whether the guest explicitly hid its cursor.
+@property (nonatomic, readonly) BOOL cursorHidden;
+
+/// Whether SPICE is using server (relative) mouse mode.
+@property (nonatomic, readonly) BOOL serverModeCursor;
+
+/// Monotonically increasing cursor-state revision.
+@property (nonatomic, readonly) NSUInteger cursorRevision;
+
+- (instancetype)init NS_UNAVAILABLE;
+
+@end
+
 /// Handles cursor rendering
 ///
 /// This implements the `CSRenderSource` protocol which can be used to render to a Metal device.
 @interface CSCursor : CSChannel <CSRenderSource>
 
-/// The current size of a client side cursor if supported. (0, 0) is returned otherwise.
-/// You can add an observer on this property to detect when the cursor size changes.
-@property (nonatomic, readonly) CGSize cursorSize;
+/// Atomically replaced after cursor set/hide/reset, visibility-restoring moves,
+/// and mouse-mode transitions. Observe this property for native presentation.
+@property (atomic, readonly, strong) CSCursorSnapshot *snapshot;
 
 /// Set this to true to not render the cursor only if client side cusor rendering is supported.
 /// If it is not supported, this will do nothing.

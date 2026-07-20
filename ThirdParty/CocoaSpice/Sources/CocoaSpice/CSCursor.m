@@ -21,14 +21,56 @@
 #import <glib.h>
 #import <spice-client.h>
 
+@interface CSCursorSnapshot ()
+
+@property (nonatomic, nullable, readwrite, copy) NSData *cursorImageData;
+@property (nonatomic, readwrite) CGSize cursorSize;
+@property (nonatomic, readwrite) CGPoint cursorHotspot;
+@property (nonatomic, readwrite) BOOL cursorHidden;
+@property (nonatomic, readwrite) BOOL serverModeCursor;
+@property (nonatomic, readwrite) NSUInteger cursorRevision;
+
+- (instancetype)initWithImageData:(nullable NSData *)imageData
+                              size:(CGSize)size
+                           hotspot:(CGPoint)hotspot
+                            hidden:(BOOL)hidden
+                        serverMode:(BOOL)serverMode
+                          revision:(NSUInteger)revision NS_DESIGNATED_INITIALIZER;
+
+@end
+
+@implementation CSCursorSnapshot
+
+- (instancetype)initWithImageData:(NSData *)imageData
+                              size:(CGSize)size
+                           hotspot:(CGPoint)hotspot
+                            hidden:(BOOL)hidden
+                        serverMode:(BOOL)serverMode
+                          revision:(NSUInteger)revision {
+    if (self = [super init]) {
+        _cursorImageData = [imageData copy];
+        _cursorSize = size;
+        _cursorHotspot = hotspot;
+        _cursorHidden = hidden;
+        _serverModeCursor = serverMode;
+        _cursorRevision = revision;
+    }
+    return self;
+}
+
+@end
+
 @interface CSCursor ()
 
 @property (nonatomic, weak) CSDisplay *display;
 @property (nonatomic, readwrite) SpiceCursorChannel *channel;
 @property (nonatomic, readwrite) CGSize cursorSize;
 @property (nonatomic, readwrite) CGPoint cursorHotspot;
+@property (nonatomic, nullable, readwrite, copy) NSData *cursorImageData;
 @property (nonatomic, readwrite) BOOL hasCursor;
 @property (nonatomic, readwrite) BOOL cursorHidden;
+@property (nonatomic, readwrite) BOOL serverModeCursor;
+@property (atomic, readwrite, strong) CSCursorSnapshot *snapshot;
 @property (nonatomic) CGPoint mouseGuest;
 
 @property (nonatomic, nullable, readwrite) id<MTLTexture> texture;
@@ -46,6 +88,18 @@ static void cs_cursor_invalidate(CSCursor *self)
     [self.display invalidate];
 }
 
+static void cs_cursor_changed(CSCursor *self)
+{
+    NSUInteger revision = self.snapshot.cursorRevision + 1;
+    self.snapshot = [[CSCursorSnapshot alloc] initWithImageData:self.cursorImageData
+                                                          size:self.cursorSize
+                                                       hotspot:self.cursorHotspot
+                                                        hidden:self.cursorHidden
+                                                    serverMode:self.serverModeCursor
+                                                      revision:revision];
+    cs_cursor_invalidate(self);
+}
+
 static void cs_cursor_set(SpiceCursorChannel *channel,
                           G_GNUC_UNUSED GParamSpec *pspec,
                           gpointer data)
@@ -58,19 +112,27 @@ static void cs_cursor_set(SpiceCursorChannel *channel,
         if (cursor_shape != NULL) {
             g_boxed_free(SPICE_TYPE_CURSOR_SHAPE, cursor_shape);
         }
+        if (self.hasCursor || self.cursorImageData || self.cursorHidden) {
+            [self destroyCursor];
+            self.cursorHidden = NO;
+            cs_cursor_changed(self);
+        }
         return;
     }
     
     CGPoint hotspot = CGPointMake(cursor_shape->hot_spot_x, cursor_shape->hot_spot_y);
     CGSize newSize = CGSizeMake(cursor_shape->width, cursor_shape->height);
-    if (!CGSizeEqualToSize(newSize, self.cursorSize) || !CGPointEqualToPoint(hotspot, self.cursorHotspot)) {
+    if (!CGSizeEqualToSize(newSize, self.cursorSize) ||
+        !CGPointEqualToPoint(hotspot, self.cursorHotspot) || !self.texture) {
         [self rebuildCursorWithSize:newSize center:hotspot];
     }
+    self.cursorImageData = [NSData dataWithBytes:cursor_shape->data
+                                          length:(NSUInteger)newSize.width * (NSUInteger)newSize.height * 4];
     [self drawCursor:cursor_shape->data];
     // this has to be after drawCursor: which runs in the same serial queue
     g_boxed_free(SPICE_TYPE_CURSOR_SHAPE, cursor_shape);
     self.cursorHidden = NO;
-    cs_cursor_invalidate(self);
+    cs_cursor_changed(self);
 }
 
 static void cs_cursor_move(SpiceCursorChannel *channel, gint x, gint y, gpointer data)
@@ -80,11 +142,14 @@ static void cs_cursor_move(SpiceCursorChannel *channel, gint x, gint y, gpointer
     self.mouseGuest = CGPointMake(x, y);
 
     /* apparently we have to restore cursor when "cursor_move" */
-    if (self.hasCursor) {
-        self.cursorHidden = NO;
+    BOOL visibilityChanged = self.cursorHidden;
+    self.cursorHidden = NO;
+
+    if (visibilityChanged) {
+        cs_cursor_changed(self);
+    } else {
+        cs_cursor_invalidate(self);
     }
-    
-    cs_cursor_invalidate(self);
 }
 
 static void cs_cursor_hide(SpiceCursorChannel *channel, gpointer data)
@@ -92,7 +157,7 @@ static void cs_cursor_hide(SpiceCursorChannel *channel, gpointer data)
     CSCursor *self = (__bridge CSCursor *)data;
     
     self.cursorHidden = YES;
-    cs_cursor_invalidate(self);
+    cs_cursor_changed(self);
 }
 
 static void cs_cursor_reset(SpiceCursorChannel *channel, gpointer data)
@@ -101,7 +166,8 @@ static void cs_cursor_reset(SpiceCursorChannel *channel, gpointer data)
     
     SPICE_DEBUG("[CocoaSpice] %s",  __FUNCTION__);
     [self destroyCursor];
-    cs_cursor_invalidate(self);
+    self.cursorHidden = NO;
+    cs_cursor_changed(self);
 }
 
 #pragma mark - Main events
@@ -114,7 +180,12 @@ static void cs_update_mouse_mode(SpiceChannel *channel, gpointer data)
     g_object_get(channel, "mouse-mode", &mouse_mode, NULL);
     SPICE_DEBUG("[CocoaSpice] mouse mode %u", mouse_mode);
     
-    if (mouse_mode == SPICE_MOUSE_MODE_SERVER) {
+    BOOL serverModeCursor = mouse_mode == SPICE_MOUSE_MODE_SERVER;
+    if (self.serverModeCursor != serverModeCursor) {
+        self.serverModeCursor = serverModeCursor;
+        cs_cursor_changed(self);
+    }
+    if (serverModeCursor) {
         self.mouseGuest = CGPointMake(-1, -1);
     }
 }
@@ -139,7 +210,9 @@ static void cs_update_mouse_mode(SpiceChannel *channel, gpointer data)
 
 - (void)setDisplay:(CSDisplay *)display {
     _display = display;
-    cs_cursor_set(self.channel, NULL, (__bridge void *)self);
+    if (display) {
+        cs_cursor_set(self.channel, NULL, (__bridge void *)self);
+    }
 }
 
 - (id<MTLDevice>)device {
@@ -148,6 +221,14 @@ static void cs_update_mouse_mode(SpiceChannel *channel, gpointer data)
 
 - (BOOL)isVisible {
     return !self.isInhibited && self.hasCursor && !self.cursorHidden;
+}
+
+- (void)setIsInhibited:(BOOL)isInhibited {
+    if (_isInhibited == isInhibited) {
+        return;
+    }
+    _isInhibited = isInhibited;
+    cs_cursor_invalidate(self);
 }
 
 - (BOOL)isInverted {
@@ -181,6 +262,12 @@ static void cs_update_mouse_mode(SpiceChannel *channel, gpointer data)
 
 - (instancetype)initWithChannel:(SpiceCursorChannel *)channel {
     if (self = [self init]) {
+        self.snapshot = [[CSCursorSnapshot alloc] initWithImageData:nil
+                                                               size:CGSizeZero
+                                                            hotspot:CGPointZero
+                                                             hidden:NO
+                                                         serverMode:NO
+                                                           revision:0];
         gpointer cursor_shape;
         self.channel = g_object_ref(channel);
         g_signal_connect(channel, "notify::cursor",
@@ -220,6 +307,9 @@ static void cs_update_mouse_mode(SpiceChannel *channel, gpointer data)
 
 - (void)rebuildCursorWithSize:(CGSize)size center:(CGPoint)hotspot {
     // hotspot is the offset in buffer for the center of the pointer
+    self.cursorSize = size;
+    self.cursorHotspot = hotspot;
+    self.hasCursor = YES;
     if (!self.device) {
         SPICE_DEBUG("[CocoaSpice] MTL device not ready for cursor draw");
         return;
@@ -252,9 +342,6 @@ static void cs_update_mouse_mode(SpiceChannel *channel, gpointer data)
 
     // Calculate the number of vertices by dividing the byte length by the size of each vertex
     self.numVertices = sizeof(quadVertices) / sizeof(CSRenderVertex);
-    self.cursorSize = size;
-    self.cursorHotspot = hotspot;
-    self.hasCursor = YES;
 }
 
 - (void)destroyCursor {
@@ -263,6 +350,7 @@ static void cs_update_mouse_mode(SpiceChannel *channel, gpointer data)
     self.texture = nil;
     self.cursorSize = CGSizeZero;
     self.cursorHotspot = CGPointZero;
+    self.cursorImageData = nil;
     self.hasCursor = NO;
 }
 

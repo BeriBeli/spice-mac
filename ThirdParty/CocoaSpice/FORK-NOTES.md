@@ -76,6 +76,12 @@ on a rebase:
   bridge's `setData:`/`setString:` no longer clear per write, so the representations
   accumulate. (Pairs with the bridge change in
   `Packages/SpiceController/Sources/SpiceController/SpicePasteboardBridge.swift`.)
+- **`Sources/CocoaSpice/CSCursor.m` + `include/CSCursor.h`** — atomically publish
+  an immutable snapshot of spice-gtk's normalized RGBA cursor pixels, hotspot,
+  guest visibility, mouse mode, and revision. The macOS host consumes one coherent
+  snapshot as an AppKit `NSCursor` in absolute mode and sets `isInhibited` so Metal
+  does not render a second cursor. Cursor-channel teardown explicitly detaches the
+  display, and changing inhibition invalidates it immediately.
 
 ## Updating upstream
 

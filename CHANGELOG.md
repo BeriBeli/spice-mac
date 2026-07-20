@@ -11,10 +11,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`delete-this-file=0` now preserves the `.vv` file.** An explicit
   `delete-this-file` directive takes precedence over the app's "Move .vv to
   Trash" preference; the preference is used only when the directive is absent.
-- **Hiding the Mac cursor is now scoped to the SPICE display area.** The app uses
-  an AppKit cursor rect instead of globally hiding the system cursor, so moving
-  into the title bar, another window, or another app restores the correct cursor
-  even if a mouse-exit event is missed.
+- **Remote cursor rendering now uses a single cursor path.** In absolute mouse
+  mode the guest shape and hot spot become the display's native AppKit cursor
+  while the duplicate Metal overlay is inhibited. Relative mode keeps the
+  server-positioned overlay with a display-scoped transparent system cursor.
 
 ## [0.1.7] — 2026-06-15
 

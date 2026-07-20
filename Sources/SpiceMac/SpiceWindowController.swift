@@ -81,11 +81,11 @@ final class SpiceWindowController: NSWindowController, NSWindowDelegate, NSMenuI
             self.displayView.router.input = input
             self.displayView.router.requestMouseMode(server: false)
             self.window?.makeFirstResponder(self.displayView)
-            self.displayView.updateHostCursorVisibility()
+            self.displayView.refreshCursorPresentation()
         }
         client.onInputUnavailable = { [weak self] _ in
             self?.displayView.router.input = nil
-            self?.displayView.updateHostCursorVisibility()
+            self?.displayView.refreshCursorPresentation()
         }
 
         client.$status
@@ -180,18 +180,18 @@ final class SpiceWindowController: NSWindowController, NSWindowDelegate, NSMenuI
 
     func windowDidBecomeKey(_ notification: Notification) {
         window?.makeFirstResponder(displayView)
-        displayView.updateHostCursorVisibility()
+        displayView.refreshCursorPresentation()
         client.usbManager?.delegate = self
         refreshUSBMenu()
     }
 
     func windowDidResignKey(_ notification: Notification) {
         // Release any held input so it does not stay latched in the guest when the
-        // user switches away, and remove the display's transparent cursor rect
-        // unconditionally (covers same-app window switches / miniaturize that don't
-        // deactivate the app).
+        // user switches away. Recompute presentation so the inactive window also
+        // inhibits its Metal overlay before restoring the system cursor.
         displayView.router.releaseAll()
-        displayView.restoreHostCursor()
+        displayView.refreshCursorPresentation()
+        displayView.restoreSystemCursor()
     }
 
     func windowWillClose(_ notification: Notification) {

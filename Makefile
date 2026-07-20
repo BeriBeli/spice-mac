@@ -7,7 +7,7 @@ export DEVELOPER_DIR
 
 .DEFAULT_GOAL := help
 
-.PHONY: help doctor setup build run test all openssl icon debug root release check-version clean distclean
+.PHONY: help doctor setup build run test test-cursor all openssl icon debug root release check-version clean distclean
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-14s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
@@ -27,6 +27,9 @@ run: ## Open build/SpiceMac.app
 test: ## Run the dependency-free check runners (vvcheck + inputcheck)
 	@( cd Packages/VVConfig && swift run vvcheck )
 	@( cd Packages/SpiceInputMap && swift run inputcheck )
+
+test-cursor: ## Run focused AppKit cursor regression tests (requires full Xcode/frameworks)
+	@swift test --filter SpiceCursorRegressionTests
 
 all: doctor setup build ## Doctor, fetch the sysroot, and build (first-time setup)
 

@@ -41,11 +41,6 @@ public final class SpiceInputRouter {
         }
     }
 
-    /// Positions the guest cursor overlay. In client (absolute) mouse mode the
-    /// guest does not send cursor-move events, so the client must drive the cursor
-    /// overlay itself (via CSCursor.moveTo) or it stays pinned to the top-left.
-    public var cursorMover: ((CGPoint) -> Void)?
-
     private var buttonMask: CSInputButton = []
     private var heldModifiers: Set<UInt16> = []
 
@@ -168,8 +163,6 @@ public final class SpiceInputRouter {
         } else {
             let p = absolutePoint(event, in: view)
             input.sendMousePosition(buttonMask, absolutePoint: p)
-            // Client mode: drive the guest cursor overlay ourselves.
-            cursorMover?(p)
         }
     }
 

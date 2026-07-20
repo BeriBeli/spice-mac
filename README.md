@@ -20,7 +20,7 @@ UTM uses). Apple-Silicon only.
 > |---|---|
 > | Display (Metal) + aspect-fit scaling + live resize | ✅ |
 > | Keyboard incl. ⌘ / modifiers (self-healing on missed key-up) | ✅ |
-> | Mouse + cursor alignment; optional hide-Mac-cursor | ✅ |
+> | Mouse + single-path guest cursor (native absolute / overlay relative) | ✅ |
 > | Clipboard (Mac↔VM, both directions) | ✅ |
 > | Audio (guest needs a SPICE audio device) | ✅ |
 > | USB redirection | plumbed |

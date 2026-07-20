@@ -43,11 +43,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     // MARK: - Preferences
 
-    @objc func toggleHideMacCursor(_ sender: NSMenuItem) {
-        Preferences.hideHostCursor.toggle()
-        sender.state = Preferences.hideHostCursor ? .on : .off
-    }
-
     @objc func toggleShareClipboard(_ sender: NSMenuItem) {
         Preferences.shareClipboard.toggle()
         sender.state = Preferences.shareClipboard ? .on : .off
@@ -60,8 +55,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
-        case #selector(toggleHideMacCursor(_:)):
-            menuItem.state = Preferences.hideHostCursor ? .on : .off
         case #selector(toggleShareClipboard(_:)):
             menuItem.state = Preferences.shareClipboard ? .on : .off
         case #selector(toggleTrashConnectionFile(_:)):

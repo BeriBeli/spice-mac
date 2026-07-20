@@ -65,6 +65,10 @@ let package = Package(
         .package(path: "ThirdParty/CocoaSpice"),
     ],
     targets: [
+        .target(
+            name: "SpiceCursorLogic",
+            path: "Packages/SpiceCursorLogic/Sources/SpiceCursorLogic"
+        ),
         // Swift glue: connection lifecycle, CSConnectionDelegate, NSEvent→CSInput,
         // pasteboard bridge. Depends on the (forked) CocoaSpice ObjC layer.
         .target(
@@ -82,6 +86,7 @@ let package = Package(
             name: "SpiceMac",
             dependencies: [
                 "SpiceController",
+                "SpiceCursorLogic",
                 .product(name: "VVConfig", package: "VVConfig"),
                 .product(name: "SpiceInputMap", package: "SpiceInputMap"),
                 .product(name: "CocoaSpice", package: "CocoaSpice"),
@@ -89,6 +94,11 @@ let package = Package(
             ],
             path: "Sources/SpiceMac",
             linkerSettings: nativeSpiceLinkerSettings
+        ),
+        .testTarget(
+            name: "SpiceMacTests",
+            dependencies: ["SpiceCursorLogic"],
+            path: "Tests/SpiceMacTests"
         ),
     ]
 )

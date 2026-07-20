@@ -305,6 +305,12 @@ static void cs_channel_destroy(SpiceSession *s, SpiceChannel *channel, gpointer 
                 [self.delegate spiceForwardedPortClosed:self port:(CSPort *)wrap];
             } else if (SPICE_IS_INPUTS_CHANNEL(channel)) {
                 [self.delegate spiceInputUnavailable:self input:(CSInput *)wrap];
+            } else if (SPICE_IS_CURSOR_CHANNEL(channel)) {
+                CSCursor *cursor = (CSCursor *)wrap;
+                CSDisplay *display = cursor.display;
+                if (display.cursor == cursor) {
+                    display.cursor = nil;
+                }
             }
         }
     }
