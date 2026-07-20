@@ -66,6 +66,10 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "SpiceClipboardLogic",
+            path: "Packages/SpiceClipboardLogic/Sources/SpiceClipboardLogic"
+        ),
+        .target(
             name: "SpiceCursorLogic",
             path: "Packages/SpiceCursorLogic/Sources/SpiceCursorLogic"
         ),
@@ -74,6 +78,7 @@ let package = Package(
         .target(
             name: "SpiceController",
             dependencies: [
+                "SpiceClipboardLogic",
                 .product(name: "VVConfig", package: "VVConfig"),
                 .product(name: "SpiceInputMap", package: "SpiceInputMap"),
                 .product(name: "CocoaSpice", package: "CocoaSpice"),
@@ -97,7 +102,7 @@ let package = Package(
         ),
         .testTarget(
             name: "SpiceMacTests",
-            dependencies: ["SpiceCursorLogic"],
+            dependencies: ["SpiceClipboardLogic", "SpiceCursorLogic"],
             path: "Tests/SpiceMacTests"
         ),
     ]

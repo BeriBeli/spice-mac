@@ -27,6 +27,9 @@ const NSNotificationName kCSPasteboardRemovedNotification = @"CSPasteboardRemove
 @property (nonatomic, readwrite, nullable) SpiceSession *session;
 @property (nonatomic, readonly) BOOL sessionReadOnly;
 @property (nonatomic, nullable) SpiceMainChannel *main;
+/// Mutated only in the SPICE GLib context after connection setup.
+@property (nonatomic) NSUInteger clipboardGeneration;
+@property (nonatomic) NSUInteger guestClipboardGeneration;
 
 @end
 
@@ -161,6 +164,12 @@ static void cs_clipboard_got_from_guest(SpiceMainChannel *main, guint selection,
     char *textData;
 
     SPICE_DEBUG("clipboard got data");
+
+    if (!self.shareClipboard ||
+        self.guestClipboardGeneration != self.clipboardGeneration) {
+        SPICE_DEBUG("dropping stale clipboard data");
+        return;
+    }
     
     if (type == VD_AGENT_CLIPBOARD_UTF8_TEXT && size > 0) {
         gchar *conv = NULL;
@@ -202,6 +211,8 @@ static gboolean cs_clipboard_grab(SpiceMainChannel *main, guint selection,
         return TRUE;
     }
 
+    self.guestClipboardGeneration = self.clipboardGeneration;
+
     // spice-mac (fix): a guest grab is ONE new clipboard offering that may carry
     // several representations at once (e.g. a copied spreadsheet cell = UTF8 text
     // + a bitmap image). Take ownership of the host pasteboard exactly once here;
@@ -211,12 +222,18 @@ static gboolean cs_clipboard_grab(SpiceMainChannel *main, guint selection,
     // (commonly the image), and pasting the cell's text on the Mac got nothing.
     [self.pasteboardDelegate clearContents];
 
+    NSUInteger generation = self.clipboardGeneration;
+    guint32 *requestedTypes = g_new(guint32, ntypes);
+    memcpy(requestedTypes, types, sizeof(guint32) * ntypes);
     g_object_ref(main);
     [CSMain.sharedInstance asyncWith:^{
-        for (int n = 0; n < ntypes; ++n) {
-            spice_main_channel_clipboard_selection_request(main, selection,
-                                                           types[n]);
+        if (self.shareClipboard && generation == self.clipboardGeneration) {
+            for (int n = 0; n < ntypes; ++n) {
+                spice_main_channel_clipboard_selection_request(main, selection,
+                                                               requestedTypes[n]);
+            }
         }
+        g_free(requestedTypes);
         g_object_unref(main);
     }];
 
@@ -241,9 +258,13 @@ static gboolean cs_clipboard_request(SpiceMainChannel *main, guint selection,
     CSPasteboardType cspbType = cspbTypeForClipboardType(type);
     NSData *data = [self.pasteboardDelegate dataForType:cspbType];
     if (data) {
+        NSUInteger generation = self.clipboardGeneration;
         g_object_ref(main);
         [CSMain.sharedInstance asyncWith:^{
-            spice_main_channel_clipboard_selection_notify(main, selection, type, data.bytes, data.length);
+            if (self.shareClipboard && generation == self.clipboardGeneration) {
+                spice_main_channel_clipboard_selection_notify(main, selection, type,
+                                                              data.bytes, data.length);
+            }
             g_object_unref(main);
         }];
     }
@@ -255,6 +276,11 @@ static void cs_clipboard_release(SpiceMainChannel *main, guint selection,
                                  gpointer user_data)
 {
     CSSession *self = (__bridge CSSession *)user_data;
+    if (!self.shareClipboard ||
+        self.guestClipboardGeneration != self.clipboardGeneration) {
+        SPICE_DEBUG("ignoring stale clipboard_release");
+        return;
+    }
     [self.pasteboardDelegate clearContents];
 }
 
@@ -306,7 +332,8 @@ static void cs_channel_destroy(SpiceSession *session, SpiceChannel *channel,
                                                  selector:@selector(pasteboardDidRemove:)
                                                      name:kCSPasteboardRemovedNotification
                                                    object:nil];
-        self.shareClipboard = YES;
+        _shareClipboard = YES;
+        self.clipboardGeneration = 1;
     }
     return self;
 }
@@ -364,9 +391,8 @@ static void cs_channel_destroy(SpiceSession *session, SpiceChannel *channel,
 
 - (void)pasteboardDidChange:(NSNotification *)notification {
     SPICE_DEBUG("[CocoaSpice] seen UIPasteboardChangedNotification");
-    if (!self.main || !self.shareClipboard || self.sessionReadOnly || !self.pasteboardDelegate) {
-        return;
-    }
+    // NotificationCenter calls us on AppKit's main thread. Inspect NSPasteboard
+    // here, then cross into the GLib context before reading session state.
     guint32 type = VD_AGENT_CLIPBOARD_NONE;
     id<CSPasteboardDelegate> pb = self.pasteboardDelegate;
     if ([pb canReadItemForType:kCSPasteboardTypePng]) {
@@ -382,28 +408,44 @@ static void cs_channel_destroy(SpiceSession *session, SpiceChannel *channel,
     } else {
         SPICE_DEBUG("[CocoaSpice] pasteboard with unrecognized type");
     }
-    if (spice_main_channel_agent_test_capability(self.main, VD_AGENT_CAP_CLIPBOARD_BY_DEMAND)) {
-        [CSMain.sharedInstance asyncWith:^{
-            guint32 _type = type;
-            spice_main_channel_clipboard_selection_grab(self.main, VD_AGENT_CLIPBOARD_SELECTION_CLIPBOARD, &_type, 1);
-        }];
-    }
+    [CSMain.sharedInstance asyncWith:^{
+        if (!self.main || !self.shareClipboard || self.sessionReadOnly || !self.pasteboardDelegate) {
+            return;
+        }
+        if (spice_main_channel_agent_test_capability(self.main, VD_AGENT_CAP_CLIPBOARD_BY_DEMAND)) {
+            guint32 offeredType = type;
+            spice_main_channel_clipboard_selection_grab(self.main,
+                                                        VD_AGENT_CLIPBOARD_SELECTION_CLIPBOARD,
+                                                        &offeredType, 1);
+        }
+    }];
 }
 
 - (void)pasteboardDidRemove:(NSNotification *)notification {
     SPICE_DEBUG("[CocoaSpice] seen UIPasteboardRemovedNotification");
-    if (!self.main || !self.shareClipboard || self.sessionReadOnly) {
-        return;
-    }
-    if (spice_main_channel_agent_test_capability(self.main, VD_AGENT_CAP_CLIPBOARD_BY_DEMAND)) {
-        [CSMain.sharedInstance asyncWith:^{
+    [CSMain.sharedInstance asyncWith:^{
+        if (!self.main || !self.shareClipboard || self.sessionReadOnly) {
+            return;
+        }
+        if (spice_main_channel_agent_test_capability(self.main, VD_AGENT_CAP_CLIPBOARD_BY_DEMAND)) {
             guint32 type = VD_AGENT_CLIPBOARD_UTF8_TEXT;
             spice_main_channel_clipboard_selection_grab(self.main, VD_AGENT_CLIPBOARD_SELECTION_CLIPBOARD, &type, 1);
-        }];
-    }
+        }
+    }];
 }
 
 #pragma mark - Instance methods
+
+- (void)setShareClipboard:(BOOL)shareClipboard {
+    if (_shareClipboard == shareClipboard) {
+        return;
+    }
+    _shareClipboard = shareClipboard;
+    self.clipboardGeneration += 1;
+    // Any responses to requests made under the previous state are stale, even
+    // if sharing is enabled again before those responses arrive.
+    self.guestClipboardGeneration = 0;
+}
 
 - (BOOL)sessionReadOnly {
     return spice_session_get_read_only(_session);

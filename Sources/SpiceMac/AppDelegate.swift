@@ -8,6 +8,7 @@ import SpiceController
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     private var windowControllers: [SpiceWindowController] = []
+    private var clients: [SpiceClient] = []
     private var didOpenAny = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -44,8 +45,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     // MARK: - Preferences
 
     @objc func toggleShareClipboard(_ sender: NSMenuItem) {
-        Preferences.shareClipboard.toggle()
-        sender.state = Preferences.shareClipboard ? .on : .off
+        let enabled = !Preferences.shareClipboard
+        Preferences.shareClipboard = enabled
+        for client in clients {
+            client.shareClipboard = enabled
+        }
+        sender.state = enabled ? .on : .off
     }
 
     @objc func toggleTrashConnectionFile(_ sender: NSMenuItem) {
@@ -86,9 +91,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             let client = SpiceClient(parameters: params)
             client.shareClipboard = Preferences.shareClipboard
             let controller = SpiceWindowController(client: client, sourceURL: url)
-            controller.onClose = { [weak self, weak controller] in
+            controller.onClose = { [weak self, weak controller, weak client] in
                 self?.windowControllers.removeAll { $0 === controller }
+                self?.clients.removeAll { $0 === client }
             }
+            clients.append(client)
             windowControllers.append(controller)
             controller.showWindow(nil)
             client.connect()

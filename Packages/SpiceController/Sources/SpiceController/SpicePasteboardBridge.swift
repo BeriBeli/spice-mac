@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 import AppKit
 import CocoaSpice
+import SpiceClipboardLogic
 
 /// Bridges the SPICE shared clipboard to the macOS general `NSPasteboard`.
 ///
@@ -20,6 +21,7 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
     private var lastChangeCount: Int
     /// changeCount produced by our own (guest→host) writes, so the poller ignores them.
     private var selfWriteChangeCount: Int = -1
+    private let sharingGate = ClipboardSharingGate()
 
     public init(pasteboard: NSPasteboard = .general) {
         self.pasteboard = pasteboard
@@ -28,6 +30,17 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
     }
 
     // MARK: - Host clipboard monitoring (host → guest)
+
+    /// Enable or disable both directions of the bridge. Changing the value also
+    /// invalidates guest writes that were queued under an older sharing state.
+    public func setSharingEnabled(_ enabled: Bool) {
+        sharingGate.setEnabled(enabled)
+        if enabled {
+            startMonitoring()
+        } else {
+            stopMonitoring()
+        }
+    }
 
     /// Begin polling the host pasteboard. Call once the session is connected.
     public func startMonitoring() {
@@ -64,12 +77,14 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
 
     @objc(canReadItemForType:)
     public func canReadItem(for type: CSPasteboardType) -> Bool {
+        guard sharingGate.tokenIfEnabled() != nil else { return false }
         guard let nsType = Self.nsType(type) else { return false }
         return pasteboard.availableType(from: [nsType]) != nil
     }
 
     @objc(dataForType:)
     public func data(for type: CSPasteboardType) -> Data? {
+        guard sharingGate.tokenIfEnabled() != nil else { return nil }
         guard let nsType = Self.nsType(type) else { return nil }
         return pasteboard.data(forType: nsType)
     }
@@ -89,8 +104,11 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
 
     @objc(setData:forType:)
     public func setData(_ data: Data, for type: CSPasteboardType) {
-        guard let nsType = Self.nsType(type), data.count <= Self.maxClipboardBytes else { return }
+        guard let token = sharingGate.tokenIfEnabled(),
+              let nsType = Self.nsType(type),
+              data.count <= Self.maxClipboardBytes else { return }
         onMain {
+            guard self.sharingGate.accepts(token) else { return }
             _ = self.pasteboard.setData(data, forType: nsType)
             self.markSelfWrite()
         }
@@ -98,7 +116,8 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
 
     @objc(string)
     public func string() -> String? {
-        pasteboard.string(forType: .string)
+        guard sharingGate.tokenIfEnabled() != nil else { return nil }
+        return pasteboard.string(forType: .string)
     }
 
     @objc(setString:)
@@ -106,8 +125,11 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
         // A malicious guest can send non-UTF8 bytes as "UTF8 text", which arrives
         // here as nil — drop it rather than crash (and don't clobber the host
         // clipboard with garbage). Also cap the size.
-        guard let string, string.utf8.count <= Self.maxClipboardBytes else { return }
+        guard let token = sharingGate.tokenIfEnabled(),
+              let string,
+              string.utf8.count <= Self.maxClipboardBytes else { return }
         onMain {
+            guard self.sharingGate.accepts(token) else { return }
             _ = self.pasteboard.setString(string, forType: .string)
             self.markSelfWrite()
         }
@@ -115,7 +137,9 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
 
     @objc(clearContents)
     public func clearContents() {
+        guard let token = sharingGate.tokenIfEnabled() else { return }
         onMain {
+            guard self.sharingGate.accepts(token) else { return }
             self.pasteboard.clearContents()
             self.markSelfWrite()
         }

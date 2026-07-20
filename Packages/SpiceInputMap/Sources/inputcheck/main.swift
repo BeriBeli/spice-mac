@@ -131,6 +131,17 @@ t.test("ordinary non-modifier flagsChanged events are ignored") {
     )
 }
 
+t.test("spurious flagsChanged events cannot reconcile partial modifier flags") {
+    t.expect(SpiceKeyboardRouting.handlesFlagsChanged(MacVirtualKey.shift),
+             "real modifier transitions must still be handled")
+    t.expect(SpiceKeyboardRouting.handlesFlagsChanged(MacVirtualKey.capsLock),
+             "Caps Lock edges must still be handled")
+    t.expect(!SpiceKeyboardRouting.handlesFlagsChanged(MacVirtualKey.a),
+             "synthetic key-code-zero/A flagsChanged must be ignored before reconciliation")
+    t.expect(!SpiceKeyboardRouting.handlesFlagsChanged(MacVirtualKey.period),
+             "ordinary punctuation flagsChanged must not alter held modifiers")
+}
+
 t.test("PID-zero hardware events stay on the physical route") {
     t.expect(!SpiceKeyboardRouting.usesSyntheticModifierChord(sourcePID: 0),
              "hardware source PID 0 must not synthesize modifiers")
@@ -170,6 +181,31 @@ t.test("synthetic control chord is balanced") {
             keyCode: MacVirtualKey.c, ownedModifiers: down.ownedModifiers
         ),
         [.release(MacVirtualKey.c), .release(MacVirtualKey.control)]
+    )
+}
+
+t.test("synthetic control-shift-C preserves Shift for the entire C stroke") {
+    let down = SpiceKeyboardRouting.syntheticKeyDownTransitions(
+        keyCode: MacVirtualKey.c,
+        requestedModifiers: [MacVirtualKey.control, MacVirtualKey.shift]
+    )
+    t.expectEqual(
+        down.transitions,
+        [
+            .press(MacVirtualKey.control),
+            .press(MacVirtualKey.shift),
+            .press(MacVirtualKey.c),
+        ]
+    )
+    t.expectEqual(
+        SpiceKeyboardRouting.syntheticKeyUpTransitions(
+            keyCode: MacVirtualKey.c, ownedModifiers: down.ownedModifiers
+        ),
+        [
+            .release(MacVirtualKey.c),
+            .release(MacVirtualKey.shift),
+            .release(MacVirtualKey.control),
+        ]
     )
 }
 

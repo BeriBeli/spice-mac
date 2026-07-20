@@ -22,7 +22,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// Handles data sharing between client and server
 @interface CSSession : NSObject
 
-/// Set to false to disable clipboard sharing (default to true)
+/// Set to false to disable clipboard sharing (default to true). Once the session
+/// is connected, mutate this property from the CSMain GLib context.
 @property (nonatomic) BOOL shareClipboard;
 
 /// Set to the pasteboard handler delegate

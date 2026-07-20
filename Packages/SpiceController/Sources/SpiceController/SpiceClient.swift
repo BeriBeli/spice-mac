@@ -38,10 +38,12 @@ public final class SpiceClient: NSObject, ObservableObject {
     /// The most recently announced inputs channel (keyboard/mouse).
     public private(set) var primaryInput: CSInput?
 
-    /// Whether to share the clipboard with the guest (both directions). Set before
-    /// `connect()`. While on, anything copied on the host is sent to the guest, so
-    /// disable it for untrusted VMs.
-    public var shareClipboard: Bool = true
+    /// Whether to share the clipboard with the guest (both directions). Changes
+    /// apply to an active connection immediately. While on, anything copied on the
+    /// host is sent to the guest, so disable it for untrusted VMs.
+    public var shareClipboard: Bool = true {
+        didSet { onMain { self.applyClipboardSharing() } }
+    }
 
     /// USB redirection manager for the active connection, if any.
     public var usbManager: CSUSBManager? { connection?.usbManager }
@@ -131,11 +133,7 @@ public final class SpiceClient: NSObject, ObservableObject {
             return
         }
 
-        // Poll the host pasteboard so host→guest copy works (macOS has no native
-        // pasteboard-change notification) — only when sharing is enabled.
-        if shareClipboard {
-            pasteboard.startMonitoring()
-        }
+        applyClipboardSharing()
     }
 
     /// Request disconnect. Final teardown is reported via `spiceDisconnected:`.
@@ -145,6 +143,29 @@ public final class SpiceClient: NSObject, ObservableObject {
 
     private func onMain(_ work: @escaping () -> Void) {
         if Thread.isMainThread { work() } else { DispatchQueue.main.async(execute: work) }
+    }
+
+    /// Apply the preference to an already-created session as well as the host
+    /// pasteboard poller. This makes the Connection menu effective immediately,
+    /// rather than only for the next single-use `.vv` connection.
+    private func applyClipboardSharing() {
+        guard let connection else { return }
+        let enabled = shareClipboard
+        if enabled {
+            // Serialize the non-atomic Objective-C property with every SPICE
+            // clipboard callback before allowing host pasteboard access.
+            CSMain.shared.sync {
+                connection.session.shareClipboard = true
+            }
+            pasteboard.setSharingEnabled(true)
+        } else {
+            // Close the AppKit-side gate first, then invalidate pending guest
+            // responses in the SPICE context before returning to the menu action.
+            pasteboard.setSharingEnabled(false)
+            CSMain.shared.sync {
+                connection.session.shareClipboard = false
+            }
+        }
     }
 }
 
@@ -158,7 +179,9 @@ extension SpiceClient: CSConnectionDelegate {
 
     public func spiceDisconnected(_ connection: CSConnection) {
         onMain {
-            self.pasteboard.stopMonitoring()
+            // Also invalidate guest writes already queued for AppKit; merely
+            // stopping the host poller would leave those closures authorized.
+            self.pasteboard.setSharingEnabled(false)
             self.status = .disconnected
             self.agentConnected = false
             self.supportsDynamicResolution = false

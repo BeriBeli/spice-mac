@@ -97,6 +97,7 @@ public final class SpiceInputRouter {
     /// held modifier so a stuck one self-corrects on the next event.
     public func flagsChanged(_ event: NSEvent) {
         let kc = event.keyCode
+        guard SpiceKeyboardRouting.handlesFlagsChanged(kc) else { return }
         if let flag = Self.modifierFlag(for: kc) {
             let isDown = event.modifierFlags.contains(flag)
             if isDown && !heldModifiers.contains(kc) {

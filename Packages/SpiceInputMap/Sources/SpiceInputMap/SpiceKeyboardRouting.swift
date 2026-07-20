@@ -12,6 +12,24 @@ public enum SpiceKeyTransition: Equatable {
 /// the key event, without sending the `flagsChanged` events used by hardware.
 /// These helpers turn that one synthetic event into a balanced guest chord.
 public enum SpiceKeyboardRouting {
+    /// Whether a `flagsChanged` event names a real modifier/lock key. Some
+    /// CGEvent injectors emit an extra `flagsChanged` with an ordinary key code
+    /// and an incomplete flags mask. The router must drop that event entirely:
+    /// reconciling from its partial mask can release a real Shift/Control that is
+    /// still part of the injected chord.
+    public static func handlesFlagsChanged(_ keyCode: UInt16) -> Bool {
+        switch keyCode {
+        case MacVirtualKey.command, MacVirtualKey.rightCommand,
+             MacVirtualKey.shift, MacVirtualKey.rightShift,
+             MacVirtualKey.control, MacVirtualKey.rightControl,
+             MacVirtualKey.option, MacVirtualKey.rightOption,
+             MacVirtualKey.function, MacVirtualKey.capsLock:
+            return true
+        default:
+            return false
+        }
+    }
+
     /// AppKit delivers Caps Lock through `flagsChanged`, but synthetic input can
     /// also produce `flagsChanged` for ordinary key codes. Only the actual lock
     /// key is an edge; treating every unknown code as a lock key injects a
