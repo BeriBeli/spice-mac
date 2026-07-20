@@ -43,6 +43,7 @@ public final class SpiceInputRouter {
 
     private var buttonMask: CSInputButton = []
     private var heldModifiers: Set<UInt16> = []
+    private var syntheticChordModifiers: [UInt16: [UInt16]] = [:]
 
     public init(input: CSInput? = nil) {
         self.input = input
@@ -54,13 +55,39 @@ public final class SpiceInputRouter {
         // Recover any modifier that was released while we weren't getting events
         // (e.g. a ⌘-combo the system intercepted) before sending the key.
         reconcileModifiers(event.modifierFlags)
+        if isSynthetic(event), !event.isARepeat {
+            let route = SpiceKeyboardRouting.syntheticKeyDownTransitions(
+                keyCode: event.keyCode,
+                requestedModifiers: Self.modifierKeyCodes(in: event.modifierFlags),
+                heldModifiers: heldModifiers
+            )
+            syntheticChordModifiers[event.keyCode] = route.ownedModifiers
+            for transition in route.transitions { sendKeyTransition(transition) }
+            return
+        }
         // Auto-repeats are forwarded as additional presses, which the guest expects.
         sendKey(event.keyCode, pressed: true)
     }
 
     public func keyUp(_ event: NSEvent) {
         reconcileModifiers(event.modifierFlags)
+        if isSynthetic(event), let owned = syntheticChordModifiers.removeValue(forKey: event.keyCode) {
+            for transition in SpiceKeyboardRouting.syntheticKeyUpTransitions(
+                keyCode: event.keyCode,
+                ownedModifiers: owned
+            ) { sendKeyTransition(transition) }
+            return
+        }
         sendKey(event.keyCode, pressed: false)
+    }
+
+    private func sendKeyTransition(_ transition: SpiceKeyTransition) {
+        switch transition {
+        case let .press(keyCode):
+            sendKey(keyCode, pressed: true)
+        case let .release(keyCode):
+            sendKey(keyCode, pressed: false)
+        }
     }
 
     /// macOS reports a modifier transition via `flagsChanged` but not its
@@ -122,6 +149,20 @@ public final class SpiceInputRouter {
         }
     }
 
+    private static func modifierKeyCodes(in flags: NSEvent.ModifierFlags) -> [UInt16] {
+        var result: [UInt16] = []
+        if flags.contains(.control) { result.append(MacVirtualKey.control) }
+        if flags.contains(.option) { result.append(MacVirtualKey.option) }
+        if flags.contains(.shift) { result.append(MacVirtualKey.shift) }
+        if flags.contains(.command) { result.append(MacVirtualKey.command) }
+        return result
+    }
+
+    private func isSynthetic(_ event: NSEvent) -> Bool {
+        let sourcePID = event.cgEvent?.getIntegerValueField(.eventSourceUnixProcessID)
+        return SpiceKeyboardRouting.usesSyntheticModifierChord(sourcePID: sourcePID)
+    }
+
     private func sendKey(_ keyCode: UInt16, pressed: Bool) {
         guard let input,
               let code = SpiceScancode.cocoaSpiceCode(forMacVirtualKey: keyCode) else { return }
@@ -143,6 +184,7 @@ public final class SpiceInputRouter {
             input.releaseKeys()
         }
         heldModifiers.removeAll()
+        syntheticChordModifiers.removeAll()
         buttonMask = []
     }
 

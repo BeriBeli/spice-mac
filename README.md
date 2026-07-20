@@ -14,7 +14,7 @@ UTM uses). Apple-Silicon only.
 > resize; keyboard including ⌘/modifiers; mouse with the guest cursor aligned to
 > the macOS pointer; bidirectional clipboard; and audio (needs a SPICE audio
 > device on the VM). USB redirection is plumbed via the Connection menu. The `.vv`
-> parser and keyboard map are also unit-tested (38 dependency-free checks).
+> parser and keyboard map are also unit-tested (45 dependency-free checks).
 >
 > | Feature | Status |
 > |---|---|
@@ -180,8 +180,8 @@ CA.
 The pure-Swift libraries build and test with just the Swift toolchain (no Xcode):
 
 ```sh
-( cd Packages/VVConfig     && swift run vvcheck )     # .vv parser: 15 checks
-( cd Packages/SpiceInputMap && swift run inputcheck )  # scancode map: 13 checks
+( cd Packages/VVConfig     && swift run vvcheck )     # .vv parser: 25 checks
+( cd Packages/SpiceInputMap && swift run inputcheck )  # scancode/synthetic routing: 20 checks
 ```
 
 The CocoaSpice fork patch was syntax-checked against the real vendored

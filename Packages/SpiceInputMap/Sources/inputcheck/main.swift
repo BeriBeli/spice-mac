@@ -110,6 +110,80 @@ t.test("unmapped keys return nil") {
     t.expect(code(0xFE) == nil, "0xFE should be unmapped")
 }
 
+t.test("PID-zero hardware events stay on the physical route") {
+    t.expect(!SpiceKeyboardRouting.usesSyntheticModifierChord(sourcePID: 0),
+             "hardware source PID 0 must not synthesize modifiers")
+}
+
+t.test("only positive source PIDs use the synthetic modifier route") {
+    t.expect(SpiceKeyboardRouting.usesSyntheticModifierChord(sourcePID: 38250),
+             "Computer Use source PID must synthesize modifiers")
+    t.expect(!SpiceKeyboardRouting.usesSyntheticModifierChord(sourcePID: nil),
+             "an NSEvent without a CGEvent must stay physical")
+    t.expect(!SpiceKeyboardRouting.usesSyntheticModifierChord(sourcePID: -1),
+             "invalid source metadata must stay physical")
+}
+
+t.test("synthetic shifted key becomes a balanced guest chord") {
+    let down = SpiceKeyboardRouting.syntheticKeyDownTransitions(
+        keyCode: MacVirtualKey.four,
+        requestedModifiers: [MacVirtualKey.shift]
+    )
+    t.expectEqual(down.transitions, [.press(MacVirtualKey.shift), .press(MacVirtualKey.four)])
+    t.expectEqual(
+        SpiceKeyboardRouting.syntheticKeyUpTransitions(
+            keyCode: MacVirtualKey.four, ownedModifiers: down.ownedModifiers
+        ),
+        [.release(MacVirtualKey.four), .release(MacVirtualKey.shift)]
+    )
+}
+
+t.test("synthetic control chord is balanced") {
+    let down = SpiceKeyboardRouting.syntheticKeyDownTransitions(
+        keyCode: MacVirtualKey.c,
+        requestedModifiers: [MacVirtualKey.control]
+    )
+    t.expectEqual(down.transitions, [.press(MacVirtualKey.control), .press(MacVirtualKey.c)])
+    t.expectEqual(
+        SpiceKeyboardRouting.syntheticKeyUpTransitions(
+            keyCode: MacVirtualKey.c, ownedModifiers: down.ownedModifiers
+        ),
+        [.release(MacVirtualKey.c), .release(MacVirtualKey.control)]
+    )
+}
+
+t.test("synthetic plain key preserves its physical key code") {
+    let down = SpiceKeyboardRouting.syntheticKeyDownTransitions(
+        keyCode: MacVirtualKey.keypad0,
+        requestedModifiers: []
+    )
+    t.expectEqual(down.transitions, [.press(MacVirtualKey.keypad0)])
+    t.expectEqual(down.ownedModifiers, [])
+}
+
+t.test("synthetic chord does not own a physically held modifier") {
+    let down = SpiceKeyboardRouting.syntheticKeyDownTransitions(
+        keyCode: MacVirtualKey.a,
+        requestedModifiers: [MacVirtualKey.shift],
+        heldModifiers: [MacVirtualKey.shift]
+    )
+    t.expectEqual(down.transitions, [.press(MacVirtualKey.a)])
+    t.expectEqual(down.ownedModifiers, [])
+}
+
+t.test("synthetic multi-modifier releases in reverse order") {
+    let down = SpiceKeyboardRouting.syntheticKeyDownTransitions(
+        keyCode: MacVirtualKey.c,
+        requestedModifiers: [MacVirtualKey.control, MacVirtualKey.shift]
+    )
+    t.expectEqual(
+        SpiceKeyboardRouting.syntheticKeyUpTransitions(
+            keyCode: MacVirtualKey.c, ownedModifiers: down.ownedModifiers
+        ),
+        [.release(MacVirtualKey.c), .release(MacVirtualKey.shift), .release(MacVirtualKey.control)]
+    )
+}
+
 t.test("all scancodes are unique (no accidental duplicate make codes)") {
     let values = Array(SpiceScancode.table.values)
     let unique = Set(values)

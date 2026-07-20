@@ -7,7 +7,7 @@ on:
 
 # The full app needs Xcode's Metal toolchain and the native SPICE sysroot, neither
 # of which CI fetches. These jobs cover what builds and tests with only the Swift
-# toolchain: the .vv parser and the macOS-keycode → scancode map (28 checks).
+# toolchain: the .vv parser and keyboard input routing (45 checks).
 # The CocoaSpice fork patch is syntax-checked as part of the local Xcode build
 # (it needs the Metal/CocoaSpiceRenderer modules, so it can't run standalone here).
 
@@ -25,7 +25,7 @@ jobs:
         working-directory: Packages/VVConfig
         run: swift run vvcheck
 
-      - name: SpiceInputMap — keycode → scancode checks
+      - name: SpiceInputMap — keycode/scancode and synthetic-routing checks
         working-directory: Packages/SpiceInputMap
         run: swift run inputcheck
 
