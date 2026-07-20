@@ -110,6 +110,27 @@ t.test("unmapped keys return nil") {
     t.expect(code(0xFE) == nil, "0xFE should be unmapped")
 }
 
+t.test("only Caps Lock produces a lock-key edge from flagsChanged") {
+    t.expectEqual(
+        SpiceKeyboardRouting.lockKeyTransitions(forFlagsChanged: MacVirtualKey.capsLock),
+        [.press(MacVirtualKey.capsLock), .release(MacVirtualKey.capsLock)]
+    )
+}
+
+t.test("synthetic flagsChanged key code zero does not inject A") {
+    t.expectEqual(
+        SpiceKeyboardRouting.lockKeyTransitions(forFlagsChanged: MacVirtualKey.a),
+        []
+    )
+}
+
+t.test("ordinary non-modifier flagsChanged events are ignored") {
+    t.expectEqual(
+        SpiceKeyboardRouting.lockKeyTransitions(forFlagsChanged: MacVirtualKey.p),
+        []
+    )
+}
+
 t.test("PID-zero hardware events stay on the physical route") {
     t.expect(!SpiceKeyboardRouting.usesSyntheticModifierChord(sourcePID: 0),
              "hardware source PID 0 must not synthesize modifiers")

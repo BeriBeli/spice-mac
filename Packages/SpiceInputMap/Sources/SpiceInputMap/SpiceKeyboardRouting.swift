@@ -12,6 +12,15 @@ public enum SpiceKeyTransition: Equatable {
 /// the key event, without sending the `flagsChanged` events used by hardware.
 /// These helpers turn that one synthetic event into a balanced guest chord.
 public enum SpiceKeyboardRouting {
+    /// AppKit delivers Caps Lock through `flagsChanged`, but synthetic input can
+    /// also produce `flagsChanged` for ordinary key codes. Only the actual lock
+    /// key is an edge; treating every unknown code as a lock key injects a
+    /// spurious keystroke (key code 0 becomes `A`).
+    public static func lockKeyTransitions(forFlagsChanged keyCode: UInt16) -> [SpiceKeyTransition] {
+        guard keyCode == MacVirtualKey.capsLock else { return [] }
+        return [.press(keyCode), .release(keyCode)]
+    }
+
     /// Hardware events report source PID 0. Accessibility/CGEvent injectors
     /// report their process PID. Missing/invalid source metadata stays on the
     /// physical path so the fallback cannot broaden accidentally.

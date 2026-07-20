@@ -117,8 +117,9 @@ public final class SpiceInputRouter {
             // flagsChanged per physical tap, so send a full press+release as one
             // keystroke. Tracking it as "held" would send press-now / release-on-
             // next-tap and latch it down on the guest in between.
-            sendKey(kc, pressed: true)
-            sendKey(kc, pressed: false)
+            for transition in SpiceKeyboardRouting.lockKeyTransitions(forFlagsChanged: kc) {
+                sendKeyTransition(transition)
+            }
         }
         reconcileModifiers(event.modifierFlags)
     }
