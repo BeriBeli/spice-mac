@@ -19,7 +19,7 @@ jobs:
     name: Pure-Swift checks
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Show toolchain
         run: swift --version
@@ -47,6 +47,6 @@ jobs:
     name: shellcheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: shellcheck scripts
         run: shellcheck --severity=warning -x scripts/*.sh
