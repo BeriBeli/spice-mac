@@ -59,27 +59,21 @@
         completion:(completionCallback_t)completion {
     /* lockless operation, need to get a copy of renderers */
     NSArray<id<CSRenderer>> *renderers = self.renderers;
-    __block atomic_int numRemaining = renderers.count;
-    if (renderers.count > 0) {
+    if (renderers.count == 0) {
+        completion();
+    } else {
         [renderers[0] renderSouce:self
                        copyBuffer:sourceBuffer
                            region:region
                      sourceOffset:sourceOffset
                 sourceBytesPerRow:sourceBytesPerRow
-                       completion:^{
-            if (atomic_fetch_sub(&numRemaining, 1) == 1) {
-                completion();
-            }
-        }];
+                       completion:completion];
     }
     if (renderers.count > 1) {
-        // invalidate all others
+        // CSMetalRenderer instances on one device share a command queue, so their
+        // texture reads remain GPU-ordered without waiting for presentation.
         for (NSInteger i = 1; i < renderers.count; i++) {
-            [renderers[i] invalidateRenderSource:self withCompletion:^{
-                if (atomic_fetch_sub(&numRemaining, 1) == 1) {
-                    completion();
-                }
-            }];
+            [renderers[i] invalidateRenderSource:self withCompletion:nil];
         }
     }
 }
@@ -87,6 +81,10 @@
 - (void)invalidateWithCompletion:(completionCallback_t)completion {
     /* lockless operation, need to get a copy of renderers */
     NSArray<id<CSRenderer>> *renderers = self.renderers;
+    if (renderers.count == 0) {
+        completion();
+        return;
+    }
     __block atomic_int numRemaining = renderers.count;
     for (NSInteger i = 0; i < renderers.count; i++) {
         [renderers[i] invalidateRenderSource:self withCompletion:^{

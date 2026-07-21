@@ -7,7 +7,7 @@ export DEVELOPER_DIR
 
 .DEFAULT_GOAL := help
 
-.PHONY: help doctor setup build run test test-clipboard test-cursor all openssl icon debug root release check-version clean distclean
+.PHONY: help doctor setup build run test test-clipboard test-cursor test-stutter test-latency all openssl icon debug root release check-version clean distclean
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-14s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
@@ -35,6 +35,12 @@ test-clipboard: ## Run focused clipboard sharing-gate tests
 
 test-cursor: ## Run focused cursor policy and lifecycle tests
 	@swift test --package-path Packages/SpiceCursorLogic
+
+test-stutter: ## Run focused regression tests for known stutter risks
+	@swift test --filter StutterRiskRegressionTests
+
+test-latency: ## Run controlled GLib queue-wait and execution-timing tests
+	@swift test --filter CSMainLatencyDiagnosticsTests
 
 all: doctor setup build ## Doctor, fetch the sysroot, and build (first-time setup)
 

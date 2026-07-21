@@ -24,7 +24,7 @@ Thanks for your interest! SpiceMac is a native macOS SPICE client for Proxmox VE
 toolchain (no Xcode/sysroot):
 
 ```sh
-make test     # the two dependency-free runners: vvcheck (.vv parser) + inputcheck (keymap)
+make test     # 55 dependency-free parser, input, clipboard, and cursor checks
 ```
 
 The full app needs **Xcode** + the **Metal toolchain component**
@@ -33,7 +33,13 @@ The full app needs **Xcode** + the **Metal toolchain component**
 ```sh
 make doctor   # checks the above and prints fixes if anything's missing
 make all      # fetch the sysroot, then build → build/SpiceMac.app
+make test-stutter  # native CocoaSpice stutter-risk regression checks
+make test-latency  # controlled GLib queue-wait/execution timing checks
 ```
+
+The two native test targets are local release gates. They link CocoaSpice and its
+staged frameworks, so the dependency-free GitHub Actions job intentionally does
+not run them.
 
 See [README.md](README.md) for prerequisites and details.
 
@@ -82,6 +88,6 @@ the existing ones).
 ## Pull requests
 
 - Keep PRs focused; explain the "why".
-- Run the two check runners (`vvcheck` / `inputcheck`) and, for native changes,
-  `clang -fsyntax-only` over the patched ObjC if relevant.
+- Run `make test`; for input, clipboard, renderer, or GLib scheduling changes,
+  also run `make test-stutter`, `make test-latency`, and a full app build.
 - Note any security implications — see [SECURITY.md](SECURITY.md).

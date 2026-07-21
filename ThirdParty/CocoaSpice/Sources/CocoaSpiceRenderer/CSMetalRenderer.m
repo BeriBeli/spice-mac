@@ -98,6 +98,29 @@ NS_ASSUME_NONNULL_END
 
 @end
 
+/// Renderers attached to the same display share a texture. A command queue per
+/// texture provides GPU ordering between uploads and draws without serializing
+/// unrelated displays that merely use the same Metal device.
+static id<MTLCommandQueue> sharedCommandQueueForTexture(id<MTLTexture> texture,
+                                                        id<MTLDevice> device) {
+    if (!texture) {
+        return [device newCommandQueue];
+    }
+    static NSMapTable<id<MTLTexture>, id<MTLCommandQueue>> *queues;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        queues = [NSMapTable weakToStrongObjectsMapTable];
+    });
+    @synchronized (queues) {
+        id<MTLCommandQueue> queue = [queues objectForKey:texture];
+        if (!queue) {
+            queue = [device newCommandQueue];
+            [queues setObject:queue forKey:texture];
+        }
+        return queue;
+    }
+}
+
 // Main class performing the rendering
 @implementation CSMetalRenderer
 {
@@ -237,6 +260,14 @@ NS_ASSUME_NONNULL_END
     [self.renderCompletions removeAllObjects];
 }
 
+/// Must be called from the main thread. These callbacks belong only to the
+/// frame being submitted; later invalidations stay queued for a later frame.
+- (NSArray<completionCallback_t> *)_takeDrawCompletions {
+    NSArray<completionCallback_t> *completions = self.renderCompletions.copy;
+    [self.renderCompletions removeAllObjects];
+    return completions;
+}
+
 /// Create a translation+scale matrix
 static matrix_float4x4 matrix_scale_translate(CGFloat scale, CGPoint translate)
 {
@@ -278,6 +309,7 @@ static matrix_float4x4 matrix_scale_translate(CGFloat scale, CGPoint translate)
     id<CAMetalDrawable> currentDrawable = view.currentDrawable;
 
     if (renderPassDescriptor == nil || currentDrawable == nil) {
+        [self _completeDraw];
         return;
     }
 
@@ -301,10 +333,14 @@ static matrix_float4x4 matrix_scale_translate(CGFloat scale, CGPoint translate)
     renderPassDescriptor:renderPassDescriptor];
 
     [commandBuffer presentDrawable:currentDrawable];
+    self.renderNeedsUpdate = NO;
+    NSArray<completionCallback_t> *frameCompletions = [self _takeDrawCompletions];
 
     [commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> commandBuffer) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self _completeDraw];
+            for (completionCallback_t completion in frameCompletions) {
+                completion();
+            }
         });
     }];
 
@@ -328,7 +364,8 @@ static matrix_float4x4 matrix_scale_translate(CGFloat scale, CGPoint translate)
         return;
     }
 
-    id<MTLCommandBuffer> commandBuffer = [_commandQueue commandBuffer];
+    id<MTLCommandQueue> commandQueue = sharedCommandQueueForTexture(sourceData.texture, _device);
+    id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
     commandBuffer.label = @"Blit Command Buffer";
     id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
     blitEncoder.label = @"Renderer Canvas Updates";
@@ -345,12 +382,16 @@ static matrix_float4x4 matrix_scale_translate(CGFloat scale, CGPoint translate)
 
     [blitEncoder endEncoding];
 
+    if (completion) {
+        [commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> commandBuffer) {
+            dispatch_async(dispatch_get_main_queue(), completion);
+        }];
+    }
+
     [commandBuffer commit];
 
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (completion) {
-            [self _addDrawCompletion:completion];
-        }
+        self->_commandQueue = commandQueue;
         self.renderSourceData = sourceData;
         self.renderNeedsUpdate = YES;
     });
@@ -366,7 +407,9 @@ static matrix_float4x4 matrix_scale_translate(CGFloat scale, CGPoint translate)
         return;
     }
 
+    id<MTLCommandQueue> commandQueue = sharedCommandQueueForTexture(sourceData.texture, _device);
     dispatch_async(dispatch_get_main_queue(), ^{
+        self->_commandQueue = commandQueue;
         if (completion) {
             [self _addDrawCompletion:completion];
         }

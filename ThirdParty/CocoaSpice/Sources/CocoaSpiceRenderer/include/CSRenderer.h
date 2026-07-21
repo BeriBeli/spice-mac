@@ -41,7 +41,8 @@ typedef void (^completionCallback_t)(void);
 ///   - region: Region in the source texture to draw to
 ///   - sourceOffset: Offset in the source buffer to copy from
 ///   - sourceBytesPerRow: Stride of the source buffer
-///   - completion: Block to run after the texture is rendered
+///   - completion: Block delivered on the main thread after the GPU upload has
+///     completed. This does not wait for a later display presentation.
 - (void)renderSouce:(id<CSRenderSource>)renderSource
          copyBuffer:(id<MTLBuffer>)sourceBuffer
              region:(MTLRegion)region

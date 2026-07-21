@@ -9,8 +9,10 @@ on:
 # of which CI fetches. These jobs cover what builds and tests with only the Swift
 # toolchain: .vv parsing, keyboard input routing, clipboard gating, and cursor
 # presentation/lifecycle policy (55 checks).
-# The CocoaSpice fork patch is syntax-checked as part of the local Xcode build
-# (it needs the Metal/CocoaSpiceRenderer modules, so it can't run standalone here).
+# The CocoaSpice fork patch and the focused stutter/latency XCTest targets are
+# release-gated locally with `make test-stutter`, `make test-latency`, and
+# `make build`. They need the staged native frameworks plus Xcode's Metal modules,
+# so they cannot run in this dependency-free job.
 
 jobs:
   swift-tests:

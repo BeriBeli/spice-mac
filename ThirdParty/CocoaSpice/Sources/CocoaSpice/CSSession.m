@@ -30,6 +30,15 @@ const NSNotificationName kCSPasteboardRemovedNotification = @"CSPasteboardRemove
 /// Mutated only in the SPICE GLib context after connection setup.
 @property (nonatomic) NSUInteger clipboardGeneration;
 @property (nonatomic) NSUInteger guestClipboardGeneration;
+/// Guest clipboard reads awaiting a main-thread pasteboard lookup. Mutated only
+/// in the SPICE GLib context; one entry per supported clipboard type bounds work.
+@property (nonatomic) NSMutableSet<NSString *> *clipboardRequestsInFlight;
+@property (nonatomic) NSUInteger clipboardReadsOutstanding;
+@property (nonatomic) guint32 hostClipboardOfferedType;
+/// Snapshot of the host clipboard for the current generation. Values are NSData
+/// or NSNull for a missing representation, so repeated guest requests never
+/// rematerialize promised pasteboard data on AppKit's main thread.
+@property (nonatomic) NSMutableDictionary<NSNumber *, id> *clipboardReadCache;
 
 @end
 
@@ -64,6 +73,20 @@ static CSPasteboardType cspbTypeForClipboardType(guint type)
         }
     }
     return kCSPasteboardTypeString;
+}
+
+static BOOL cs_clipboard_type_is_supported(guint type)
+{
+    switch (type) {
+        case VD_AGENT_CLIPBOARD_UTF8_TEXT:
+        case VD_AGENT_CLIPBOARD_IMAGE_PNG:
+        case VD_AGENT_CLIPBOARD_IMAGE_BMP:
+        case VD_AGENT_CLIPBOARD_IMAGE_TIFF:
+        case VD_AGENT_CLIPBOARD_IMAGE_JPG:
+            return YES;
+        default:
+            return NO;
+    }
 }
 
 // helper from spice-util.c
@@ -255,19 +278,64 @@ static gboolean cs_clipboard_request(SpiceMainChannel *main, guint selection,
         return FALSE;
     }
 
+    if (!cs_clipboard_type_is_supported(type)) {
+        SPICE_DEBUG("ignoring unsupported clipboard type: %u", type);
+        return FALSE;
+    }
+    if (type != self.hostClipboardOfferedType) {
+        SPICE_DEBUG("ignoring clipboard type that was not offered: %u", type);
+        return FALSE;
+    }
+
+    NSUInteger generation = self.clipboardGeneration;
+    id cachedValue = self.clipboardReadCache[@(type)];
+    if (cachedValue) {
+        if (cachedValue != NSNull.null) {
+            NSData *cachedData = cachedValue;
+            spice_main_channel_clipboard_selection_notify(main, selection, type,
+                                                          cachedData.bytes, cachedData.length);
+        }
+        return TRUE;
+    }
+
+    NSString *requestKey = [NSString stringWithFormat:@"%p:%lu:%u",
+                            main, (unsigned long)generation, type];
+    if ([self.clipboardRequestsInFlight containsObject:requestKey]) {
+        return TRUE;
+    }
+    if (self.clipboardReadsOutstanding >= 5) {
+        SPICE_DEBUG("ignoring clipboard request: too many reads in flight");
+        return FALSE;
+    }
+    [self.clipboardRequestsInFlight addObject:requestKey];
+    self.clipboardReadsOutstanding += 1;
+
     CSPasteboardType cspbType = cspbTypeForClipboardType(type);
-    NSData *data = [self.pasteboardDelegate dataForType:cspbType];
-    if (data) {
-        NSUInteger generation = self.clipboardGeneration;
-        g_object_ref(main);
-        [CSMain.sharedInstance asyncWith:^{
-            if (self.shareClipboard && generation == self.clipboardGeneration) {
-                spice_main_channel_clipboard_selection_notify(main, selection, type,
-                                                              data.bytes, data.length);
+    g_object_ref(main);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        BOOL measurePasteboard = CSMain.sharedInstance.latencyObserver != nil;
+        NSTimeInterval pasteboardStartedAt = measurePasteboard ? CFAbsoluteTimeGetCurrent() : 0;
+        NSData *data = [self.pasteboardDelegate dataForType:cspbType];
+        if (measurePasteboard) {
+            [CSMain.sharedInstance reportExecutionTime:CFAbsoluteTimeGetCurrent() - pasteboardStartedAt
+                                              forLabel:@"clipboard.read"];
+        }
+        [CSMain.sharedInstance asyncWithLabel:@"clipboard.notify" block:^{
+            [self.clipboardRequestsInFlight removeObject:requestKey];
+            if (self.clipboardReadsOutstanding > 0) {
+                self.clipboardReadsOutstanding -= 1;
+            }
+            if (self.main == main && self.shareClipboard &&
+                generation == self.clipboardGeneration) {
+                self.clipboardReadCache[@(type)] = data ?: NSNull.null;
+                if (data) {
+                    spice_main_channel_clipboard_selection_notify(main, selection, type,
+                                                                  data.bytes, data.length);
+                }
             }
             g_object_unref(main);
         }];
-    }
+    });
 
     return TRUE;
 }
@@ -310,6 +378,12 @@ static void cs_channel_destroy(SpiceSession *session, SpiceChannel *channel,
 
     if (SPICE_IS_MAIN_CHANNEL(channel)) {
         g_assert(SPICE_MAIN_CHANNEL(channel) == self.main);
+        NSString *requestPrefix = [NSString stringWithFormat:@"%p:", channel];
+        for (NSString *requestKey in self.clipboardRequestsInFlight.copy) {
+            if ([requestKey hasPrefix:requestPrefix]) {
+                [self.clipboardRequestsInFlight removeObject:requestKey];
+            }
+        }
         g_signal_handlers_disconnect_by_func(channel, G_CALLBACK(cs_clipboard_grab), (__bridge void *)self);
         g_signal_handlers_disconnect_by_func(channel, G_CALLBACK(cs_clipboard_request), (__bridge void *)self);
         g_signal_handlers_disconnect_by_func(channel, G_CALLBACK(cs_clipboard_release), (__bridge void *)self);
@@ -334,6 +408,9 @@ static void cs_channel_destroy(SpiceSession *session, SpiceChannel *channel,
                                                    object:nil];
         _shareClipboard = YES;
         self.clipboardGeneration = 1;
+        self.clipboardRequestsInFlight = [NSMutableSet set];
+        self.clipboardReadCache = [NSMutableDictionary dictionary];
+        self.hostClipboardOfferedType = VD_AGENT_CLIPBOARD_NONE;
     }
     return self;
 }
@@ -409,6 +486,10 @@ static void cs_channel_destroy(SpiceSession *session, SpiceChannel *channel,
         SPICE_DEBUG("[CocoaSpice] pasteboard with unrecognized type");
     }
     [CSMain.sharedInstance asyncWith:^{
+        self.clipboardGeneration += 1;
+        [self.clipboardReadCache removeAllObjects];
+        [self.clipboardRequestsInFlight removeAllObjects];
+        self.hostClipboardOfferedType = type;
         if (!self.main || !self.shareClipboard || self.sessionReadOnly || !self.pasteboardDelegate) {
             return;
         }
@@ -424,6 +505,10 @@ static void cs_channel_destroy(SpiceSession *session, SpiceChannel *channel,
 - (void)pasteboardDidRemove:(NSNotification *)notification {
     SPICE_DEBUG("[CocoaSpice] seen UIPasteboardRemovedNotification");
     [CSMain.sharedInstance asyncWith:^{
+        self.clipboardGeneration += 1;
+        [self.clipboardReadCache removeAllObjects];
+        [self.clipboardRequestsInFlight removeAllObjects];
+        self.hostClipboardOfferedType = VD_AGENT_CLIPBOARD_UTF8_TEXT;
         if (!self.main || !self.shareClipboard || self.sessionReadOnly) {
             return;
         }
@@ -442,6 +527,8 @@ static void cs_channel_destroy(SpiceSession *session, SpiceChannel *channel,
     }
     _shareClipboard = shareClipboard;
     self.clipboardGeneration += 1;
+    [self.clipboardReadCache removeAllObjects];
+    [self.clipboardRequestsInFlight removeAllObjects];
     // Any responses to requests made under the previous state are stale, even
     // if sharing is enabled again before those responses arrive.
     self.guestClipboardGeneration = 0;

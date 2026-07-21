@@ -15,6 +15,7 @@
 //
 
 #import "CSMain.h"
+#import <QuartzCore/QuartzCore.h>
 #import <glib.h>
 #import <spice-client.h>
 #import <pthread.h>
@@ -31,6 +32,10 @@
 
 @property (nonatomic, copy) dispatch_block_t userBlock;
 @property (nonatomic, nullable, strong) dispatch_group_t group;
+@property (nonatomic, copy) NSString *diagnosticLabel;
+@property (nonatomic) NSTimeInterval enqueuedAt;
+@property (nonatomic) BOOL measuresLatency;
+@property (nonatomic, nullable, copy) CSMainLatencyObserver_t latencyObserver;
 
 @end
 
@@ -177,9 +182,60 @@ void *spice_main_loop(void *args) {
     }
 }
 
+static dispatch_queue_t latencyObserverQueue(void) {
+    static dispatch_queue_t queue;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        queue = dispatch_queue_create("CocoaSpice.CSMainLatencyObserver",
+                                      DISPATCH_QUEUE_SERIAL);
+        dispatch_set_target_queue(queue,
+                                  dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
+    });
+    return queue;
+}
+
+static dispatch_semaphore_t latencyObserverSlots(void) {
+    static dispatch_semaphore_t slots;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        slots = dispatch_semaphore_create(128);
+    });
+    return slots;
+}
+
+static void deliverLatencySample(CSMainLatencyObserver_t observer,
+                                 NSString *label,
+                                 NSTimeInterval queueWait,
+                                 NSTimeInterval executionTime) {
+    dispatch_semaphore_t slots = latencyObserverSlots();
+    if (dispatch_semaphore_wait(slots, DISPATCH_TIME_NOW) != 0) {
+        return;
+    }
+    dispatch_async(latencyObserverQueue(), ^{
+        @try {
+            observer(label, queueWait, executionTime);
+        } @finally {
+            dispatch_semaphore_signal(slots);
+        }
+    });
+}
+
 static gboolean callBlockInMainContext(gpointer data) {
     _CSMainBlock *block = (__bridge _CSMainBlock *)data;
+    if (!block.measuresLatency) {
+        block.userBlock();
+        return FALSE;
+    }
+    NSTimeInterval startedAt = CACurrentMediaTime();
     block.userBlock();
+    NSTimeInterval executionTime = CACurrentMediaTime() - startedAt;
+    CSMainLatencyObserver_t observer = block.latencyObserver;
+    if (observer) {
+        deliverLatencySample(observer,
+                             block.diagnosticLabel,
+                             MAX(0, startedAt - block.enqueuedAt),
+                             MAX(0, executionTime));
+    }
     return FALSE;
 }
 
@@ -192,6 +248,11 @@ static void cleanupBlock(gpointer data) {
 }
 
 - (void)asyncWithBlock:(_CSMainBlock *)block {
+    block.latencyObserver = self.latencyObserver;
+    block.measuresLatency = block.latencyObserver != nil;
+    if (block.measuresLatency) {
+        block.enqueuedAt = CACurrentMediaTime();
+    }
     gpointer data = (__bridge_retained void *)block;
     g_main_context_invoke_full(self.glibMainContext,
                                G_PRIORITY_DEFAULT,
@@ -201,9 +262,21 @@ static void cleanupBlock(gpointer data) {
 }
 
 - (void)asyncWith:(dispatch_block_t)block {
+    [self asyncWithLabel:@"unlabelled" block:block];
+}
+
+- (void)asyncWithLabel:(NSString *)label block:(dispatch_block_t)block {
     _CSMainBlock *_block = [[_CSMainBlock alloc] init];
     _block.userBlock = block;
+    _block.diagnosticLabel = label;
     [self asyncWithBlock:_block];
+}
+
+- (void)reportExecutionTime:(NSTimeInterval)executionTime forLabel:(NSString *)label {
+    CSMainLatencyObserver_t observer = self.latencyObserver;
+    if (observer) {
+        deliverLatencySample(observer, label, 0, MAX(0, executionTime));
+    }
 }
 
 - (void)syncWith:(dispatch_block_t)block {
@@ -215,6 +288,7 @@ static void cleanupBlock(gpointer data) {
         dispatch_group_enter(mainContextGroup);
         _block.userBlock = block;
         _block.group = mainContextGroup;
+        _block.diagnosticLabel = @"sync";
         [self asyncWithBlock:_block];
         dispatch_group_wait(mainContextGroup, DISPATCH_TIME_FOREVER);
     }

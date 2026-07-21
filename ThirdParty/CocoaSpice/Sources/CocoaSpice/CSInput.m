@@ -21,15 +21,55 @@
 #import <spice-client.h>
 #import <spice/protocol.h>
 
+typedef NS_ENUM(NSUInteger, _CSInputPointerKind) {
+    _CSInputPointerKindRelative,
+    _CSInputPointerKindAbsolute,
+};
+
+@interface _CSInputPointerBatch : NSObject
+
+@property (nonatomic) _CSInputPointerKind kind;
+@property (nonatomic) CGPoint point;
+@property (nonatomic) CSInputButton buttonMask;
+@property (nonatomic) NSInteger monitorID;
+
+@end
+
+@implementation _CSInputPointerBatch
+@end
+
+@interface _CSInputScrollBatch : NSObject
+
+@property (nonatomic) CGFloat deltaY;
+@property (nonatomic) CSInputButton buttonMask;
+
+@end
+
+
+@implementation _CSInputScrollBatch
+@end
+
 @interface CSInput ()
 
 @property (nonatomic, readwrite) SpiceInputsChannel *channel;
+
+- (void)enqueueBoundaryWithLabel:(NSString *)label block:(dispatch_block_t)block;
+- (void)enqueueCoalescedPointer:(_CSInputPointerKind)kind
+                           point:(CGPoint)point
+                      buttonMask:(CSInputButton)buttonMask
+                       monitorID:(NSInteger)monitorID;
+- (void)enqueueCoalescedScroll:(CSInputScroll)type
+                        deltaY:(CGFloat)deltaY
+                    buttonMask:(CSInputButton)buttonMask;
 
 @end
 
 @implementation CSInput {
     CGFloat                 _scroll_delta_y;
-    
+    _CSInputPointerBatch    *_pendingPointerBatch;
+    _CSInputScrollBatch     *_pendingScrollBatch;
+    NSUInteger              _pendingInputSubmissionCount;
+
     uint32_t                _key_state[512 / 32];
 }
 
@@ -55,7 +95,7 @@
     if (!self.channel) {
         return;
     }
-    [CSMain.sharedInstance asyncWith:^{
+    [self enqueueBoundaryWithLabel:@"input.pause" block:^{
         SpiceInputsChannel *inputs = self.channel;
         /* Send proper scancodes. This will send same scancodes
          * as hardware.
@@ -89,7 +129,7 @@
     m = (1u << b);
     g_return_if_fail(i < SPICE_N_ELEMENTS(self->_key_state));
     
-    [CSMain.sharedInstance asyncWith:^{
+    [self enqueueBoundaryWithLabel:@"input.key" block:^{
         SpiceInputsChannel *inputs = self.channel;
         switch (type) {
             case kCSInputKeyPress:
@@ -167,7 +207,7 @@
         locks |= SPICE_INPUTS_SCROLL_LOCK;
     }
     
-    [CSMain.sharedInstance asyncWith:^{
+    [self enqueueBoundaryWithLabel:@"input.key-lock" block:^{
         spice_inputs_channel_set_key_locks(self.channel, locks);
     }];
 }
@@ -216,6 +256,141 @@ static int cs_button_to_spice(CSInputButton button)
     return spice;
 }
 
+/// Stop later motion from being folded into the batch queued before a key,
+/// button, scroll, or mouse-mode event. This preserves FIFO event boundaries
+/// while still bounding consecutive pointer motion to one GLib submission.
+- (void)enqueueBoundaryWithLabel:(NSString *)label block:(dispatch_block_t)block {
+    @synchronized (self) {
+        _pendingPointerBatch = nil;
+        _pendingScrollBatch = nil;
+        [CSMain.sharedInstance asyncWithLabel:label block:block];
+    }
+}
+
+- (void)enqueueCoalescedPointer:(_CSInputPointerKind)kind
+                           point:(CGPoint)point
+                      buttonMask:(CSInputButton)buttonMask
+                       monitorID:(NSInteger)monitorID {
+    _CSInputPointerBatch *batch;
+
+    @synchronized (self) {
+        _pendingScrollBatch = nil;
+        batch = _pendingPointerBatch;
+        BOOL needsSubmission = NO;
+        if (!batch || batch.kind != kind || batch.monitorID != monitorID) {
+            if (_pendingInputSubmissionCount >= 32) {
+                return;
+            }
+            batch = [_CSInputPointerBatch new];
+            batch.kind = kind;
+            batch.monitorID = monitorID;
+            _pendingPointerBatch = batch;
+            _pendingInputSubmissionCount += 1;
+            needsSubmission = YES;
+        }
+        if (kind == _CSInputPointerKindRelative) {
+            batch.point = CGPointMake(batch.point.x + point.x, batch.point.y + point.y);
+        } else {
+            batch.point = point;
+        }
+        batch.buttonMask = buttonMask;
+        if (needsSubmission) {
+            NSString *label = kind == _CSInputPointerKindRelative
+                ? @"input.pointer.relative"
+                : @"input.pointer.absolute";
+            [CSMain.sharedInstance asyncWithLabel:label block:^{
+                CGPoint coalescedPoint;
+                CSInputButton coalescedButtonMask;
+                NSInteger coalescedMonitorID;
+                @synchronized (self) {
+                    if (self->_pendingInputSubmissionCount > 0) {
+                        self->_pendingInputSubmissionCount -= 1;
+                    }
+                    coalescedPoint = batch.point;
+                    coalescedButtonMask = batch.buttonMask;
+                    coalescedMonitorID = batch.monitorID;
+                    if (self->_pendingPointerBatch == batch) {
+                        self->_pendingPointerBatch = nil;
+                    }
+                }
+
+                if (kind == _CSInputPointerKindRelative) {
+                    if (self.serverModeCursor) {
+                        spice_inputs_channel_motion(self.channel,
+                                                    coalescedPoint.x,
+                                                    coalescedPoint.y,
+                                                    cs_button_mask_to_spice(coalescedButtonMask));
+                    }
+                } else if (!self.serverModeCursor) {
+                    spice_inputs_channel_position(self.channel,
+                                                  coalescedPoint.x,
+                                                  coalescedPoint.y,
+                                                  (int)coalescedMonitorID,
+                                                  cs_button_mask_to_spice(coalescedButtonMask));
+                }
+            }];
+        }
+    }
+}
+
+- (void)enqueueCoalescedScroll:(CSInputScroll)type
+                        deltaY:(CGFloat)deltaY
+                    buttonMask:(CSInputButton)buttonMask {
+    _CSInputScrollBatch *batch;
+    @synchronized (self) {
+        _pendingPointerBatch = nil;
+        batch = _pendingScrollBatch;
+        BOOL needsSubmission = NO;
+        if (!batch) {
+            if (_pendingInputSubmissionCount >= 32) {
+                return;
+            }
+            batch = [_CSInputScrollBatch new];
+            _pendingScrollBatch = batch;
+            _pendingInputSubmissionCount += 1;
+            needsSubmission = YES;
+        }
+        if (type == kCSInputScrollUp) {
+            batch.deltaY -= 1;
+        } else if (type == kCSInputScrollDown) {
+            batch.deltaY += 1;
+        } else {
+            batch.deltaY += deltaY;
+        }
+        batch.buttonMask = buttonMask;
+        if (needsSubmission) {
+            [CSMain.sharedInstance asyncWithLabel:@"input.scroll" block:^{
+                CGFloat coalescedDeltaY;
+                CSInputButton coalescedButtonMask;
+                @synchronized (self) {
+                    if (self->_pendingInputSubmissionCount > 0) {
+                        self->_pendingInputSubmissionCount -= 1;
+                    }
+                    coalescedDeltaY = batch.deltaY;
+                    coalescedButtonMask = batch.buttonMask;
+                    if (self->_pendingScrollBatch == batch) {
+                        self->_pendingScrollBatch = nil;
+                    }
+                }
+                gint buttonState = cs_button_mask_to_spice(coalescedButtonMask);
+                // Bound work in one GLib callback. Under an extreme burst, keep
+                // the newest direction but drop excess steps rather than blocking
+                // input, display, and clipboard processing behind thousands of
+                // synthetic button events.
+                self->_scroll_delta_y = MAX(-32, MIN(32, self->_scroll_delta_y + coalescedDeltaY));
+                while (ABS(self->_scroll_delta_y) >= 1) {
+                    gint button = self->_scroll_delta_y < 0
+                        ? SPICE_MOUSE_BUTTON_UP
+                        : SPICE_MOUSE_BUTTON_DOWN;
+                    spice_inputs_channel_button_press(self.channel, button, buttonState);
+                    spice_inputs_channel_button_release(self.channel, button, buttonState);
+                    self->_scroll_delta_y += self->_scroll_delta_y < 0 ? 1 : -1;
+                }
+            }];
+        }
+    }
+}
+
 - (void)sendMouseMotion:(CSInputButton)buttonMask relativePoint:(CGPoint)relativePoint forMonitorID:(NSInteger)monitorID {
     if (!self.channel) {
         return;
@@ -224,14 +399,10 @@ static int cs_button_to_spice(CSInputButton button)
         return;
     }
     
-    [CSMain.sharedInstance asyncWith:^{
-        if (!self.serverModeCursor) {
-            SPICE_DEBUG("[CocoaSpice] %s:%d ignoring mouse motion event since we are in client mode", __FUNCTION__, __LINE__);
-        } else {
-            spice_inputs_channel_motion(self.channel, relativePoint.x, relativePoint.y,
-                                        cs_button_mask_to_spice(buttonMask));
-        }
-    }];
+    [self enqueueCoalescedPointer:_CSInputPointerKindRelative
+                            point:relativePoint
+                       buttonMask:buttonMask
+                        monitorID:monitorID];
 }
 
 - (void)sendMouseMotion:(CSInputButton)buttonMask relativePoint:(CGPoint)relativePoint {
@@ -246,14 +417,10 @@ static int cs_button_to_spice(CSInputButton button)
         return;
     }
     
-    [CSMain.sharedInstance asyncWith:^{
-        if (self.serverModeCursor) {
-            SPICE_DEBUG("[CocoaSpice] %s:%d ignoring mouse position event since we are in server mode", __FUNCTION__, __LINE__);
-        } else {
-            spice_inputs_channel_position(self.channel, absolutePoint.x, absolutePoint.y, (int)monitorID,
-                                          cs_button_mask_to_spice(buttonMask));
-        }
-    }];
+    [self enqueueCoalescedPointer:_CSInputPointerKindAbsolute
+                            point:absolutePoint
+                       buttonMask:buttonMask
+                        monitorID:monitorID];
 }
 
 - (void)sendMousePosition:(CSInputButton)buttonMask absolutePoint:(CGPoint)absolutePoint {
@@ -261,8 +428,6 @@ static int cs_button_to_spice(CSInputButton button)
 }
 
 - (void)sendMouseScroll:(CSInputScroll)type buttonMask:(CSInputButton)buttonMask dy:(CGFloat)dy {
-    gint button_state = cs_button_mask_to_spice(buttonMask);
-    
     SPICE_DEBUG("%s", __FUNCTION__);
     
     if (!self.channel) {
@@ -271,36 +436,8 @@ static int cs_button_to_spice(CSInputButton button)
     if (self.disableInputs) {
         return;
     }
-    
-    [CSMain.sharedInstance asyncWith:^{
-        SpiceInputsChannel *inputs = self.channel;
-        switch (type) {
-            case kCSInputScrollUp:
-                spice_inputs_channel_button_press(inputs, SPICE_MOUSE_BUTTON_UP, button_state);
-                spice_inputs_channel_button_release(inputs, SPICE_MOUSE_BUTTON_UP, button_state);
-                break;
-            case kCSInputScrollDown:
-                spice_inputs_channel_button_press(inputs, SPICE_MOUSE_BUTTON_DOWN, button_state);
-                spice_inputs_channel_button_release(inputs, SPICE_MOUSE_BUTTON_DOWN, button_state);
-                break;
-            case kCSInputScrollSmooth:
-                self->_scroll_delta_y += dy;
-                while (ABS(self->_scroll_delta_y) >= 1) {
-                    if (self->_scroll_delta_y < 0) {
-                        spice_inputs_channel_button_press(inputs, SPICE_MOUSE_BUTTON_UP, button_state);
-                        spice_inputs_channel_button_release(inputs, SPICE_MOUSE_BUTTON_UP, button_state);
-                        self->_scroll_delta_y += 1;
-                    } else {
-                        spice_inputs_channel_button_press(inputs, SPICE_MOUSE_BUTTON_DOWN, button_state);
-                        spice_inputs_channel_button_release(inputs, SPICE_MOUSE_BUTTON_DOWN, button_state);
-                        self->_scroll_delta_y -= 1;
-                    }
-                }
-                break;
-            default:
-                SPICE_DEBUG("unsupported scroll direction");
-        }
-    }];
+
+    [self enqueueCoalescedScroll:type deltaY:dy buttonMask:buttonMask];
 }
 
 - (void)sendMouseButton:(CSInputButton)button mask:(CSInputButton)mask pressed:(BOOL)pressed {
@@ -315,7 +452,7 @@ static int cs_button_to_spice(CSInputButton button)
         return;
     }
     
-    [CSMain.sharedInstance asyncWith:^{
+    [self enqueueBoundaryWithLabel:@"input.button" block:^{
         SpiceInputsChannel *inputs = self.channel;
         if (pressed) {
             spice_inputs_channel_button_press(inputs,
@@ -333,7 +470,7 @@ static int cs_button_to_spice(CSInputButton button)
     if (!self.spiceMain) {
         return;
     }
-    [CSMain.sharedInstance asyncWith:^{
+    [self enqueueBoundaryWithLabel:@"input.mouse-mode" block:^{
         SpiceMainChannel *main = self.spiceMain;
         if (server) {
             spice_main_channel_request_mouse_mode(main, SPICE_MOUSE_MODE_SERVER);

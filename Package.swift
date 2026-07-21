@@ -52,6 +52,15 @@ spiceLinkFlags += ["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Framew
 spiceLinkFlags += ["-Xlinker", "-rpath", "-Xlinker", "@loader_path/../Frameworks"]
 
 let nativeSpiceLinkerSettings: [LinkerSetting] = [.unsafeFlags(spiceLinkFlags)]
+var spiceTestLinkFlags = spiceLinkFlags
+// XCTest bundles run from .build/<triple>/debug/<name>.xctest/Contents/MacOS,
+// not from an assembled .app. Give that loader a stable path back to the staged
+// frameworks without copying them into generated test output.
+spiceTestLinkFlags += [
+    "-Xlinker", "-rpath",
+    "-Xlinker", "@loader_path/../../../../../../Frameworks",
+]
+let nativeSpiceTestLinkerSettings: [LinkerSetting] = [.unsafeFlags(spiceTestLinkFlags)]
 
 let package = Package(
     name: "SpiceMac",
@@ -99,6 +108,14 @@ let package = Package(
             ],
             path: "Sources/SpiceMac",
             linkerSettings: nativeSpiceLinkerSettings
+        ),
+        .testTarget(
+            name: "SpiceMacTests",
+            dependencies: [
+                .product(name: "CocoaSpice", package: "CocoaSpice"),
+            ],
+            path: "Tests/SpiceMacTests",
+            linkerSettings: nativeSpiceTestLinkerSettings
         ),
     ]
 )

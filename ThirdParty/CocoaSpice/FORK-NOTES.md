@@ -2,7 +2,7 @@
 
 This directory is a vendored copy of [utmapp/CocoaSpice](https://github.com/utmapp/CocoaSpice)
 (Apache License 2.0 — see `LICENSE`), the Objective-C/Metal SPICE client layer that
-UTM uses, with a single addition for **spice-mac**.
+UTM uses, with Proxmox support and downstream fixes for **spice-mac**.
 
 ## Why a fork is required
 
@@ -82,9 +82,17 @@ on a rebase:
   snapshot as an AppKit `NSCursor` in absolute mode and sets `isInhibited` so Metal
   does not render a second cursor. Cursor-channel teardown explicitly detaches the
   display, and changing inhibition invalidates it immediately.
+- **Input scheduling, clipboard requests, and Metal frame handoff** — coalesce
+  bursty pointer motion and scroll input before submitting bounded work to the
+  SPICE main context; move host pasteboard materialization off the GLib callback
+  with generation-scoped caching and bounded reads; and complete canvas uploads
+  after the Metal blit rather than after every display has presented. The renderer
+  now clears its dirty flag after submission and shares one command queue per
+  texture so secondary displays remain GPU-ordered without blocking the producer.
 
 ## Updating upstream
 
 To re-base onto a newer CocoaSpice: replace this directory with the new upstream
-tree and re-apply `../cocoaspice-proxmox.patch` (or re-add the three changes above).
-The patch is intentionally tiny and is a good candidate to upstream as a PR.
+tree, re-apply `../cocoaspice-proxmox.patch`, then re-apply the security and bug-fix
+entries above. The Proxmox patch is intentionally tiny and is a good candidate to
+upstream as a PR.
