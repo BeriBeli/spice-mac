@@ -65,7 +65,7 @@ enum MainMenu {
                                         action: #selector(AppDelegate.toggleShareClipboard(_:)), keyEquivalent: "")
         shareClipboard.state = Preferences.shareClipboard ? .on : .off
         shareClipboard.toolTip = "Share the clipboard with the VM (both directions). "
-            + "Takes effect on the next connection. Turn off for untrusted VMs."
+            + "Changes apply immediately. Turn off for untrusted VMs."
         connMenu.addItem(shareClipboard)
         connMenu.addItem(.separator())
         // USB submenu, populated dynamically by the window controller.

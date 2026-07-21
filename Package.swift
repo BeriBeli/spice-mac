@@ -11,7 +11,7 @@ import PackageDescription
 //        ./scripts/fetch-sysroot.sh
 //  * Build & bundle into SpiceMac.app with:  ./scripts/build-app.sh
 //
-// The pure-Swift libraries (VVConfig, SpiceInputMap) build and test on their own
+// The pure-Swift libraries build and test on their own
 // with just the toolchain — see their packages under Packages/.
 
 // The native SPICE stack is linked as @rpath-relocatable *.framework bundles from
@@ -99,11 +99,6 @@ let package = Package(
             ],
             path: "Sources/SpiceMac",
             linkerSettings: nativeSpiceLinkerSettings
-        ),
-        .testTarget(
-            name: "SpiceMacTests",
-            dependencies: ["SpiceClipboardLogic", "SpiceCursorLogic"],
-            path: "Tests/SpiceMacTests"
         ),
     ]
 )

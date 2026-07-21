@@ -22,7 +22,8 @@ final class SpiceDisplayView: MTKView {
     /// Tracks late cursor-channel attachment and subsequent shape/mode changes.
     private var displayCursorObservation: NSKeyValueObservation?
     private var cursorSnapshotObservation: NSKeyValueObservation?
-    private weak var attachedCursor: CSCursor?
+    private let cursorAttachment = CursorAttachmentSlot<CSCursor>()
+    private var attachedCursor: CSCursor? { cursorAttachment.value }
 
     /// The AppKit cursor installed over the SPICE display. In client/absolute
     /// mode this is built from the guest-provided shape; in server/relative mode
@@ -201,10 +202,10 @@ final class SpiceDisplayView: MTKView {
     // MARK: - Native guest cursor
 
     private func attachCursor(_ cursor: CSCursor?) {
-        guard attachedCursor !== cursor else { return }
-        attachedCursor?.isInhibited = false
+        let previousCursor = attachedCursor
+        guard cursorAttachment.replace(with: cursor) else { return }
+        previousCursor?.isInhibited = false
         cursorSnapshotObservation = nil
-        attachedCursor = cursor
         cursorSnapshotObservation = cursor?.observe(\.snapshot, options: [.initial, .new]) {
             [weak self, weak cursor] _, change in
             guard let snapshot = change.newValue else { return }

@@ -7,7 +7,7 @@ export DEVELOPER_DIR
 
 .DEFAULT_GOAL := help
 
-.PHONY: help doctor setup build run test test-cursor all openssl icon debug root release check-version clean distclean
+.PHONY: help doctor setup build run test test-clipboard test-cursor all openssl icon debug root release check-version clean distclean
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-14s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
@@ -24,12 +24,17 @@ build: ## Build and assemble build/SpiceMac.app
 run: ## Open build/SpiceMac.app
 	@open build/SpiceMac.app
 
-test: ## Run the dependency-free check runners (vvcheck + inputcheck)
+test: ## Run all dependency-free checks (55 tests)
 	@( cd Packages/VVConfig && swift run vvcheck )
 	@( cd Packages/SpiceInputMap && swift run inputcheck )
+	@swift test --package-path Packages/SpiceClipboardLogic
+	@swift test --package-path Packages/SpiceCursorLogic
 
-test-cursor: ## Run focused AppKit cursor regression tests (requires full Xcode/frameworks)
-	@swift test --filter SpiceCursorRegressionTests
+test-clipboard: ## Run focused clipboard sharing-gate tests
+	@swift test --package-path Packages/SpiceClipboardLogic
+
+test-cursor: ## Run focused cursor policy and lifecycle tests
+	@swift test --package-path Packages/SpiceCursorLogic
 
 all: doctor setup build ## Doctor, fetch the sysroot, and build (first-time setup)
 

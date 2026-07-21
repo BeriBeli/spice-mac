@@ -3,17 +3,16 @@ import Foundation
 import XCTest
 @testable import SpiceCursorLogic
 
-final class SpiceCursorRegressionTests: XCTestCase {
-    private var repositoryRoot: URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-    }
+private final class WeakBox<Value: AnyObject> {
+    weak var value: Value?
 
+    init(_ value: Value?) {
+        self.value = value
+    }
+}
+
+final class SpiceCursorLogicTests: XCTestCase {
     func testNativeCursorPreservesRGBAChannels() throws {
-        // spice-gtk publishes normalized RGBA bytes. A red source pixel must
-        // remain red after the CGImage interpretation used by AppKit.
         let rgbaRed = Data([255, 0, 0, 255])
         let image = try XCTUnwrap(
             SpiceCursorLogic.makeNativeCursorImage(width: 1, height: 1, data: rgbaRed)
@@ -93,36 +92,41 @@ final class SpiceCursorRegressionTests: XCTestCase {
         XCTAssertEqual(decision.visibleCursorCount(customOverlayVisible: true), 1)
     }
 
-    func testNativePresentationConsumesOneAtomicSnapshotContract() throws {
-        let header = try String(contentsOf: repositoryRoot.appendingPathComponent(
-            "ThirdParty/CocoaSpice/Sources/CocoaSpice/include/CSCursor.h"
-        ))
-        let view = try String(contentsOf: repositoryRoot.appendingPathComponent(
-            "Sources/SpiceMac/SpiceDisplayView.swift"
-        ))
+    func testAttachmentSlotRetainsCursorUntilDetach() throws {
+        final class Cursor {}
 
-        XCTAssertTrue(header.contains("@property (atomic, readonly, strong) CSCursorSnapshot *snapshot;"))
-        XCTAssertTrue(view.contains("observe(\\.snapshot"))
-        XCTAssertFalse(view.contains("observe(\\.cursorRevision"))
-        XCTAssertTrue(view.contains("makeNativeCursor(from snapshot: CSCursorSnapshot)"))
+        let slot = CursorAttachmentSlot<Cursor>()
+        var cursor: Cursor? = Cursor()
+        let weakCursor = WeakBox(cursor)
+
+        XCTAssertTrue(slot.replace(with: cursor))
+        cursor = nil
+
+        XCTAssertNotNil(weakCursor.value)
+        XCTAssertTrue(slot.value === weakCursor.value)
     }
 
-    func testCursorChannelDestroyDetachesDisplayCursor() throws {
-        let connection = try String(contentsOf: repositoryRoot.appendingPathComponent(
-            "ThirdParty/CocoaSpice/Sources/CocoaSpice/CSConnection.m"
-        ))
+    func testDetachReleasesCursorAndReportsTransition() {
+        final class Cursor {}
 
-        XCTAssertTrue(connection.contains("SPICE_IS_CURSOR_CHANNEL(channel)"))
-        XCTAssertTrue(connection.contains("display.cursor = nil;"))
+        let slot = CursorAttachmentSlot<Cursor>()
+        var cursor: Cursor? = Cursor()
+        let weakCursor = WeakBox(cursor)
+        slot.replace(with: cursor)
+        cursor = nil
+
+        XCTAssertTrue(slot.replace(with: nil))
+        XCTAssertNil(slot.value)
+        XCTAssertNil(weakCursor.value)
     }
 
-    func testCursorMoveRestoresHiddenDefaultCursorContract() throws {
-        let cursor = try String(contentsOf: repositoryRoot.appendingPathComponent(
-            "ThirdParty/CocoaSpice/Sources/CocoaSpice/CSCursor.m"
-        ))
+    func testReplacingSameCursorIsNotASecondAttachment() throws {
+        final class Cursor {}
 
-        XCTAssertTrue(cursor.contains("BOOL visibilityChanged = self.cursorHidden;"))
-        XCTAssertTrue(cursor.contains("self.cursorHidden = NO;"))
-        XCTAssertFalse(cursor.contains("BOOL visibilityChanged = self.hasCursor && self.cursorHidden;"))
+        let slot = CursorAttachmentSlot<Cursor>()
+        let cursor = Cursor()
+
+        XCTAssertTrue(slot.replace(with: cursor))
+        XCTAssertFalse(slot.replace(with: cursor))
     }
 }

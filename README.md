@@ -14,7 +14,8 @@ UTM uses). Apple-Silicon only.
 > resize; keyboard including ⌘/modifiers; mouse with the guest cursor aligned to
 > the macOS pointer; bidirectional clipboard; and audio (needs a SPICE audio
 > device on the VM). USB redirection is plumbed via the Connection menu. The `.vv`
-> parser and keyboard map are also unit-tested (42 dependency-free checks).
+> parser, keyboard map, clipboard gate, and cursor policy are also unit-tested
+> (55 dependency-free checks).
 >
 > | Feature | Status |
 > |---|---|
@@ -91,6 +92,8 @@ Native SPICE frameworks (arm64)   Frameworks/  (staged by scripts/fetch-sysroot.
 Pure-Swift, independently testable:
   VVConfig        Packages/VVConfig       — virt-viewer .vv parser (+ Proxmox)
   SpiceInputMap   Packages/SpiceInputMap  — macOS keycode → PC set-1 scancode
+  ClipboardLogic  Packages/SpiceClipboardLogic — clipboard sharing gate
+  CursorLogic     Packages/SpiceCursorLogic — cursor image, policy, and lifecycle
 ```
 
 The decisive design point: **CocoaSpice must be forked.** `CSConnection` keeps the
@@ -182,6 +185,8 @@ The pure-Swift libraries build and test with just the Swift toolchain (no Xcode)
 ```sh
 ( cd Packages/VVConfig     && swift run vvcheck )     # .vv parser: 25 checks
 ( cd Packages/SpiceInputMap && swift run inputcheck )  # scancode/flagsChanged routing: 17 checks
+swift test --package-path Packages/SpiceClipboardLogic # clipboard sharing gate: 4 tests
+swift test --package-path Packages/SpiceCursorLogic    # cursor policy/lifecycle: 9 tests
 ```
 
 The CocoaSpice fork patch was syntax-checked against the real vendored

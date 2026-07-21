@@ -1,6 +1,22 @@
 import CoreGraphics
 import Foundation
 
+/// Owns the cursor channel object for as long as the display view is attached.
+/// A nil replacement is always treated as a transition so callers can repeat
+/// teardown safely and still run their cleanup path.
+public final class CursorAttachmentSlot<Value: AnyObject> {
+    public private(set) var value: Value?
+
+    public init() {}
+
+    @discardableResult
+    public func replace(with next: Value?) -> Bool {
+        if let next, value === next { return false }
+        value = next
+        return true
+    }
+}
+
 public enum SpiceCursorLogic {
     public enum HostCursorPresentation: Equatable {
         case transparent

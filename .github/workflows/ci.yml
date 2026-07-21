@@ -7,7 +7,8 @@ on:
 
 # The full app needs Xcode's Metal toolchain and the native SPICE sysroot, neither
 # of which CI fetches. These jobs cover what builds and tests with only the Swift
-# toolchain: the .vv parser and keyboard input routing (45 checks).
+# toolchain: .vv parsing, keyboard input routing, clipboard gating, and cursor
+# presentation/lifecycle policy (55 checks).
 # The CocoaSpice fork patch is syntax-checked as part of the local Xcode build
 # (it needs the Metal/CocoaSpiceRenderer modules, so it can't run standalone here).
 
@@ -28,6 +29,14 @@ jobs:
       - name: SpiceInputMap — keycode/scancode and synthetic-routing checks
         working-directory: Packages/SpiceInputMap
         run: swift run inputcheck
+
+      - name: SpiceClipboardLogic — sharing-gate checks
+        working-directory: Packages/SpiceClipboardLogic
+        run: swift test
+
+      - name: SpiceCursorLogic — presentation and lifecycle checks
+        working-directory: Packages/SpiceCursorLogic
+        run: swift test
 
       - name: Version consistency (Info.plist / CHANGELOG / links)
         run: ./scripts/check-version.sh
