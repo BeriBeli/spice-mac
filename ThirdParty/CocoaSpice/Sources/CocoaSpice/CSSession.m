@@ -313,14 +313,8 @@ static gboolean cs_clipboard_request(SpiceMainChannel *main, guint selection,
     CSPasteboardType cspbType = cspbTypeForClipboardType(type);
     g_object_ref(main);
     dispatch_async(dispatch_get_main_queue(), ^{
-        BOOL measurePasteboard = CSMain.sharedInstance.latencyObserver != nil;
-        NSTimeInterval pasteboardStartedAt = measurePasteboard ? CFAbsoluteTimeGetCurrent() : 0;
         NSData *data = [self.pasteboardDelegate dataForType:cspbType];
-        if (measurePasteboard) {
-            [CSMain.sharedInstance reportExecutionTime:CFAbsoluteTimeGetCurrent() - pasteboardStartedAt
-                                              forLabel:@"clipboard.read"];
-        }
-        [CSMain.sharedInstance asyncWithLabel:@"clipboard.notify" block:^{
+        [CSMain.sharedInstance asyncWith:^{
             [self.clipboardRequestsInFlight removeObject:requestKey];
             if (self.clipboardReadsOutstanding > 0) {
                 self.clipboardReadsOutstanding -= 1;

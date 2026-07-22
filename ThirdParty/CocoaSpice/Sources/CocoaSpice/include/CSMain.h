@@ -19,9 +19,6 @@
 NS_ASSUME_NONNULL_BEGIN
 
 typedef void (^LogHandler_t)(NSString *line);
-typedef void (^CSMainLatencyObserver_t)(NSString *label,
-                                        NSTimeInterval queueWait,
-                                        NSTimeInterval executionTime);
 
 /// SPICE client lifetime management
 ///
@@ -53,12 +50,6 @@ typedef void (^CSMainLatencyObserver_t)(NSString *label,
 /// If set, SPICE logging will be sent to this callback
 @property (nonatomic, nullable) LogHandler_t logHandler;
 
-/// Optional low-overhead timing hook for tests and attached diagnostics.
-/// No samples are retained or logged by CocoaSpice. Keep the observer lightweight:
-/// it runs asynchronously on a serial utility queue after measured work completes.
-/// Samples are dropped if the observer falls more than 128 samples behind.
-@property (atomic, nullable, copy) CSMainLatencyObserver_t latencyObserver;
-
 - (instancetype)init NS_UNAVAILABLE;
 
 /// Set verbose logging
@@ -77,16 +68,6 @@ typedef void (^CSMainLatencyObserver_t)(NSString *label,
 /// Run a block in the SPICE GTK main context
 /// @param block Block to run
 - (void)asyncWith:(dispatch_block_t)block;
-
-/// Run a labelled block in the SPICE GTK main context. The label is reported to
-/// `latencyObserver` together with queue-wait and execution durations.
-- (void)asyncWithLabel:(NSString *)label
-                  block:(dispatch_block_t)block NS_SWIFT_NAME(async(label:block:));
-
-/// Report synchronous work that already runs in the SPICE context, such as a
-/// callback from spice-gtk. This is a no-op unless `latencyObserver` is installed.
-- (void)reportExecutionTime:(NSTimeInterval)executionTime
-                    forLabel:(NSString *)label NS_SWIFT_NAME(report(executionTime:label:));
 
 /// Run a block with main context lock held
 /// @param block Block to run

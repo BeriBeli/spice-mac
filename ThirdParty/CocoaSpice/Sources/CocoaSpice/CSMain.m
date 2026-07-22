@@ -15,7 +15,6 @@
 //
 
 #import "CSMain.h"
-#import <QuartzCore/QuartzCore.h>
 #import <glib.h>
 #import <spice-client.h>
 #import <pthread.h>
@@ -32,10 +31,6 @@
 
 @property (nonatomic, copy) dispatch_block_t userBlock;
 @property (nonatomic, nullable, strong) dispatch_group_t group;
-@property (nonatomic, copy) NSString *diagnosticLabel;
-@property (nonatomic) NSTimeInterval enqueuedAt;
-@property (nonatomic) BOOL measuresLatency;
-@property (nonatomic, nullable, copy) CSMainLatencyObserver_t latencyObserver;
 
 @end
 
@@ -43,7 +38,6 @@
 
 @implementation CSMain {
     GMainContext *_main_context;
-    GMainLoop *_main_loop;
 }
 
 static void logHandler(const gchar *log_domain, GLogLevelFlags log_level,
@@ -100,7 +94,11 @@ void *spice_main_loop(void *args) {
     
     g_main_context_ref(self->_main_context);
     g_main_context_push_thread_default(self->_main_context);
-    g_main_loop_run(self->_main_loop);
+    while (self.running) {
+        @autoreleasepool {
+            g_main_context_iteration(self->_main_context, TRUE);
+        }
+    }
     g_main_context_pop_thread_default(self->_main_context);
     g_main_context_unref(self->_main_context);
     
@@ -131,10 +129,6 @@ void *spice_main_loop(void *args) {
         if ((_main_context = g_main_context_new()) == NULL) {
             return nil;
         }
-        if ((_main_loop = g_main_loop_new(_main_context, FALSE)) == NULL) {
-            g_main_context_unref(_main_context);
-            return nil;
-        }
         g_log_set_default_handler(logHandler, NULL);
     }
     return self;
@@ -142,7 +136,6 @@ void *spice_main_loop(void *args) {
 
 - (void)dealloc {
     [self spiceStop];
-    g_main_loop_unref(_main_loop);
     g_main_context_unref(_main_context);
     g_log_set_default_handler(g_log_default_handler, NULL);
 }
@@ -159,10 +152,16 @@ void *spice_main_loop(void *args) {
             pthread_attr_t qosAttribute;
             pthread_attr_init(&qosAttribute);
             pthread_attr_set_qos_class_np(&qosAttribute, QOS_CLASS_USER_INTERACTIVE, 0);
-            if (pthread_create(&spiceThread, &qosAttribute, &spice_main_loop, (__bridge_retained void *)self) != 0) {
+            self.running = YES;
+            void *threadArgument = (__bridge_retained void *)self;
+            if (pthread_create(&spiceThread, &qosAttribute, &spice_main_loop, threadArgument) != 0) {
+                __unused id releasedSelf = (__bridge_transfer id)threadArgument;
+                self.running = NO;
+                spice_util_set_main_context(NULL);
+                pthread_attr_destroy(&qosAttribute);
                 return NO;
             }
-            self.running = YES;
+            pthread_attr_destroy(&qosAttribute);
             self.spiceThread = spiceThread;
         }
     }
@@ -173,69 +172,18 @@ void *spice_main_loop(void *args) {
     @synchronized (self) {
         if (self.running) {
             void *status;
-            spice_util_set_main_context(NULL);
-            g_main_loop_quit(_main_loop);
-            pthread_join(self.spiceThread, &status);
             self.running = NO;
+            spice_util_set_main_context(NULL);
+            g_main_context_wakeup(_main_context);
+            pthread_join(self.spiceThread, &status);
             self.spiceThread = NULL;
         }
     }
 }
 
-static dispatch_queue_t latencyObserverQueue(void) {
-    static dispatch_queue_t queue;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        queue = dispatch_queue_create("CocoaSpice.CSMainLatencyObserver",
-                                      DISPATCH_QUEUE_SERIAL);
-        dispatch_set_target_queue(queue,
-                                  dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
-    });
-    return queue;
-}
-
-static dispatch_semaphore_t latencyObserverSlots(void) {
-    static dispatch_semaphore_t slots;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        slots = dispatch_semaphore_create(128);
-    });
-    return slots;
-}
-
-static void deliverLatencySample(CSMainLatencyObserver_t observer,
-                                 NSString *label,
-                                 NSTimeInterval queueWait,
-                                 NSTimeInterval executionTime) {
-    dispatch_semaphore_t slots = latencyObserverSlots();
-    if (dispatch_semaphore_wait(slots, DISPATCH_TIME_NOW) != 0) {
-        return;
-    }
-    dispatch_async(latencyObserverQueue(), ^{
-        @try {
-            observer(label, queueWait, executionTime);
-        } @finally {
-            dispatch_semaphore_signal(slots);
-        }
-    });
-}
-
 static gboolean callBlockInMainContext(gpointer data) {
     _CSMainBlock *block = (__bridge _CSMainBlock *)data;
-    if (!block.measuresLatency) {
-        block.userBlock();
-        return FALSE;
-    }
-    NSTimeInterval startedAt = CACurrentMediaTime();
     block.userBlock();
-    NSTimeInterval executionTime = CACurrentMediaTime() - startedAt;
-    CSMainLatencyObserver_t observer = block.latencyObserver;
-    if (observer) {
-        deliverLatencySample(observer,
-                             block.diagnosticLabel,
-                             MAX(0, startedAt - block.enqueuedAt),
-                             MAX(0, executionTime));
-    }
     return FALSE;
 }
 
@@ -248,11 +196,6 @@ static void cleanupBlock(gpointer data) {
 }
 
 - (void)asyncWithBlock:(_CSMainBlock *)block {
-    block.latencyObserver = self.latencyObserver;
-    block.measuresLatency = block.latencyObserver != nil;
-    if (block.measuresLatency) {
-        block.enqueuedAt = CACurrentMediaTime();
-    }
     gpointer data = (__bridge_retained void *)block;
     g_main_context_invoke_full(self.glibMainContext,
                                G_PRIORITY_DEFAULT,
@@ -262,21 +205,9 @@ static void cleanupBlock(gpointer data) {
 }
 
 - (void)asyncWith:(dispatch_block_t)block {
-    [self asyncWithLabel:@"unlabelled" block:block];
-}
-
-- (void)asyncWithLabel:(NSString *)label block:(dispatch_block_t)block {
     _CSMainBlock *_block = [[_CSMainBlock alloc] init];
     _block.userBlock = block;
-    _block.diagnosticLabel = label;
     [self asyncWithBlock:_block];
-}
-
-- (void)reportExecutionTime:(NSTimeInterval)executionTime forLabel:(NSString *)label {
-    CSMainLatencyObserver_t observer = self.latencyObserver;
-    if (observer) {
-        deliverLatencySample(observer, label, 0, MAX(0, executionTime));
-    }
 }
 
 - (void)syncWith:(dispatch_block_t)block {
@@ -288,7 +219,6 @@ static void cleanupBlock(gpointer data) {
         dispatch_group_enter(mainContextGroup);
         _block.userBlock = block;
         _block.group = mainContextGroup;
-        _block.diagnosticLabel = @"sync";
         [self asyncWithBlock:_block];
         dispatch_group_wait(mainContextGroup, DISPATCH_TIME_FOREVER);
     }

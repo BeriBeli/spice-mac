@@ -192,14 +192,14 @@ swift test --package-path Packages/SpiceCursorLogic    # cursor policy/lifecycle
 The CocoaSpice fork patch was syntax-checked against the real vendored
 glib/spice headers (`clang -fsyntax-only`, exit 0).
 
-Changes that touch the native CocoaSpice input, clipboard, or Metal paths also
-have focused regression and timing checks. These need the staged native SPICE
+Changes that touch the native CocoaSpice input, clipboard, Metal, or worker paths
+also have focused regression and lifecycle checks. These need the staged native SPICE
 frameworks and full Xcode, so they run locally rather than in the dependency-free
 CI job:
 
 ```sh
 make test-stutter  # queue bounds, coalescing, clipboard handoff, renderer completion
-make test-latency  # controlled GLib queue-wait vs. execution-time diagnostics
+make test-worker   # SPICE worker stop/restart and autorelease-pool lifecycle
 ```
 
 ## Gotchas

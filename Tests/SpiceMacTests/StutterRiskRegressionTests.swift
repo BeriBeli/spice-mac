@@ -43,7 +43,7 @@ final class StutterRiskRegressionTests: XCTestCase {
             "The high-frequency path needs an explicit bounded coalescing policy."
         )
         XCTAssertFalse(
-            method.contains("asyncWithLabel"),
+            method.contains("asyncWith:"),
             "One GLib submission per pointer event permits an unbounded backlog."
         )
 
@@ -52,7 +52,7 @@ final class StutterRiskRegressionTests: XCTestCase {
         )
         let coalescer = input[implementationStart...]
         let lock = try XCTUnwrap(coalescer.range(of: "@synchronized (self)"))
-        let submission = try XCTUnwrap(coalescer.range(of: "asyncWithLabel:"))
+        let submission = try XCTUnwrap(coalescer.range(of: "asyncWith:"))
         XCTAssertLessThan(
             lock.lowerBound,
             submission.lowerBound,
@@ -132,7 +132,7 @@ final class StutterRiskRegressionTests: XCTestCase {
         )
 
         XCTAssertTrue(method.contains("enqueueCoalescedScroll"))
-        XCTAssertFalse(method.contains("asyncWithLabel"))
+        XCTAssertFalse(method.contains("asyncWith:"))
         XCTAssertTrue(
             input.contains("MAX(-32, MIN(32"),
             "A coalesced burst must not monopolize the GLib context while draining."
@@ -200,23 +200,4 @@ final class StutterRiskRegressionTests: XCTestCase {
         XCTAssertTrue(method.contains("completion();"))
     }
 
-    func testSuspectedGLibPathsExposeStableDiagnosticLabels() throws {
-        let input = try source("ThirdParty/CocoaSpice/Sources/CocoaSpice/CSInput.m")
-        let session = try source("ThirdParty/CocoaSpice/Sources/CocoaSpice/CSSession.m")
-
-        for label in [
-            "input.key",
-            "input.pointer.relative",
-            "input.pointer.absolute",
-            "input.scroll",
-            "input.button",
-        ] {
-            XCTAssertTrue(input.contains("@\"" + label + "\""), "Missing diagnostic label: \(label)")
-        }
-        XCTAssertTrue(session.contains("@\"clipboard.read\""))
-        let main = try source("ThirdParty/CocoaSpice/Sources/CocoaSpice/CSMain.m")
-        XCTAssertTrue(main.contains("CACurrentMediaTime()"))
-        XCTAssertFalse(main.contains("CFAbsoluteTimeGetCurrent()"))
-        XCTAssertTrue(main.contains("dispatch_semaphore_create(128)"))
-    }
 }

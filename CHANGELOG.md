@@ -8,12 +8,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **Fixed input latency that grew during long SPICE sessions.** The long-lived
+  GLib worker now drains Objective-C autoreleased objects after each context
+  iteration instead of retaining cursor, clipboard, and Metal temporaries until
+  disconnect. Added runtime regression coverage for pool draining and worker
+  stop/restart behavior. (Fork change — see `ThirdParty/CocoaSpice/FORK-NOTES.md`.)
 - **Reduced intermittent input lag and display frame drops under bursty load.**
   Pointer motion and scroll events are now coalesced before entering the SPICE
   main context, host clipboard reads leave the GLib thread and use bounded
   generation-scoped caching, and Metal upload completion no longer waits for
-  secondary display presentation. Added focused source-contract and controlled
-  queue-latency regression tests for these paths.
+  secondary display presentation. Added focused source-contract tests for these
+  paths.
 - **`delete-this-file=0` now preserves the `.vv` file.** An explicit
   `delete-this-file` directive takes precedence over the app's "Move .vv to
   Trash" preference; the preference is used only when the directive is absent.

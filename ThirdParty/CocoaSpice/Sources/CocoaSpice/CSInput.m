@@ -53,7 +53,7 @@ typedef NS_ENUM(NSUInteger, _CSInputPointerKind) {
 
 @property (nonatomic, readwrite) SpiceInputsChannel *channel;
 
-- (void)enqueueBoundaryWithLabel:(NSString *)label block:(dispatch_block_t)block;
+- (void)enqueueBoundaryWithBlock:(dispatch_block_t)block;
 - (void)enqueueCoalescedPointer:(_CSInputPointerKind)kind
                            point:(CGPoint)point
                       buttonMask:(CSInputButton)buttonMask
@@ -95,7 +95,7 @@ typedef NS_ENUM(NSUInteger, _CSInputPointerKind) {
     if (!self.channel) {
         return;
     }
-    [self enqueueBoundaryWithLabel:@"input.pause" block:^{
+    [self enqueueBoundaryWithBlock:^{
         SpiceInputsChannel *inputs = self.channel;
         /* Send proper scancodes. This will send same scancodes
          * as hardware.
@@ -129,7 +129,7 @@ typedef NS_ENUM(NSUInteger, _CSInputPointerKind) {
     m = (1u << b);
     g_return_if_fail(i < SPICE_N_ELEMENTS(self->_key_state));
     
-    [self enqueueBoundaryWithLabel:@"input.key" block:^{
+    [self enqueueBoundaryWithBlock:^{
         SpiceInputsChannel *inputs = self.channel;
         switch (type) {
             case kCSInputKeyPress:
@@ -207,7 +207,7 @@ typedef NS_ENUM(NSUInteger, _CSInputPointerKind) {
         locks |= SPICE_INPUTS_SCROLL_LOCK;
     }
     
-    [self enqueueBoundaryWithLabel:@"input.key-lock" block:^{
+    [self enqueueBoundaryWithBlock:^{
         spice_inputs_channel_set_key_locks(self.channel, locks);
     }];
 }
@@ -259,11 +259,11 @@ static int cs_button_to_spice(CSInputButton button)
 /// Stop later motion from being folded into the batch queued before a key,
 /// button, scroll, or mouse-mode event. This preserves FIFO event boundaries
 /// while still bounding consecutive pointer motion to one GLib submission.
-- (void)enqueueBoundaryWithLabel:(NSString *)label block:(dispatch_block_t)block {
+- (void)enqueueBoundaryWithBlock:(dispatch_block_t)block {
     @synchronized (self) {
         _pendingPointerBatch = nil;
         _pendingScrollBatch = nil;
-        [CSMain.sharedInstance asyncWithLabel:label block:block];
+        [CSMain.sharedInstance asyncWith:block];
     }
 }
 
@@ -295,10 +295,7 @@ static int cs_button_to_spice(CSInputButton button)
         }
         batch.buttonMask = buttonMask;
         if (needsSubmission) {
-            NSString *label = kind == _CSInputPointerKindRelative
-                ? @"input.pointer.relative"
-                : @"input.pointer.absolute";
-            [CSMain.sharedInstance asyncWithLabel:label block:^{
+            [CSMain.sharedInstance asyncWith:^{
                 CGPoint coalescedPoint;
                 CSInputButton coalescedButtonMask;
                 NSInteger coalescedMonitorID;
@@ -359,7 +356,7 @@ static int cs_button_to_spice(CSInputButton button)
         }
         batch.buttonMask = buttonMask;
         if (needsSubmission) {
-            [CSMain.sharedInstance asyncWithLabel:@"input.scroll" block:^{
+            [CSMain.sharedInstance asyncWith:^{
                 CGFloat coalescedDeltaY;
                 CSInputButton coalescedButtonMask;
                 @synchronized (self) {
@@ -452,7 +449,7 @@ static int cs_button_to_spice(CSInputButton button)
         return;
     }
     
-    [self enqueueBoundaryWithLabel:@"input.button" block:^{
+    [self enqueueBoundaryWithBlock:^{
         SpiceInputsChannel *inputs = self.channel;
         if (pressed) {
             spice_inputs_channel_button_press(inputs,
@@ -470,7 +467,7 @@ static int cs_button_to_spice(CSInputButton button)
     if (!self.spiceMain) {
         return;
     }
-    [self enqueueBoundaryWithLabel:@"input.mouse-mode" block:^{
+    [self enqueueBoundaryWithBlock:^{
         SpiceMainChannel *main = self.spiceMain;
         if (server) {
             spice_main_channel_request_mouse_mode(main, SPICE_MOUSE_MODE_SERVER);

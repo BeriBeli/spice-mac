@@ -34,7 +34,7 @@ The full app needs **Xcode** + the **Metal toolchain component**
 make doctor   # checks the above and prints fixes if anything's missing
 make all      # fetch the sysroot, then build → build/SpiceMac.app
 make test-stutter  # native CocoaSpice stutter-risk regression checks
-make test-latency  # controlled GLib queue-wait/execution timing checks
+make test-worker   # SPICE worker lifecycle and autorelease-pool checks
 ```
 
 The two native test targets are local release gates. They link CocoaSpice and its
@@ -89,5 +89,5 @@ the existing ones).
 
 - Keep PRs focused; explain the "why".
 - Run `make test`; for input, clipboard, renderer, or GLib scheduling changes,
-  also run `make test-stutter`, `make test-latency`, and a full app build.
+  also run `make test-stutter`, `make test-worker`, and a full app build.
 - Note any security implications — see [SECURITY.md](SECURITY.md).

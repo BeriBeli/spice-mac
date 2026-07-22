@@ -89,6 +89,11 @@ on a rebase:
   after the Metal blit rather than after every display has presented. The renderer
   now clears its dirty flag after submission and shares one command queue per
   texture so secondary displays remain GPU-ordered without blocking the producer.
+- **`Sources/CocoaSpice/CSMain.m`** — drain an Objective-C autorelease pool after
+  every GLib main-context iteration. The SPICE worker otherwise retained
+  autoreleased cursor, clipboard, and Metal objects for the lifetime of a
+  connection, allowing input latency and memory use to grow during long sessions.
+  Stopping the worker now wakes the blocking context iteration before joining it.
 
 ## Updating upstream
 
