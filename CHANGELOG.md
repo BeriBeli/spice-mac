@@ -6,6 +6,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Moved project operations to `BeriBeli/spice-mac`: application and dependency
+  Releases, security reporting, funding metadata, release tooling, and the
+  pinned sysroot download no longer depend on the original repository. Original
+  authorship, history, and third-party attribution remain intact.
+
 ## [0.2.0] — 2026-07-26
 
 ### Added

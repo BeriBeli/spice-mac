@@ -30,7 +30,7 @@ UTM uses). Apple-Silicon only.
 ## Download
 
 Prebuilt `SpiceMac.app` bundles are attached to each
-[Release](https://github.com/Ching367436/spice-mac/releases) (Apple-Silicon only).
+[Release](https://github.com/BeriBeli/spice-mac/releases) (Apple-Silicon only).
 You can also [build from source](#build).
 
 ### Why it's unsigned
@@ -146,7 +146,7 @@ open build/SpiceMac.app
 CocoaSpice does **not** bundle the native libraries it links (glib, gstreamer,
 spice-client-glib, libusb, …). `scripts/fetch-sysroot.sh` stages them. By default it
 downloads a **pinned, SHA-256-checksummed** tarball published on this repo's
-[releases](https://github.com/Ching367436/spice-mac/releases/tag/sysroot-arm64-v2) —
+[releases](https://github.com/BeriBeli/spice-mac/releases/tag/sysroot-arm64-v2) —
 the 26-framework + 19-plugin build/runtime closure (LGPL/MIT/BSD/OpenSSL only, **no
 GPL**, OpenSSL already 3.5.6 LTS). So a fresh clone builds with no extra setup, and the
 script fails closed on a checksum mismatch.
@@ -265,13 +265,15 @@ against trusted VMs.
 SpiceMac is free and open source. The one recurring cost it can't absorb is the
 **Apple Developer Program** membership (US$99/yr) needed to ship Developer-ID-signed,
 notarized builds that open without the Gatekeeper detour above. If you'd like to fund
-that, use the repo's **Sponsor** button (see [`.github/FUNDING.yml`](.github/FUNDING.yml)),
-or send ETH to **`ching367436.eth`**
-([Etherscan](https://etherscan.io/address/ching367436.eth)). It's entirely optional —
-building from source, and rebuilding to verify a download, will always stay free.
+that, use the repo's **Sponsor** button if it is available (see
+`.github/FUNDING.yml`). It's entirely optional — building from source, and
+rebuilding to verify a download, will always stay free.
 
 ## Licensing
 
+- This independently maintained project originated from
+  [Ching367436/spice-mac](https://github.com/Ching367436/spice-mac). Its original
+  MIT copyright and full Git history are preserved.
 - SpiceMac's own code: **MIT** (see [LICENSE](LICENSE)).
 - `ThirdParty/CocoaSpice`: **Apache-2.0** (vendored fork; `LICENSE` retained, changes in
   [FORK-NOTES.md](ThirdParty/CocoaSpice/FORK-NOTES.md)).

@@ -34,7 +34,7 @@ SYSROOT_ARTIFACT="${SPICEMAC_SYSROOT_ARTIFACT:-Sysroot-macos-arm64}"
 
 # Pinned default sysroot (this repo's release). The 26-framework + 19-plugin
 # closure SpiceMac links/embeds; LGPL/MIT/BSD/OpenSSL only (no GPL); OpenSSL 3.5.6 (LTS).
-DEFAULT_SYSROOT_URL="https://github.com/Ching367436/spice-mac/releases/download/sysroot-arm64-v2/spice-sysroot-macos-arm64.tgz"
+DEFAULT_SYSROOT_URL="https://github.com/BeriBeli/spice-mac/releases/download/sysroot-arm64-v2/spice-sysroot-macos-arm64.tgz"
 DEFAULT_SYSROOT_SHA256="a7435e48731861b6babc6ea7804b9bdc801c7e03e808b460492cb6fab299d03f"
 
 # Static GStreamer plugin archives CocoaSpice registers — must match Package.swift.

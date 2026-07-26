@@ -120,7 +120,7 @@ date you received a given SpiceMac binary, the maintainer will provide, to any
 third party, the complete corresponding machine-readable source code for the
 LGPL-2.1+ libraries it bundles, for the exact versions in that release, for a
 charge no more than the cost of physically performing source distribution.
-Request it by opening an issue at https://github.com/Ching367436/spice-mac (or
+Request it by opening an issue at https://github.com/BeriBeli/spice-mac (or
 contacting the maintainer via GitHub). Upstream sources for these versions are
 also publicly available from the GNOME (glib, gio, json-glib, libsoup), GStreamer,
 freedesktop.org / SPICE (spice-gtk, usbredir, phodav, pixman), libusb, and GNU

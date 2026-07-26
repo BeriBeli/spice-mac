@@ -46,7 +46,7 @@ an individual is officially representing the community in public spaces.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the maintainer by opening a confidential issue or contacting
-**Ching367436** via GitHub (https://github.com/Ching367436). All complaints will
+**BeriBeli** via GitHub (https://github.com/BeriBeli). All complaints will
 be reviewed and investigated promptly and fairly.
 
 ## Attribution
