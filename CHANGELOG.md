@@ -6,6 +6,34 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-07-26
+
+### Added
+
+- **Integrated the Ravada workflow directly into SpiceMac.** The macOS 26
+  native SwiftUI `WebView`/`WebPage` surface supports portal login and securely
+  intercepts same-origin `.vv` downloads without showing a Downloads window.
+- Added Trust Once and certificate-fingerprint-pinned Always Trust handling for
+  private portals that use self-signed certificates.
+- Added focused session-lifecycle and SwiftUI command-registration tests.
+
+### Changed
+
+- **SpiceMac now requires macOS 26 or later.** The application has moved to
+  Swift 6.2, strict concurrency, the SwiftUI application lifecycle, Observation,
+  typed session windows, SwiftUI commands, and SwiftUI settings.
+- Opening a session closes the launcher by default. A failed or disconnected
+  session cleans up its resources and returns to the singleton launcher.
+- Session windows opt out of state restoration because Proxmox `.vv` tickets
+  are short-lived and generally single-use.
+
+### Security
+
+- Portal downloads require HTTPS, the original portal host, a user-initiated
+  navigation, bounded streaming, correct cookie scope, and certificate pinning.
+- Portal credentials remain inside WebKit and are never read or stored by
+  SpiceMac.
+
 ### Fixed
 
 - **Fixed input latency that grew during long SPICE sessions.** The long-lived
@@ -199,7 +227,8 @@ CocoaSpice.
   QEMU frameworks are no longer shipped (app size 443 MB → 23 MB).
 - See [SECURITY.md](SECURITY.md) for the threat model and residual risks.
 
-[Unreleased]: https://github.com/Ching367436/spice-mac/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/BeriBeli/spice-mac/compare/v0.1.7%2Bberibeli.4...v0.2.0
 [0.1.7]: https://github.com/Ching367436/spice-mac/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/Ching367436/spice-mac/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/Ching367436/spice-mac/compare/v0.1.4...v0.1.5
