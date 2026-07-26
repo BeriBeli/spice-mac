@@ -14,8 +14,8 @@ What are you trying to do that's hard or impossible today?
 **Alternatives considered**
 
 **Scope note**
-SpiceMac targets Proxmox VE on Apple Silicon, connecting via `.vv` files. Requests
-that fit that scope are easiest to land; broader ones (other hypervisors, Intel,
-Proxmox REST integration) are welcome but bigger.
+SpiceMac targets macOS 26+ on Apple Silicon, connecting to Proxmox VE through
+`.vv` files and to Ravada through the embedded portal. Requests that fit that
+scope are easiest to land; other hypervisors and Intel support are out of scope.
 
 **Additional context**

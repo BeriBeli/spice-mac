@@ -7,7 +7,7 @@ export DEVELOPER_DIR
 
 .DEFAULT_GOAL := help
 
-.PHONY: help doctor setup build run test test-clipboard test-cursor test-stutter test-worker all openssl icon debug root release check-version clean distclean
+.PHONY: help doctor setup build run test test-clipboard test-cursor test-session test-stutter test-worker all openssl icon debug root release check-version clean distclean
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-14s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
@@ -24,11 +24,12 @@ build: ## Build and assemble build/SpiceMac.app
 run: ## Open build/SpiceMac.app
 	@open build/SpiceMac.app
 
-test: ## Run all dependency-free checks (55 tests)
+test: ## Run all dependency-light checks (58 tests)
 	@( cd Packages/VVConfig && swift run vvcheck )
 	@( cd Packages/SpiceInputMap && swift run inputcheck )
 	@swift test --package-path Packages/SpiceClipboardLogic
 	@swift test --package-path Packages/SpiceCursorLogic
+	@swift test --package-path Packages/SpiceSessionLogic
 
 test-clipboard: ## Run focused clipboard sharing-gate tests
 	@swift test --package-path Packages/SpiceClipboardLogic
@@ -36,13 +37,18 @@ test-clipboard: ## Run focused clipboard sharing-gate tests
 test-cursor: ## Run focused cursor policy and lifecycle tests
 	@swift test --package-path Packages/SpiceCursorLogic
 
+test-session: ## Run focused session cleanup and command-state tests
+	@swift test --package-path Packages/SpiceSessionLogic
+
 test-stutter: ## Run focused regression tests for known stutter risks
 	@swift test --filter StutterRiskRegressionTests
 
 test-worker: ## Run focused SPICE worker lifecycle tests
 	@swift test --filter CSMainWorkerLifecycleTests
 
-all: doctor setup build ## Doctor, fetch the sysroot, and build (first-time setup)
+all: setup ## Fetch the sysroot, verify the environment, and build
+	@$(MAKE) doctor
+	@$(MAKE) build
 
 openssl: ## Upgrade the bundled OpenSSL (only needed on a raw UTM sysroot)
 	@./scripts/upgrade-openssl.sh
@@ -56,7 +62,7 @@ debug: ## Launch with verbose SPICE/CocoaSpice logging:  make debug VV=conn.vv
 root: ## Launch as root for USB capture (kernel-claimed devices):  make root VV=conn.vv
 	@./scripts/run-as-root.sh $(VV)
 
-release: ## Cut a release (prompts before publishing):  make release VERSION=0.1.7
+release: ## Cut a release (prompts before publishing):  make release VERSION=0.2.1
 	@test -n "$(VERSION)" || { echo "usage: make release VERSION=X.Y.Z"; exit 1; }
 	@./scripts/release.sh $(VERSION)
 

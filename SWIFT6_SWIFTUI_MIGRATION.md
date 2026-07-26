@@ -1,4 +1,8 @@
-# Swift 6 + SwiftUI Migration Plan
+# Swift 6 + SwiftUI Migration Status
+
+> The code migration is complete. This document now records the implemented
+> architecture, acceptance criteria, and the remaining real-environment release
+> validation rather than describing future implementation work.
 
 ## Objective
 
@@ -30,7 +34,7 @@ session lifetime. AppKit remains only where SwiftUI does not expose the required
 primitive: `MTKView`, raw `NSEvent` delivery, cursor rectangles, first responder,
 backing-pixel conversion, and narrowly scoped window notifications.
 
-## Migration Stages
+## Completed Migration Stages
 
 ### 1. Swift 6 baseline
 
@@ -131,7 +135,7 @@ The migration is complete only when all of the following are true.
 - [x] A packaged app is launched from outside the build directory and re-tested
   for file opening and embedded framework/resource loading.
 
-## Effort and Risk
+## Original Effort and Risk Estimate
 
 Expected implementation effort is four to seven engineering days:
 

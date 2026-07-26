@@ -6,6 +6,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Updated GitHub Actions to use the macOS 26 / Swift 6.2 runner, restored the
+  complete 58-check test suite, fixed first-time `make all` ordering, and aligned
+  environment checks and contributor documentation with the macOS 26+ codebase.
+
 ### Changed
 
 - Moved project operations to `BeriBeli/spice-mac`: application and dependency

@@ -6,9 +6,9 @@ on:
   pull_request:
 
 # The full app needs Xcode's Metal toolchain and the native SPICE sysroot, neither
-# of which CI fetches. These jobs cover what builds and tests with only the Swift
-# toolchain: .vv parsing, keyboard input routing, clipboard gating, and cursor
-# presentation/lifecycle policy (55 checks).
+# of which CI fetches. These jobs cover the 58 dependency-light Swift checks:
+# .vv parsing, keyboard input routing, clipboard gating, cursor policy, and
+# session lifecycle/command state.
 # The CocoaSpice fork patch and focused stutter/worker XCTest targets are
 # release-gated locally with `make test-stutter`, `make test-worker`, and
 # `make build`. They need the staged native frameworks plus Xcode's Metal modules,
@@ -16,29 +16,16 @@ on:
 
 jobs:
   swift-tests:
-    name: Pure-Swift checks
-    runs-on: macos-14
+    name: Swift 6.2 checks
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
 
       - name: Show toolchain
         run: swift --version
 
-      - name: VVConfig — .vv parser checks
-        working-directory: Packages/VVConfig
-        run: swift run vvcheck
-
-      - name: SpiceInputMap — keycode/scancode and synthetic-routing checks
-        working-directory: Packages/SpiceInputMap
-        run: swift run inputcheck
-
-      - name: SpiceClipboardLogic — sharing-gate checks
-        working-directory: Packages/SpiceClipboardLogic
-        run: swift test
-
-      - name: SpiceCursorLogic — presentation and lifecycle checks
-        working-directory: Packages/SpiceCursorLogic
-        run: swift test
+      - name: Dependency-light test suite
+        run: make test
 
       - name: Version consistency (Info.plist / CHANGELOG / links)
         run: ./scripts/check-version.sh

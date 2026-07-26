@@ -15,7 +15,7 @@ UTM uses). Apple-Silicon only.
 > the macOS pointer; bidirectional clipboard; and audio (needs a SPICE audio
 > device on the VM). USB redirection is plumbed via the Connection menu. The `.vv`
 > parser, keyboard map, clipboard gate, cursor policy, and session lifecycle are
-> also unit-tested (58 dependency-free checks).
+> also unit-tested (58 dependency-light checks).
 >
 > | Feature | Status |
 > |---|---|
@@ -91,6 +91,7 @@ Pure-Swift, independently testable:
   SpiceInputMap   Packages/SpiceInputMap  — macOS keycode → PC set-1 scancode
   ClipboardLogic  Packages/SpiceClipboardLogic — clipboard sharing gate
   CursorLogic     Packages/SpiceCursorLogic — cursor image, policy, and lifecycle
+  SessionLogic    Packages/SpiceSessionLogic — session cleanup and command state
 ```
 
 The launcher can also embed a Ravada portal with the macOS 26 native SwiftUI
@@ -127,8 +128,8 @@ xcodebuild -downloadComponent MetalToolchain   # Xcode 26: a separate download
 Then, from a fresh clone:
 
 ```sh
-make doctor   # verify Xcode + Metal toolchain + frameworks (prints fixes if not)
-make all      # fetch the pinned sysroot, then build → build/SpiceMac.app
+make doctor   # optional preflight; reports missing frameworks before first setup
+make all      # fetch sysroot, verify the environment, build → build/SpiceMac.app
 make run      # open it
 ```
 
@@ -183,7 +184,7 @@ CA.
 
 ## Verifying the tested components
 
-The pure-Swift libraries build and test with just the Swift toolchain (no Xcode):
+The dependency-light libraries build and test without the native SPICE sysroot:
 
 ```sh
 ( cd Packages/VVConfig     && swift run vvcheck )     # .vv parser: 25 checks
@@ -198,7 +199,7 @@ glib/spice headers (`clang -fsyntax-only`, exit 0).
 
 Changes that touch the native CocoaSpice input, clipboard, Metal, or worker paths
 also have focused regression and lifecycle checks. These need the staged native SPICE
-frameworks and full Xcode, so they run locally rather than in the dependency-free
+frameworks and full Xcode, so they run locally rather than in the dependency-light
 CI job:
 
 ```sh
@@ -297,7 +298,8 @@ rebuilding to verify a download, will always stay free.
 | `Packages/VVConfig` | `.vv` parser + `SpiceConnectionParameters` (tested) |
 | `Packages/SpiceInputMap` | keycode → set-1 scancode map (tested) |
 | `Packages/SpiceController` | connection lifecycle, input/clipboard glue |
-| `Sources/SpiceMac` | AppKit/Metal application |
+| `Packages/SpiceSessionLogic` | session cleanup and command-state policy (tested) |
+| `Sources/SpiceMac` | SwiftUI application and narrow AppKit/Metal/WebKit bridges |
 | `ThirdParty/CocoaSpice` | vendored Apache-2.0 fork + Proxmox patch |
 | `Frameworks/` | native SPICE frameworks (staged, git-ignored) |
 | `Makefile` | task runner over `scripts/` (`make help`) |

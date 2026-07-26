@@ -10,8 +10,8 @@
 
 <!-- How did you verify this? -->
 
-- [ ] `cd Packages/VVConfig && swift run vvcheck` passes
-- [ ] `cd Packages/SpiceInputMap && swift run inputcheck` passes
+- [ ] `make test` passes (58 dependency-light checks)
+- [ ] `make check-version` passes
 - [ ] For app/native changes: built `./scripts/build-app.sh` and ran against a VM
 - [ ] For CocoaSpice fork changes: updated `ThirdParty/CocoaSpice/FORK-NOTES.md`
 

@@ -16,10 +16,11 @@ A clear description of the bug.
 2. …
 
 **Environment**
-- macOS version + chip (e.g. macOS 14.5, M2):
+- macOS 26 version + chip (e.g. macOS 26.1, M2):
 - SpiceMac version / commit:
 - Xcode version used to build:
 - Proxmox VE version:
+- Ravada version / portal URL (if applicable):
 - Guest OS + `spice-vdagent` installed? (yes/no):
 - VM display set to `qxl`/SPICE? (yes/no):
 
@@ -31,6 +32,7 @@ A clear description of the bug.
 - [ ] Audio
 - [ ] USB redirection
 - [ ] Connection / TLS / `.vv` parsing
+- [ ] Ravada portal / WebView / automatic `.vv` handoff
 - [ ] Build
 
 **Logs**

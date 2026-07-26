@@ -1,30 +1,33 @@
 # Contributing to SpiceMac
 
-Thanks for your interest! SpiceMac is a native macOS SPICE client for Proxmox VE.
+Thanks for your interest! SpiceMac is a native macOS 26+ SPICE client for
+Proxmox VE and Ravada portals.
 
 ## Ground rules
 
 - Be respectful — see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 - By contributing, you agree your changes are licensed under the project's
   [MIT License](LICENSE).
-- Keep the dependency-free test runners green (CI runs them).
+- Keep the dependency-light Swift test suite green (CI runs it on macOS 26).
 
 ## Project layout
 
 | Path | What |
 |------|------|
-| `Sources/SpiceMac` | AppKit/Metal app |
+| `Sources/SpiceMac` | SwiftUI app + narrow AppKit/Metal/WebKit bridges |
 | `Packages/SpiceController` | connection lifecycle, input, clipboard glue |
-| `Packages/VVConfig`, `Packages/SpiceInputMap` | pure-Swift, unit-tested |
+| `Packages/VVConfig`, `Packages/SpiceInputMap` | connection parsing and input routing |
+| `Packages/SpiceClipboardLogic`, `Packages/SpiceCursorLogic` | clipboard and cursor policy |
+| `Packages/SpiceSessionLogic` | session cleanup and command-state policy |
 | `ThirdParty/CocoaSpice` | vendored Apache-2.0 fork (Proxmox patch + security fixes) |
 
 ## Building & testing
 
-`make help` lists every task. The pure-Swift libraries build and test with just the
-toolchain (no Xcode/sysroot):
+`make help` lists every task. The dependency-light libraries build and test
+without the native SPICE sysroot:
 
 ```sh
-make test     # 55 dependency-free parser, input, clipboard, and cursor checks
+make test     # 58 parser, input, clipboard, cursor, and session checks
 ```
 
 The full app needs **Xcode** + the **Metal toolchain component**
@@ -38,7 +41,7 @@ make test-worker   # SPICE worker lifecycle and autorelease-pool checks
 ```
 
 The two native test targets are local release gates. They link CocoaSpice and its
-staged frameworks, so the dependency-free GitHub Actions job intentionally does
+staged frameworks, so the dependency-light GitHub Actions job intentionally does
 not run them.
 
 See [README.md](README.md) for prerequisites and details.
@@ -69,7 +72,7 @@ the GitHub release:
 
 ```sh
 # Put the changes under '## [Unreleased]' in CHANGELOG.md first, then:
-make release VERSION=0.1.7
+make release VERSION=0.2.1
 ```
 
 It refuses to run on a dirty tree, off `main`, with an existing tag, a non-increasing
