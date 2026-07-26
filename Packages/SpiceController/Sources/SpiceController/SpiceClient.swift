@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 import Foundation
 import VVConfig
-import CocoaSpice
+@preconcurrency import CocoaSpice
 import CocoaSpiceRenderer
 
 /// Drives a single SPICE session on top of (the forked) CocoaSpice: starts the
@@ -9,7 +9,7 @@ import CocoaSpiceRenderer
 /// TLS-via-proxy knobs), implements `CSConnectionDelegate`, and surfaces state to
 /// the UI. Delegate callbacks arrive on the GLib worker thread, so all observable
 /// state is mutated on the main queue.
-public final class SpiceClient: NSObject, ObservableObject {
+public final class SpiceClient: NSObject, ObservableObject, @unchecked Sendable {
 
     public enum Status: Equatable {
         case idle
@@ -141,8 +141,12 @@ public final class SpiceClient: NSObject, ObservableObject {
         onMain { self.connection?.disconnect() }
     }
 
-    private func onMain(_ work: @escaping () -> Void) {
-        if Thread.isMainThread { work() } else { DispatchQueue.main.async(execute: work) }
+    private func onMain(_ work: @escaping @MainActor @Sendable () -> Void) {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { work() }
+        } else {
+            DispatchQueue.main.async { work() }
+        }
     }
 
     /// Apply the preference to an already-created session as well as the host

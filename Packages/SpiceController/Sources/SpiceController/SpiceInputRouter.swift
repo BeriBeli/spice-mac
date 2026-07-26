@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 import AppKit
-import CocoaSpice
+@preconcurrency import CocoaSpice
 import SpiceInputMap
 
 /// Translates AppKit `NSEvent`s into CocoaSpice `CSInput` calls. The hosting view
 /// forwards its responder events here; this class owns the running button mask,
 /// the set of held modifier keys, and the absolute-coordinate transform.
+@MainActor
 public final class SpiceInputRouter {
 
     /// The active inputs channel. Set when `spiceInputAvailable:` fires.

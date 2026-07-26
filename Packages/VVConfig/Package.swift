@@ -1,4 +1,4 @@
-// swift-tools-version:5.9
+// swift-tools-version:6.2
 import PackageDescription
 
 // Note: tests use a tiny dependency-free runner (the `vvcheck` executable) instead
@@ -6,7 +6,7 @@ import PackageDescription
 // (they ship only with full Xcode). Run them with: `swift run vvcheck`.
 let package = Package(
     name: "VVConfig",
-    platforms: [.macOS(.v12)],
+    platforms: [.macOS(.v26)],
     products: [
         .library(name: "VVConfig", targets: ["VVConfig"]),
         .executable(name: "vvcheck", targets: ["vvcheck"]),
@@ -14,5 +14,6 @@ let package = Package(
     targets: [
         .target(name: "VVConfig"),
         .executableTarget(name: "vvcheck", dependencies: ["VVConfig"]),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

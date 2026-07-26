@@ -1,10 +1,17 @@
 // SPDX-License-Identifier: MIT
 import AppKit
 import MetalKit
-import CocoaSpice
+@preconcurrency import CocoaSpice
 import CocoaSpiceRenderer
 import SpiceController
 import SpiceCursorLogic
+
+/// CocoaSpice invokes KVO from its serial GLib worker. Channel objects remain
+/// owned by CocoaSpice and cursor snapshots are immutable, atomically replaced
+/// values. This wrapper documents their one-way handoff to AppKit's main actor.
+private struct CocoaSpiceTransfer<Value>: @unchecked Sendable {
+    let value: Value
+}
 
 /// The Metal-backed view that renders one SPICE display and is the keyboard/mouse
 /// first responder. CocoaSpice draws into it via a `CSMetalRenderer` set as the
@@ -12,6 +19,7 @@ import SpiceCursorLogic
 final class SpiceDisplayView: MTKView {
 
     let router = SpiceInputRouter()
+    var onWindowChanged: ((NSWindow?) -> Void)?
     private var renderer: CSMetalRenderer?
     private(set) weak var attachedDisplay: CSDisplay?
 
@@ -88,7 +96,8 @@ final class SpiceDisplayView: MTKView {
         }
         displayCursorObservation = display.observe(\.cursor, options: [.initial, .new]) {
             [weak self] _, change in
-            DispatchQueue.main.async { self?.attachCursor(change.newValue ?? nil) }
+            let cursor = CocoaSpiceTransfer(value: change.newValue ?? nil)
+            DispatchQueue.main.async { self?.attachCursor(cursor.value) }
         }
     }
 
@@ -184,6 +193,7 @@ final class SpiceDisplayView: MTKView {
     // Grab keyboard focus as soon as we're placed in a window.
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        onWindowChanged?(window)
         if window != nil {
             window?.makeFirstResponder(self)
             // Backing scale is now known; refit so we don't draw at the wrong scale.
@@ -209,7 +219,9 @@ final class SpiceDisplayView: MTKView {
         cursorSnapshotObservation = cursor?.observe(\.snapshot, options: [.initial, .new]) {
             [weak self, weak cursor] _, change in
             guard let snapshot = change.newValue else { return }
+            let payload = CocoaSpiceTransfer(value: (cursor, snapshot))
             DispatchQueue.main.async {
+                let (cursor, snapshot) = payload.value
                 guard let self, self.attachedCursor === cursor else { return }
                 self.refreshCursorPresentation(using: snapshot)
             }

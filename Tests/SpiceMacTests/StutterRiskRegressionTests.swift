@@ -14,7 +14,9 @@ final class StutterRiskRegressionTests: XCTestCase {
     }
 
     private func source(_ relativePath: String) throws -> String {
-        try String(contentsOf: repositoryRoot.appendingPathComponent(relativePath))
+        try String(
+            contentsOf: repositoryRoot.appendingPathComponent(relativePath),
+            encoding: .utf8)
     }
 
     private func slice(

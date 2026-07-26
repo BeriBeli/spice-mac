@@ -14,8 +14,8 @@ UTM uses). Apple-Silicon only.
 > resize; keyboard including ⌘/modifiers; mouse with the guest cursor aligned to
 > the macOS pointer; bidirectional clipboard; and audio (needs a SPICE audio
 > device on the VM). USB redirection is plumbed via the Connection menu. The `.vv`
-> parser, keyboard map, clipboard gate, and cursor policy are also unit-tested
-> (55 dependency-free checks).
+> parser, keyboard map, clipboard gate, cursor policy, and session lifecycle are
+> also unit-tested (58 dependency-free checks).
 >
 > | Feature | Status |
 > |---|---|
@@ -25,6 +25,7 @@ UTM uses). Apple-Silicon only.
 > | Clipboard (Mac↔VM, both directions) | ✅ |
 > | Audio (guest needs a SPICE audio device) | ✅ |
 > | USB redirection | plumbed |
+> | Ravada portal (native SwiftUI WebView, automatic `.vv` handoff) | implemented; portal verification pending |
 
 ## Download
 
@@ -44,19 +45,15 @@ membership (see [Sponsoring](#sponsoring)) or just build from source.
 
 ### Opening an unsigned build
 
-After unzipping and moving `SpiceMac.app` to `/Applications`, do one of:
+After unzipping and moving `SpiceMac.app` to `/Applications`, double-click once,
+click **Done** in the verification dialog, then use **System Settings ▸ Privacy &
+Security ▸ Open Anyway** and confirm. Alternatively, clear the quarantine flag in
+Terminal and open the app:
 
-- **macOS 14 (Sonoma):** right-click (Control-click) the app ▸ **Open** ▸ **Open**
-  in the dialog (only needed once).
-- **macOS 15 (Sequoia) and later:** double-click once (you'll see *"Apple could not
-  verify…"* — click **Done**), then **System Settings ▸ Privacy & Security ▸ Open
-  Anyway**, and confirm. (Sequoia removed the old right-click→Open shortcut here.)
-- **Terminal (works on both)** — clear the quarantine flag, then open:
-
-  ```sh
-  xattr -dr com.apple.quarantine /Applications/SpiceMac.app
-  open /Applications/SpiceMac.app
-  ```
+```sh
+xattr -dr com.apple.quarantine /Applications/SpiceMac.app
+open /Applications/SpiceMac.app
+```
 
 Verify your download against the SHA-256 in the release notes before clearing
 quarantine:
@@ -77,8 +74,8 @@ Proxmox the way the Proxmox web UI does: by consuming the short-lived `.vv` file
 ## Architecture
 
 ```
-AppKit + SwiftUI chrome           Sources/SpiceMac
-        │   (MTKView host, .vv open, menus, USB picker, window mgmt)
+SwiftUI scenes + AppKit bridge   Sources/SpiceMac
+        │   (SwiftUI lifecycle/windows/commands/WebView; AppKit MTKView/raw input edge)
         ▼
 SpiceController (Swift)           Packages/SpiceController
         │   CSConnectionDelegate, NSEvent→CSInput, NSPasteboard bridge, lifecycle
@@ -96,6 +93,12 @@ Pure-Swift, independently testable:
   CursorLogic     Packages/SpiceCursorLogic — cursor image, policy, and lifecycle
 ```
 
+The launcher can also embed a Ravada portal with the macOS 26 native SwiftUI
+`WebView`. Authenticated `.vv` links are intercepted before WebKit presents a
+download panel, validated by `VVConfig`, handed directly to a session, and then
+removed from the temporary directory. Credentials remain inside WebKit's
+website data store and are not persisted by SpiceMac.
+
 The decisive design point: **CocoaSpice must be forked.** `CSConnection` keeps the
 underlying `SpiceSession` private, so the Proxmox knobs (`proxy`, `ca`,
 `cert-subject`, subject-verify) can only be set from inside the library. The fork
@@ -104,7 +107,7 @@ adds exactly one method, `-[CSConnection setProxy:ca:certSubject:]`
 
 ## Requirements
 
-- Apple Silicon Mac, macOS 12+.
+- Apple Silicon Mac, macOS 26+.
 - **Full Xcode** (build with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`).
 - The **Metal toolchain component** — on Xcode 26 it is a separate download:
   `xcodebuild -downloadComponent MetalToolchain`. Needed because SwiftPM does not
@@ -187,6 +190,7 @@ The pure-Swift libraries build and test with just the Swift toolchain (no Xcode)
 ( cd Packages/SpiceInputMap && swift run inputcheck )  # scancode/flagsChanged routing: 17 checks
 swift test --package-path Packages/SpiceClipboardLogic # clipboard sharing gate: 4 tests
 swift test --package-path Packages/SpiceCursorLogic    # cursor policy/lifecycle: 9 tests
+swift test --package-path Packages/SpiceSessionLogic   # session cleanup/commands: 3 tests
 ```
 
 The CocoaSpice fork patch was syntax-checked against the real vendored

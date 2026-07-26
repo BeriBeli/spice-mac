@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 import AppKit
-import CocoaSpice
+@preconcurrency import CocoaSpice
 import SpiceClipboardLogic
 
 /// Bridges the SPICE shared clipboard to the macOS general `NSPasteboard`.
@@ -14,7 +14,7 @@ import SpiceClipboardLogic
 ///    (tracking our own writes to avoid a guest→host→guest feedback loop).
 ///
 /// Note: clipboard sharing only takes effect when the guest runs the SPICE vdagent.
-public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
+public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate, @unchecked Sendable {
 
     private let pasteboard: NSPasteboard
     private var monitorTimer: Timer?
@@ -145,8 +145,12 @@ public final class SpicePasteboardBridge: NSObject, CSPasteboardDelegate {
         }
     }
 
-    private func onMain(_ work: @escaping () -> Void) {
-        if Thread.isMainThread { work() } else { DispatchQueue.main.async(execute: work) }
+    private func onMain(_ work: @escaping @MainActor @Sendable () -> Void) {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { work() }
+        } else {
+            DispatchQueue.main.async { work() }
+        }
     }
 
     /// Map a SPICE pasteboard type to the closest `NSPasteboard` UTI type.

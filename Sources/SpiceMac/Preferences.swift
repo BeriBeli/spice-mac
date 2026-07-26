@@ -1,27 +1,39 @@
 // SPDX-License-Identifier: MIT
 import Foundation
 
-/// App preferences, backed by `UserDefaults`.
 enum Preferences {
-    private static let shareClipboardKey = "ShareClipboard"
+    static let shareClipboardKey = "ShareClipboard"
+    static let trashConnectionFileAfterUseKey = "TrashConnectionFileAfterUse"
+    static let ravadaPortalURLKey = "RavadaPortalURL"
+    static let trustedPortalCertificatesKey = "TrustedPortalCertificates"
 
-    /// Whether to share the clipboard with the guest (both directions). Default
-    /// ON (matches virt-viewer and the working behavior). Disable it when
-    /// connecting to an untrusted VM — while on, anything you copy on the Mac is
-    /// sent to the guest. Changes apply immediately to active connections.
     static var shareClipboard: Bool {
         get { (UserDefaults.standard.object(forKey: shareClipboardKey) as? Bool) ?? true }
         set { UserDefaults.standard.set(newValue, forKey: shareClipboardKey) }
     }
 
-    private static let trashAfterUseKey = "TrashConnectionFileAfterUse"
-
-    /// Whether to move a `.vv` connection file to the Trash after using it to
-    /// connect. Proxmox SPICE tickets are single-use and the file also carries the
-    /// cluster CA, so keeping it around is pointless and a mild secret-hygiene risk.
-    /// Default ON. It goes to the Trash (recoverable), not a permanent delete.
     static var trashConnectionFileAfterUse: Bool {
-        get { (UserDefaults.standard.object(forKey: trashAfterUseKey) as? Bool) ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: trashAfterUseKey) }
+        get { (UserDefaults.standard.object(forKey: trashConnectionFileAfterUseKey) as? Bool) ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: trashConnectionFileAfterUseKey) }
+    }
+
+    static func trustedPortalCertificateFingerprint(for host: String) -> String? {
+        trustedPortalCertificates[host.lowercased()]
+    }
+
+    static func trustPortalCertificate(host: String, fingerprint: String) {
+        var certificates = trustedPortalCertificates
+        certificates[host.lowercased()] = fingerprint
+        UserDefaults.standard.set(certificates, forKey: trustedPortalCertificatesKey)
+    }
+
+    static func forgetPortalCertificateTrust(for host: String) {
+        var certificates = trustedPortalCertificates
+        certificates.removeValue(forKey: host.lowercased())
+        UserDefaults.standard.set(certificates, forKey: trustedPortalCertificatesKey)
+    }
+
+    private static var trustedPortalCertificates: [String: String] {
+        UserDefaults.standard.dictionary(forKey: trustedPortalCertificatesKey) as? [String: String] ?? [:]
     }
 }

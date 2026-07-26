@@ -1,9 +1,9 @@
-// swift-tools-version:5.9
+// swift-tools-version:6.2
 import PackageDescription
 
 let package = Package(
     name: "SpiceCursorLogic",
-    platforms: [.macOS(.v12)],
+    platforms: [.macOS(.v26)],
     products: [
         .library(name: "SpiceCursorLogic", targets: ["SpiceCursorLogic"]),
     ],
@@ -13,5 +13,6 @@ let package = Package(
             name: "SpiceCursorLogicTests",
             dependencies: ["SpiceCursorLogic"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

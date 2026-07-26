@@ -81,7 +81,7 @@ fi
 # --- Publish (irreversible) ------------------------------------------------
 notes="$(mktemp)"
 awk -v v="$VER" '$0 ~ "^## \\[" v "\\]"{f=1;next} f&&/^## \[/{f=0} f' "$CHANGELOG" > "$notes"
-printf '\n### Download\n`SpiceMac.app.zip` — Apple Silicon, macOS 12+. Ad-hoc signed; to open: right-click ▸ **Open** (macOS 14) or **System Settings ▸ Privacy & Security ▸ Open Anyway** (macOS 15+), or `xattr -dr com.apple.quarantine /Applications/SpiceMac.app`.\n\nSHA-256: `%s`\n' "${SHA:-see asset}" >> "$notes"
+printf '\n### Download\n`SpiceMac.app.zip` — Apple Silicon, macOS 26+. Ad-hoc signed; use **System Settings ▸ Privacy & Security ▸ Open Anyway**, or `xattr -dr com.apple.quarantine /Applications/SpiceMac.app`.\n\nSHA-256: `%s`\n' "${SHA:-see asset}" >> "$notes"
 
 git add "$PLIST" "$CHANGELOG"
 git commit -q -m "Release $VER"

@@ -1,9 +1,9 @@
-// swift-tools-version:5.9
+// swift-tools-version:6.2
 import PackageDescription
 
 let package = Package(
     name: "SpiceClipboardLogic",
-    platforms: [.macOS(.v12)],
+    platforms: [.macOS(.v26)],
     products: [
         .library(name: "SpiceClipboardLogic", targets: ["SpiceClipboardLogic"]),
     ],
@@ -13,5 +13,6 @@ let package = Package(
             name: "SpiceClipboardLogicTests",
             dependencies: ["SpiceClipboardLogic"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

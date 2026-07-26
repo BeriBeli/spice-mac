@@ -1,4 +1,4 @@
-// swift-tools-version:5.9
+// swift-tools-version:6.2
 import PackageDescription
 
 // SpiceMac — a native macOS SPICE client that opens Proxmox VE `.vv` consoles by
@@ -64,13 +64,14 @@ let nativeSpiceTestLinkerSettings: [LinkerSetting] = [.unsafeFlags(spiceTestLink
 
 let package = Package(
     name: "SpiceMac",
-    platforms: [.macOS(.v12)],
+    platforms: [.macOS(.v26)],
     products: [
         .executable(name: "SpiceMac", targets: ["SpiceMac"]),
     ],
     dependencies: [
         .package(path: "Packages/VVConfig"),
         .package(path: "Packages/SpiceInputMap"),
+        .package(path: "Packages/SpiceSessionLogic"),
         .package(path: "ThirdParty/CocoaSpice"),
     ],
     targets: [
@@ -95,12 +96,13 @@ let package = Package(
             ],
             path: "Packages/SpiceController/Sources/SpiceController"
         ),
-        // The AppKit/SwiftUI application.
+        // The SwiftUI application with a narrow AppKit/Metal display bridge.
         .executableTarget(
             name: "SpiceMac",
             dependencies: [
                 "SpiceController",
                 "SpiceCursorLogic",
+                .product(name: "SpiceSessionLogic", package: "SpiceSessionLogic"),
                 .product(name: "VVConfig", package: "VVConfig"),
                 .product(name: "SpiceInputMap", package: "SpiceInputMap"),
                 .product(name: "CocoaSpice", package: "CocoaSpice"),
@@ -117,5 +119,6 @@ let package = Package(
             path: "Tests/SpiceMacTests",
             linkerSettings: nativeSpiceTestLinkerSettings
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )
