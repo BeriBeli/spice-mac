@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# release.sh — cut a SpiceMac release in one command.
+# release.sh — cut a Maspice release in one command.
 #
 #   ./scripts/release.sh X.Y.Z          # prepare + build, then ask before publishing
 #   ./scripts/release.sh X.Y.Z --yes    # skip the confirmation (for automation)
@@ -63,8 +63,8 @@ log "CHANGELOG rolled (Unreleased -> [$VER], links updated)"
 log "building"
 DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}" ./scripts/build-app.sh
 ./scripts/check-version.sh "v$VER"
-ZIP="build/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$PLIST" 2>/dev/null || echo SpiceMac).app.zip"
-[ -f "$ZIP" ] || ZIP="build/SpiceMac.app.zip"
+DISPLAY_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$PLIST" 2>/dev/null || echo Maspice)"
+ZIP="build/$DISPLAY_NAME.app.zip"
 SHA="$(awk '{print $1}' "$ZIP.sha256" 2>/dev/null)"
 
 # --- Review + confirm (publish is irreversible) ----------------------------
@@ -81,15 +81,18 @@ fi
 # --- Publish (irreversible) ------------------------------------------------
 notes="$(mktemp)"
 awk -v v="$VER" '$0 ~ "^## \\[" v "\\]"{f=1;next} f&&/^## \[/{f=0} f' "$CHANGELOG" > "$notes"
-printf '\n### Download\n`SpiceMac.app.zip` — Apple Silicon, macOS 26+. Ad-hoc signed; use **System Settings ▸ Privacy & Security ▸ Open Anyway**, or `xattr -dr com.apple.quarantine /Applications/SpiceMac.app`.\n\nSHA-256: `%s`\n' "${SHA:-see asset}" >> "$notes"
+# The backticks and command text are intentionally literal Markdown.
+# shellcheck disable=SC2016
+printf '\n### Download\n`%s.app.zip` — Apple Silicon, macOS 26+. Ad-hoc signed; use **System Settings ▸ Privacy & Security ▸ Open Anyway**, or `xattr -dr com.apple.quarantine /Applications/%s.app`.\n\nMaspice uses the independent bundle identifier `io.github.beribeli.Maspice`. It can coexist with an older `SpiceMac.app`; remove the old app if you want only one `.vv` file handler.\n\nSHA-256: `%s`\n' \
+    "$DISPLAY_NAME" "$DISPLAY_NAME" "${SHA:-see asset}" >> "$notes"
 
 git add "$PLIST" "$CHANGELOG"
 git commit -q -m "Release $VER"
-git tag -a "v$VER" -m "SpiceMac $VER"
+git tag -a "v$VER" -m "Maspice $VER"
 log "pushing"
 git push origin main
 git push origin "v$VER"
 log "creating GitHub release"
-gh release create "v$VER" "$ZIP" "$ZIP.sha256" --title "SpiceMac $VER" --verify-tag --notes-file "$notes"
+gh release create "v$VER" "$ZIP" "$ZIP.sha256" --title "Maspice $VER" --verify-tag --notes-file "$notes"
 rm -f "$notes"
 log "released v$VER ✓  https://github.com/BeriBeli/spice-mac/releases/tag/v$VER"

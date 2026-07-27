@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# doctor.sh — preflight: is this Mac ready to build SpiceMac? Reports PASS/FAIL
+# doctor.sh — preflight: is this Mac ready to build Maspice? Reports PASS/FAIL
 # with a fix for each check. Run it before your first build (or `make doctor`).
 # Does NOT use `set -e` — it runs every check so you see the full picture.
 set -uo pipefail
@@ -13,7 +13,7 @@ fails=0
 pass() { printf '  \033[1;32m✓\033[0m %s\n' "$1"; }
 fail() { printf '  \033[1;31m✗\033[0m %s\n     ↳ %s\n' "$1" "$2"; fails=$((fails+1)); }
 
-printf '\033[1;34m[doctor]\033[0m checking the SpiceMac build environment\n'
+printf '\033[1;34m[doctor]\033[0m checking the Maspice build environment\n'
 
 # 1. Supported OS and architecture
 macos_version="$(sw_vers -productVersion 2>/dev/null || true)"
@@ -21,11 +21,11 @@ macos_major="${macos_version%%.*}"
 if [ -n "$macos_major" ] && [ "$macos_major" -ge 26 ] 2>/dev/null; then
     pass "macOS $macos_version (26+)"
 else
-    fail "unsupported macOS ${macos_version:-unknown}" "SpiceMac requires macOS 26 or later."
+    fail "unsupported macOS ${macos_version:-unknown}" "Maspice requires macOS 26 or later."
 fi
 
 if [ "$(uname -m)" = "arm64" ]; then pass "Apple Silicon (arm64)"
-else fail "not arm64 (got $(uname -m))" "SpiceMac is Apple-Silicon only."; fi
+else fail "not arm64 (got $(uname -m))" "Maspice is Apple-Silicon only."; fi
 
 # 2. Full Xcode selected (Command Line Tools alone can't build this)
 xc="$(xcode-select -p 2>/dev/null)"

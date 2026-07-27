@@ -1,6 +1,6 @@
-# Contributing to SpiceMac
+# Contributing to Maspice
 
-Thanks for your interest! SpiceMac is a native macOS 26+ SPICE client for
+Thanks for your interest! Maspice is a native macOS 26+ SPICE client for
 Proxmox VE and Ravada portals.
 
 ## Ground rules
@@ -14,7 +14,7 @@ Proxmox VE and Ravada portals.
 
 | Path | What |
 |------|------|
-| `Sources/SpiceMac` | SwiftUI app + narrow AppKit/Metal/WebKit bridges |
+| `Sources/Maspice` | SwiftUI app + narrow AppKit/Metal/WebKit bridges |
 | `Packages/SpiceController` | connection lifecycle, input, clipboard glue |
 | `Packages/VVConfig`, `Packages/SpiceInputMap` | connection parsing and input routing |
 | `Packages/SpiceClipboardLogic`, `Packages/SpiceCursorLogic` | clipboard and cursor policy |
@@ -35,7 +35,7 @@ The full app needs **Xcode** + the **Metal toolchain component**
 
 ```sh
 make doctor   # checks the above and prints fixes if anything's missing
-make all      # fetch the sysroot, then build → build/SpiceMac.app
+make all      # fetch the sysroot, then build → build/Maspice.app
 make test-stutter  # native CocoaSpice stutter-risk regression checks
 make test-worker   # SPICE worker lifecycle and autorelease-pool checks
 ```

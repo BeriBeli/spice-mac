@@ -23,7 +23,7 @@ struct SettingsView: View {
             Section("Ravada Portal") {
                 TextField("Portal URL", text: $ravadaPortalURL, prompt: Text("https://vdi.example.com/"))
                     .textContentType(.URL)
-                Text("The portal handles credentials directly. SpiceMac only intercepts downloaded .vv connection files.")
+                Text("The portal handles credentials directly. Maspice only intercepts downloaded .vv connection files.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

@@ -1,7 +1,7 @@
 # Verbatim license texts
 
 This directory holds the full, verbatim license texts for the third-party
-components SpiceMac bundles into a built `SpiceMac.app`. They are copied into the
+components Maspice bundles into a built `Maspice.app`. They are copied into the
 app at `Contents/Resources/Licenses/` by `scripts/build-app.sh`, so the required
 notices travel **with** any distributed binary.
 
@@ -14,5 +14,5 @@ notices travel **with** any distributed binary.
 | `MIT.txt` | pixman, libffi |
 
 Attribution, SPDX identifiers, exact versions, and the LGPL §6 source offer are in
-[`../THIRD-PARTY-LICENSES.txt`](../THIRD-PARTY-LICENSES.txt). SpiceMac's own code is
+[`../THIRD-PARTY-LICENSES.txt`](../THIRD-PARTY-LICENSES.txt). Maspice's own code is
 MIT ([`../LICENSE`](../LICENSE)).

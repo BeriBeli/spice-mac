@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# build-app.sh — build SpiceMac via SwiftPM and assemble a runnable SpiceMac.app.
+# build-app.sh — build Maspice via SwiftPM and assemble a runnable Maspice.app.
 #
 # Requirements:
 #   * Full Xcode (the Metal toolchain compiles CocoaSpice's shader; Command Line
@@ -19,7 +19,9 @@ cd "$ROOT"
 
 CONFIG="${CONFIG:-release}"
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
-APP_NAME="SpiceMac"
+PLIST="$ROOT/Resources/Info.plist"
+APP_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$PLIST")"
+EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$PLIST")"
 OUT="$ROOT/build"
 APP="$OUT/$APP_NAME.app"
 WORK="$(mktemp -d)"
@@ -50,7 +52,7 @@ shopt -s nullglob
 # plus spice-server, swtpm, virglrenderer, slirp, MoltenVK/vulkan/epoxy — which the
 # SPICE *client* never loads and which would attach GPL obligations (and ~390 MB of
 # dead weight) to the distributed .app. Re-verify after changing with:
-#   otool -L build/SpiceMac.app/Contents/MacOS/SpiceMac  (and recurse over frameworks)
+#   otool -L build/Maspice.app/Contents/MacOS/Maspice  (and recurse over frameworks)
 RUNTIME_FRAMEWORKS=(
     glib-2.0.0 gobject-2.0.0 gio-2.0.0 gmodule-2.0.0 ffi.8 intl.8 iconv.2
     spice-client-glib-2.0.8
@@ -68,18 +70,40 @@ RUNTIME_FRAMEWORKS=(
 log "swift build -c $CONFIG"
 swift build -c "$CONFIG"
 BIN_PATH="$(swift build -c "$CONFIG" --show-bin-path)"
-[ -x "$BIN_PATH/$APP_NAME" ] || die "built executable not found at $BIN_PATH/$APP_NAME"
+[ -x "$BIN_PATH/$EXECUTABLE_NAME" ] || die "built executable not found at $BIN_PATH/$EXECUTABLE_NAME"
 
 # --- Assemble .app ---------------------------------------------------------
 log "assembling $APP"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 
-cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
-cp "$BIN_PATH/$APP_NAME" "$APP/Contents/MacOS/$APP_NAME"
+cp "$PLIST" "$APP/Contents/Info.plist"
+cp "$BIN_PATH/$EXECUTABLE_NAME" "$APP/Contents/MacOS/$EXECUTABLE_NAME"
 
-# App icon (CFBundleIconFile=AppIcon). Regenerate with scripts/make-icon.sh.
-[ -f "$ROOT/Resources/AppIcon.icns" ] && cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+# Compile the macOS 26 Icon Composer source. Assets.car preserves the layered
+# Liquid Glass representation; AppIcon.icns is the Finder/legacy fallback.
+ICON_SOURCE="$ROOT/Resources/AppIcon.icon"
+ICON_OUTPUT="$WORK/icon-assets"
+[ -d "$ICON_SOURCE" ] || die "Icon Composer source not found: $ICON_SOURCE"
+mkdir -p "$ICON_OUTPUT"
+log "compiling Icon Composer artwork"
+if ! xcrun actool "$ICON_SOURCE" \
+    --compile "$ICON_OUTPUT" \
+    --output-format human-readable-text \
+    --notices --warnings \
+    --app-icon AppIcon \
+    --include-all-app-icons \
+    --platform macosx \
+    --minimum-deployment-target 26.0 \
+    --output-partial-info-plist "$ICON_OUTPUT/partial.plist" \
+    >"$WORK/actool.log" 2>&1; then
+    sed 's/^/         actool: /' "$WORK/actool.log" >&2
+    die "Icon Composer compilation failed"
+fi
+[ -f "$ICON_OUTPUT/Assets.car" ] || die "actool did not produce Assets.car"
+[ -f "$ICON_OUTPUT/AppIcon.icns" ] || die "actool did not produce AppIcon.icns"
+cp "$ICON_OUTPUT/Assets.car" "$APP/Contents/Resources/Assets.car"
+cp "$ICON_OUTPUT/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
 # SwiftPM resource bundles (e.g. the compiled Metal shader for the renderer).
 # SwiftPM resource bundles go in Contents/Resources (CocoaSpice's renderer loads
@@ -103,7 +127,7 @@ if [ -f "$RENDERER_DIR/CSShaders.metal" ] && [ -d "$RES_BUNDLE" ]; then
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-  <key>CFBundleIdentifier</key><string>org.spicemac.CocoaSpiceRenderer.resources</string>
+  <key>CFBundleIdentifier</key><string>io.github.beribeli.Maspice.CocoaSpiceRenderer.resources</string>
   <key>CFBundleName</key><string>CocoaSpiceRenderer</string>
   <key>CFBundlePackageType</key><string>BNDL</string>
 </dict></plist>
@@ -144,11 +168,11 @@ cp "$ROOT/LICENSE" "$APP/Contents/Resources/LICENSE.txt"
 # at runtime (all libswift* resolve from the OS dyld shared cache via /usr/lib/swift),
 # but it leaks a machine-specific path; drop it so the bundle is host-agnostic. The
 # app is (re-)signed below, so this stays sealed.
-XCODE_SWIFT_RPATH="$(otool -l "$APP/Contents/MacOS/$APP_NAME" 2>/dev/null \
+XCODE_SWIFT_RPATH="$(otool -l "$APP/Contents/MacOS/$EXECUTABLE_NAME" 2>/dev/null \
     | awk '/LC_RPATH/{f=1} f&&/path /{print $2; f=0}' \
     | grep -m1 'Xcode.*Toolchains.*swift' || true)"
 if [ -n "$XCODE_SWIFT_RPATH" ]; then
-    install_name_tool -delete_rpath "$XCODE_SWIFT_RPATH" "$APP/Contents/MacOS/$APP_NAME" \
+    install_name_tool -delete_rpath "$XCODE_SWIFT_RPATH" "$APP/Contents/MacOS/$EXECUTABLE_NAME" \
         2>/dev/null && log "  stripped host rpath: $XCODE_SWIFT_RPATH" || true
 fi
 
@@ -162,7 +186,7 @@ fi
 
 APP_SIGN_ARGS=("${SIGN_ARGS[@]}")
 if [ "${HARDENED:-0}" = "1" ]; then
-    APP_SIGN_ARGS+=(--options runtime --entitlements "$ROOT/Resources/$APP_NAME.entitlements")
+    APP_SIGN_ARGS+=(--options runtime --entitlements "$ROOT/Resources/$EXECUTABLE_NAME.entitlements")
 fi
 
 log "signing frameworks (identity: $SIGN_IDENTITY)"

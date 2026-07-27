@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# debug-run.sh — run SpiceMac with verbose SPICE / GStreamer logging.
+# debug-run.sh — run Maspice with verbose SPICE / GStreamer logging.
 # Usage: ./scripts/debug-run.sh <connection.vv>
 #
 # Captures the spice-gtk channel lifecycle, clipboard, and GStreamer audio logs
@@ -9,7 +9,10 @@
 # ~30s), reproduce the issue, then quit (Cmd-Q).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP="$ROOT/build/SpiceMac.app/Contents/MacOS/SpiceMac"
+PLIST="$ROOT/Resources/Info.plist"
+APP_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$PLIST")"
+EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$PLIST")"
+APP="$ROOT/build/$APP_NAME.app/Contents/MacOS/$EXECUTABLE_NAME"
 VV="${1:?usage: debug-run.sh <connection.vv>}"
 LOG="${SPICEMAC_LOG:-/tmp/spicemac-debug.log}"
 

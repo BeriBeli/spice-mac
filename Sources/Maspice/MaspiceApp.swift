@@ -2,12 +2,12 @@
 import SwiftUI
 
 @main
-struct SpiceMacApp: App {
+struct MaspiceApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var applicationModel = ApplicationModel()
 
     var body: some Scene {
-        Window("SpiceMac", id: "launcher") {
+        Window("Maspice", id: "launcher") {
             LauncherView(appDelegate: appDelegate)
                 .environment(applicationModel)
         }

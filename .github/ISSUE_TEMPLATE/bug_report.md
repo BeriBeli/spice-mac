@@ -17,7 +17,7 @@ A clear description of the bug.
 
 **Environment**
 - macOS 26 version + chip (e.g. macOS 26.1, M2):
-- SpiceMac version / commit:
+- Maspice version / commit:
 - Xcode version used to build:
 - Proxmox VE version:
 - Ravada version / portal URL (if applicable):
@@ -36,7 +36,7 @@ A clear description of the bug.
 - [ ] Build
 
 **Logs**
-Relevant console output (run from Terminal: `build/SpiceMac.app/Contents/MacOS/SpiceMac`).
+Relevant console output (run from Terminal: `build/Maspice.app/Contents/MacOS/Maspice`).
 **Do not paste the contents of a `.vv` file** — it contains a live ticket and CA.
 
 **Additional context**

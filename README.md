@@ -1,8 +1,10 @@
 <p align="center">
-  <img src="design/icon/icon.png" width="168" height="168" alt="SpiceMac app icon">
+  <img src="design/icon/icon.png" width="168" height="168" alt="Maspice app icon">
 </p>
 
-# SpiceMac
+# Maspice
+
+**The Spicy SPICE client for Mac.**
 
 A native macOS [SPICE](https://www.spice-space.org/) client that opens **Proxmox VE**
 virtual-machine consoles from `.vv` connection files, built on a forked
@@ -29,7 +31,7 @@ UTM uses). Apple-Silicon only.
 
 ## Download
 
-Prebuilt `SpiceMac.app` bundles are attached to each
+Prebuilt `Maspice.app` bundles are attached to each
 [Release](https://github.com/BeriBeli/spice-mac/releases) (Apple-Silicon only).
 You can also [build from source](#build).
 
@@ -45,21 +47,26 @@ membership (see [Sponsoring](#sponsoring)) or just build from source.
 
 ### Opening an unsigned build
 
-After unzipping and moving `SpiceMac.app` to `/Applications`, double-click once,
+After unzipping and moving `Maspice.app` to `/Applications`, double-click once,
 click **Done** in the verification dialog, then use **System Settings ▸ Privacy &
 Security ▸ Open Anyway** and confirm. Alternatively, clear the quarantine flag in
 Terminal and open the app:
 
+Maspice uses the independent bundle identifier `io.github.beribeli.Maspice`, so
+it can coexist with an older `SpiceMac.app`. Remove the old app after verifying
+Maspice if you want Finder to have only one handler for `.vv` files. Preferences,
+portal trust decisions, and WebView login state are not migrated automatically.
+
 ```sh
-xattr -dr com.apple.quarantine /Applications/SpiceMac.app
-open /Applications/SpiceMac.app
+xattr -dr com.apple.quarantine /Applications/Maspice.app
+open /Applications/Maspice.app
 ```
 
 Verify your download against the SHA-256 in the release notes before clearing
 quarantine:
 
 ```sh
-shasum -a 256 SpiceMac.app.zip   # compare to the value in the Release
+shasum -a 256 Maspice.app.zip   # compare to the value in the Release
 ```
 
 See [SECURITY.md](SECURITY.md) for the full signing/trust posture.
@@ -67,14 +74,14 @@ See [SECURITY.md](SECURITY.md) for the full signing/trust posture.
 ## Why this exists
 
 There is no pleasant native SPICE client on macOS — `remote-viewer`/`spice-gtk`
-builds are heavy, GTK/X11-bound, and sluggish. SpiceMac wraps the same mature
-SPICE stack but renders through Metal in a small native app, and connects to
+builds are heavy, GTK/X11-bound, and sluggish. Maspice wraps the same mature
+SPICE stack but renders through Metal in Maspice, a small native app that connects to
 Proxmox the way the Proxmox web UI does: by consuming the short-lived `.vv` file.
 
 ## Architecture
 
 ```
-SwiftUI scenes + AppKit bridge   Sources/SpiceMac
+SwiftUI scenes + AppKit bridge   Sources/Maspice
         │   (SwiftUI lifecycle/windows/commands/WebView; AppKit MTKView/raw input edge)
         ▼
 SpiceController (Swift)           Packages/SpiceController
@@ -98,7 +105,7 @@ The launcher can also embed a Ravada portal with the macOS 26 native SwiftUI
 `WebView`. Authenticated `.vv` links are intercepted before WebKit presents a
 download panel, validated by `VVConfig`, handed directly to a session, and then
 removed from the temporary directory. Credentials remain inside WebKit's
-website data store and are not persisted by SpiceMac.
+website data store and are not persisted by Maspice.
 
 The decisive design point: **CocoaSpice must be forked.** `CSConnection` keeps the
 underlying `SpiceSession` private, so the Proxmox knobs (`proxy`, `ca`,
@@ -129,7 +136,7 @@ Then, from a fresh clone:
 
 ```sh
 make doctor   # optional preflight; reports missing frameworks before first setup
-make all      # fetch sysroot, verify the environment, build → build/SpiceMac.app
+make all      # fetch sysroot, verify the environment, build → build/Maspice.app
 make run      # open it
 ```
 
@@ -139,7 +146,7 @@ forget it (`make help` lists every target). By hand it's:
 ```sh
 ./scripts/fetch-sysroot.sh   # pinned, checksummed sysroot (OpenSSL already 3.5.6 LTS)
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./scripts/build-app.sh
-open build/SpiceMac.app
+open build/Maspice.app
 ```
 
 ### Dependencies
@@ -170,7 +177,7 @@ the matching build-time headers; keep the sysroot version in sync with them.
 1. In the Proxmox web UI, open a VM whose **Display is set to SPICE/qxl**
    (`qm set <vmid> --vga qxl`), click **Console ▸ SPICE**, and download the
    `.vv` file.
-2. Open it in SpiceMac (double-click, drag onto the app, or **File ▸ Open**).
+2. Open it in Maspice (double-click, drag onto the app, or **File ▸ Open**).
    **Do this promptly** — the SPICE ticket inside is single-use and valid for only
    ~30 seconds. To reconnect, download a fresh `.vv`.
 3. For clipboard sharing and dynamic resolution, the guest must run
@@ -263,7 +270,7 @@ against trusted VMs.
 
 ## Sponsoring
 
-SpiceMac is free and open source. The one recurring cost it can't absorb is the
+Maspice is free and open source. The one recurring cost it can't absorb is the
 **Apple Developer Program** membership (US$99/yr) needed to ship Developer-ID-signed,
 notarized builds that open without the Gatekeeper detour above. If you'd like to fund
 that, use the repo's **Sponsor** button if it is available (see
@@ -275,7 +282,7 @@ rebuilding to verify a download, will always stay free.
 - This independently maintained project originated from
   [Ching367436/spice-mac](https://github.com/Ching367436/spice-mac). Its original
   MIT copyright and full Git history are preserved.
-- SpiceMac's own code: **MIT** (see [LICENSE](LICENSE)).
+- Maspice's own code: **MIT** (see [LICENSE](LICENSE)).
 - `ThirdParty/CocoaSpice`: **Apache-2.0** (vendored fork; `LICENSE` retained, changes in
   [FORK-NOTES.md](ThirdParty/CocoaSpice/FORK-NOTES.md)).
 - The native SPICE stack (fetched at build time, bundled into a built `.app`) is mostly
@@ -299,7 +306,8 @@ rebuilding to verify a download, will always stay free.
 | `Packages/SpiceInputMap` | keycode → set-1 scancode map (tested) |
 | `Packages/SpiceController` | connection lifecycle, input/clipboard glue |
 | `Packages/SpiceSessionLogic` | session cleanup and command-state policy (tested) |
-| `Sources/SpiceMac` | SwiftUI application and narrow AppKit/Metal/WebKit bridges |
+| `Sources/Maspice` | SwiftUI application and narrow AppKit/Metal/WebKit bridges |
+| `Tests/MaspiceTests` | App-level lifecycle, command, and regression tests |
 | `ThirdParty/CocoaSpice` | vendored Apache-2.0 fork + Proxmox patch |
 | `Frameworks/` | native SPICE frameworks (staged, git-ignored) |
 | `Makefile` | task runner over `scripts/` (`make help`) |
@@ -310,9 +318,9 @@ rebuilding to verify a download, will always stay free.
 |--------|--------|-------------------|
 | `doctor.sh` | `doctor` | Check the build environment (Xcode, Metal toolchain, frameworks) |
 | `fetch-sysroot.sh` | `setup` | Stage the native SPICE frameworks (pinned, checksummed) |
-| `build-app.sh` | `build` | Build + assemble `build/SpiceMac.app` |
+| `build-app.sh` | `build` | Build + assemble `build/Maspice.app` |
 | `upgrade-openssl.sh` | `openssl` | Rebuild OpenSSL → 3.5.6 (only on a raw UTM sysroot) |
-| `make-icon.sh` | `icon` | Regenerate `Resources/AppIcon.icns` from `design/icon/` |
+| `make-icon.sh` | `icon` | Validate `Resources/AppIcon.icon` and refresh the README preview |
 | `debug-run.sh` | `debug VV=…` | Launch with verbose SPICE/CocoaSpice tracing |
 | `run-as-root.sh` | `root VV=…` | Launch as root for USB capture (kernel-claimed devices) |
 | `release.sh` | `release VERSION=…` | Cut a release (bump, changelog, build, tag, publish) |

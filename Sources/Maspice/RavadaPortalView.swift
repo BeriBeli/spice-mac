@@ -270,7 +270,7 @@ private final class RavadaNavigationDecider: WebPage.NavigationDeciding {
             _ = try VVConfig.parse(contents)
 
             let destination = FileManager.default.temporaryDirectory
-                .appendingPathComponent("SpiceMac-\(UUID().uuidString).vv")
+                .appendingPathComponent("Maspice-\(UUID().uuidString).vv")
             try data.write(to: destination, options: .atomic)
             do {
                 try Task.checkCancellation()

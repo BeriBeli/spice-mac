@@ -1,6 +1,6 @@
 # Security
 
-This documents SpiceMac's security posture, the threat model, what's hardened,
+This documents Maspice's security posture, the threat model, what's hardened,
 and the residual risks. It reflects a threat-model-driven audit (with adversarial
 verification of every finding).
 

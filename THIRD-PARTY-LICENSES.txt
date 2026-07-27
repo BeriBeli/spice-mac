@@ -1,20 +1,20 @@
-SpiceMac — Third-Party Licenses and Attribution
+Maspice — Third-Party Licenses and Attribution
 ================================================
 
-SpiceMac itself is licensed under the MIT License (see LICENSE).
+Maspice itself is licensed under the MIT License (see LICENSE).
 
-This file attributes the third-party components SpiceMac uses. Note the split:
+This file attributes the third-party components Maspice uses. Note the split:
 
   * ThirdParty/CocoaSpice/ is VENDORED in this repository (a fork — see
     ThirdParty/CocoaSpice/FORK-NOTES.md) and ships with its own LICENSE.
   * The native SPICE stack (glib, spice-gtk, gstreamer, OpenSSL, …) is NOT in
     this repository. It is fetched at build time by scripts/fetch-sysroot.sh and,
-    in a built SpiceMac.app, bundled under Contents/Frameworks/. This source
+    in a built Maspice.app, bundled under Contents/Frameworks/. This source
     release does not distribute those binaries; anyone who distributes a built
     .app assumes the redistribution obligations below.
 
 Full verbatim license texts are in the `licenses/` directory of this repository
-and are copied into every built SpiceMac.app at `Contents/Resources/Licenses/`, so
+and are copied into every built Maspice.app at `Contents/Resources/Licenses/`, so
 a distributed binary self-carries the LGPL-2.1, Apache-2.0, OpenSSL/SSLeay,
 BSD-3-Clause, and MIT texts together with this attribution file.
 
@@ -104,10 +104,10 @@ scripts/fetch-sysroot.sh) plus scripts/upgrade-openssl.sh.
 
 The LGPL-2.1+ libraries above are used as dynamically-linked frameworks; the
 GStreamer base/good plugins are statically linked into the SpiceMac executable.
-A distributed SpiceMac.app therefore carries, under `Contents/Resources/Licenses/`,
+A distributed Maspice.app therefore carries, under `Contents/Resources/Licenses/`,
 a copy of the LGPL-2.1 license text and this notice (LGPL-2.1 §6 / §1).
 
-Relinking with a modified library is supported and documented: SpiceMac is fully
+Relinking with a modified library is supported and documented: Maspice is fully
 open source (MIT). A recipient of a binary can rebuild it against their own
 modified LGPL library — replace the relevant `.framework` under
 `Contents/Frameworks/` (dynamic libraries) or rebuild from source with a modified
@@ -116,7 +116,7 @@ static archive (the statically-linked gst plugins) and re-run
 (Package.swift, scripts/build-app.sh). This provides the §6(b)/§6(a) relink path.
 
 WRITTEN OFFER (valid to any third party). For at least three (3) years from the
-date you received a given SpiceMac binary, the maintainer will provide, to any
+date you received a given Maspice binary, the maintainer will provide, to any
 third party, the complete corresponding machine-readable source code for the
 LGPL-2.1+ libraries it bundles, for the exact versions in that release, for a
 charge no more than the cost of physically performing source distribution.

@@ -199,7 +199,7 @@ final class SessionModel {
         guard sourceURL.isFileURL, getuid() != 0 else { return }
         NSWorkspace.shared.recycle([sourceURL]) { _, error in
             if let error {
-                NSLog("SpiceMac: could not move \(self.sourceURL.lastPathComponent) to Trash: \(error.localizedDescription)")
+                NSLog("Maspice: could not move \(self.sourceURL.lastPathComponent) to Trash: \(error.localizedDescription)")
             }
         }
     }
@@ -209,7 +209,7 @@ final class SessionModel {
         do {
             try FileManager.default.removeItem(at: sourceURL)
         } catch {
-            NSLog("SpiceMac: could not remove temporary \(sourceURL.lastPathComponent): \(error.localizedDescription)")
+            NSLog("Maspice: could not remove temporary \(sourceURL.lastPathComponent): \(error.localizedDescription)")
         }
     }
 

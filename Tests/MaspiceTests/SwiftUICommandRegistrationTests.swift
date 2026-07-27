@@ -16,7 +16,7 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
     }
 
     func testApplicationRegistersSpiceCommandsExactlyOnce() throws {
-        let appSource = try source("Sources/SpiceMac/SpiceMacApp.swift")
+        let appSource = try source("Sources/Maspice/MaspiceApp.swift")
 
         XCTAssertEqual(
             appSource.components(separatedBy: "SpiceCommands()").count - 1,
@@ -26,11 +26,11 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
     }
 
     func testLauncherIsSingletonAndDoesNotAutomaticallyOpenFilePicker() throws {
-        let appSource = try source("Sources/SpiceMac/SpiceMacApp.swift")
-        let launcherSource = try source("Sources/SpiceMac/LauncherView.swift")
+        let appSource = try source("Sources/Maspice/MaspiceApp.swift")
+        let launcherSource = try source("Sources/Maspice/LauncherView.swift")
 
-        XCTAssertTrue(appSource.contains("Window(\"SpiceMac\", id: \"launcher\")"))
-        XCTAssertFalse(appSource.contains("WindowGroup(\"SpiceMac\", id: \"launcher\")"))
+        XCTAssertTrue(appSource.contains("Window(\"Maspice\", id: \"launcher\")"))
+        XCTAssertFalse(appSource.contains("WindowGroup(\"Maspice\", id: \"launcher\")"))
         XCTAssertFalse(launcherSource.contains("offerOpenPanelIfNeeded"))
         XCTAssertTrue(launcherSource.contains("dismissWindow(id: \"launcher\")"))
         XCTAssertTrue(launcherSource.contains("private func openSession(_ request: SessionRequest)"))
@@ -38,7 +38,7 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
     }
 
     func testPortalUsesNativeSwiftUIWebViewAndInterceptsConnectionFiles() throws {
-        let portalSource = try source("Sources/SpiceMac/RavadaPortalView.swift")
+        let portalSource = try source("Sources/Maspice/RavadaPortalView.swift")
 
         XCTAssertTrue(portalSource.contains("WebView(model.page)"))
         XCTAssertTrue(portalSource.contains("WebPage("))

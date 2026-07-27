@@ -6,6 +6,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Renamed the application and its internal SwiftPM package, module, executable,
+  source directory, and test target to **Maspice** — “The Spicy SPICE client for
+  Mac.” The new application identity is `io.github.beribeli.Maspice`, and its
+  Icon Composer source is standardized as `Resources/AppIcon.icon`.
+
 ### Fixed
 
 - Updated GitHub Actions to use the macOS 26 / Swift 6.2 runner, restored the

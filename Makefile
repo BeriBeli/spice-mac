@@ -1,9 +1,10 @@
-# SpiceMac — thin task runner over scripts/. Run `make` (or `make help`) for the list.
+# Maspice — thin task runner over scripts/. Run `make` (or `make help`) for the list.
 # Sets DEVELOPER_DIR so you never have to remember the prefix. The scripts in
 # scripts/ stay the source of truth.
 
 DEVELOPER_DIR ?= /Applications/Xcode.app/Contents/Developer
 export DEVELOPER_DIR
+APP_NAME := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleName' Resources/Info.plist)
 
 .DEFAULT_GOAL := help
 
@@ -18,11 +19,11 @@ doctor: ## Check the build environment (Xcode, Metal toolchain, frameworks)
 setup: ## Stage the native SPICE frameworks (pinned, checksummed sysroot)
 	@./scripts/fetch-sysroot.sh
 
-build: ## Build and assemble build/SpiceMac.app
+build: ## Build and assemble build/Maspice.app
 	@./scripts/build-app.sh
 
-run: ## Open build/SpiceMac.app
-	@open build/SpiceMac.app
+run: ## Open build/Maspice.app
+	@open "build/$(APP_NAME).app"
 
 test: ## Run all dependency-light checks (58 tests)
 	@( cd Packages/VVConfig && swift run vvcheck )
@@ -53,7 +54,7 @@ all: setup ## Fetch the sysroot, verify the environment, and build
 openssl: ## Upgrade the bundled OpenSSL (only needed on a raw UTM sysroot)
 	@./scripts/upgrade-openssl.sh
 
-icon: ## Regenerate Resources/AppIcon.icns from design/icon/source.png
+icon: ## Validate Resources/AppIcon.icon and refresh the README preview
 	@./scripts/make-icon.sh
 
 debug: ## Launch with verbose SPICE/CocoaSpice logging:  make debug VV=conn.vv

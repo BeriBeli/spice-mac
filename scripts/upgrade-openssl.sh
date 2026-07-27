@@ -103,4 +103,4 @@ fi
 log "all $(printf '%s\n' "$imported" | grep -c .) imported OpenSSL symbols resolve ✓"
 
 log "done. now: $(strings "$FW/crypto.1.1.framework/crypto.1.1" | grep -m1 -iE '^OpenSSL [0-9]')"
-log "re-run scripts/build-app.sh to repackage SpiceMac.app, then test a real TLS connection."
+log "re-run scripts/build-app.sh to repackage Maspice.app, then test a real TLS connection."

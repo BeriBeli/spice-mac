@@ -34,7 +34,7 @@ struct LauncherView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.tint)
 
-            Text("SpiceMac")
+            Text("Maspice")
                 .font(.title.bold())
 
             Text("Connect to a SPICE console.")

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# run-as-root.sh — launch SpiceMac as root so libusb can CAPTURE (seize) USB
+# run-as-root.sh — launch Maspice as root so libusb can CAPTURE (seize) USB
 # devices that macOS kernel drivers claim (mass storage, HID, audio, serial,
 # iOS, …). On a personal/ad-hoc-signed build this is the only entitlement-free
 # way to redirect such devices — the alternative, the Apple-restricted
@@ -32,7 +32,10 @@ ASSUME_YES="${SPICEMAC_ASSUME_YES:-0}"
 [ "${1:-}" = "-y" ] && { ASSUME_YES=1; shift; }
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP="$ROOT/build/SpiceMac.app/Contents/MacOS/SpiceMac"
+PLIST="$ROOT/Resources/Info.plist"
+APP_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$PLIST")"
+EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$PLIST")"
+APP="$ROOT/build/$APP_NAME.app/Contents/MacOS/$EXECUTABLE_NAME"
 VV="${1:?usage: run-as-root.sh [-y] <connection.vv>}"
 
 [ -x "$APP" ] || { echo "build first: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./scripts/build-app.sh" >&2; exit 1; }
@@ -41,7 +44,7 @@ VV="${1:?usage: run-as-root.sh [-y] <connection.vv>}"
 VV="$(cd "$(dirname "$VV")" && pwd)/$(basename "$VV")"
 
 cat >&2 <<'WARN'
-⚠️  SpiceMac will run as ROOT for USB capture.
+⚠️  Maspice will run as ROOT for USB capture.
     The WHOLE app runs as root — including the parsers that read data from the SPICE
     server — so do this only against a VM/node you TRUST, and only when you need a
     device a macOS kernel driver owns (driverless devices don't need root).

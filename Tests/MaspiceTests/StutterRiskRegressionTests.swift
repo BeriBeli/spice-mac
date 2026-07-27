@@ -54,11 +54,125 @@ final class StutterRiskRegressionTests: XCTestCase {
         )
         let coalescer = input[implementationStart...]
         let lock = try XCTUnwrap(coalescer.range(of: "@synchronized (self)"))
-        let submission = try XCTUnwrap(coalescer.range(of: "asyncWith:"))
+        let submission = try XCTUnwrap(
+            coalescer.range(of: "asyncUserInteractiveWith:")
+        )
         XCTAssertLessThan(
             lock.lowerBound,
             submission.lowerBound,
             "Batch mutation and GLib submission need one FIFO linearization point."
+        )
+    }
+
+    func testInputSubmissionsRunAheadOfNormalSpiceWork() throws {
+        let main = try source("ThirdParty/CocoaSpice/Sources/CocoaSpice/CSMain.m")
+        let interactiveMethod = try slice(
+            main,
+            from: "- (void)asyncUserInteractiveWith:(dispatch_block_t)block {",
+            through: "\n}"
+        )
+        XCTAssertTrue(
+            interactiveMethod.contains("G_PRIORITY_HIGH"),
+            "User input must not wait behind normal-priority display and network work."
+        )
+        XCTAssertTrue(main.contains("CSInteractiveBurstLimit = 8"))
+        XCTAssertTrue(main.contains("g_idle_source_new()"))
+        XCTAssertTrue(main.contains("g_source_attach(source, self.glibMainContext)"))
+        XCTAssertTrue(
+            main.contains("scheduleInteractiveDrainWithPriority:G_PRIORITY_DEFAULT"),
+            "Sustained input must yield to normal-priority socket and display work."
+        )
+
+        let header = try source(
+            "ThirdParty/CocoaSpice/Sources/CocoaSpice/include/CSMain.h"
+        )
+        XCTAssertFalse(
+            header.contains("asyncUserInteractiveWith"),
+            "Input scheduling is an internal policy, not a public CSMain escape hatch."
+        )
+
+        let input = try source("ThirdParty/CocoaSpice/Sources/CocoaSpice/CSInput.m")
+        XCTAssertFalse(
+            input.contains("CSMain.sharedInstance asyncWith:"),
+            "Every CSInput submission must use the latency-sensitive GLib path."
+        )
+        XCTAssertEqual(
+            input.components(separatedBy: "CSMain.sharedInstance asyncUserInteractiveWith:").count - 1,
+            3,
+            "Boundary, pointer, and scroll submissions must share one priority and preserve FIFO ordering."
+        )
+    }
+
+    func testKeyboardTransitionsUseDedicatedLosslessSubmissionPath() throws {
+        let input = try source("ThirdParty/CocoaSpice/Sources/CocoaSpice/CSInput.m")
+        let method = try slice(
+            input,
+            from: "- (void)sendKey:(CSInputKey)type code:(int)scancode {",
+            through: "\n}"
+        )
+
+        XCTAssertFalse(
+            method.contains("enqueueBoundaryWithBlock"),
+            "Keyboard transitions must not share the generic burst drain, where a saturated input stream can drop press/release pairs."
+        )
+        XCTAssertTrue(
+            method.contains("enqueueKeyboard"),
+            "Keyboard transitions need a dedicated lossless FIFO submission path."
+        )
+
+        let main = try source("ThirdParty/CocoaSpice/Sources/CocoaSpice/CSMain.m")
+        XCTAssertTrue(
+            main.contains("- (void)asyncKeyboardWith:(dispatch_block_t)block {"),
+            "The keyboard FIFO must be independent from the generic interactive burst queue."
+        )
+        let drain = try slice(
+            main,
+            from: "- (void)drainNextKeyboardBlock {",
+            through: "\n}"
+        )
+        XCTAssertTrue(drain.contains("removeObjectAtIndex:0"))
+        XCTAssertFalse(
+            drain.contains("for ("),
+            "Only one keyboard transition may be submitted per GLib iteration."
+        )
+    }
+
+    func testKeyEventsRecoverModifiersWhenFlagsChangedIsMissing() throws {
+        let router = try source(
+            "Packages/SpiceController/Sources/SpiceController/SpiceInputRouter.swift"
+        )
+        let keyDown = try slice(
+            router,
+            from: "public func keyDown(_ event: NSEvent) {",
+            through: "\n    }"
+        )
+        let synthesize = try XCTUnwrap(
+            keyDown.range(of: "synthesizeMissingModifiers")
+        )
+        let press = try XCTUnwrap(
+            keyDown.range(of: "sendKey(event.keyCode, pressed: true)")
+        )
+        XCTAssertLessThan(
+            synthesize.lowerBound,
+            press.lowerBound,
+            "A modifier present only in keyDown.modifierFlags must be pressed before the ordinary key."
+        )
+
+        let keyUp = try slice(
+            router,
+            from: "public func keyUp(_ event: NSEvent) {",
+            through: "\n    }"
+        )
+        let releaseKey = try XCTUnwrap(
+            keyUp.range(of: "sendKey(event.keyCode, pressed: false)")
+        )
+        let releaseSynthetic = try XCTUnwrap(
+            keyUp.range(of: "releaseSyntheticModifiers")
+        )
+        XCTAssertLessThan(
+            releaseKey.lowerBound,
+            releaseSynthetic.lowerBound,
+            "A synthesized modifier must remain held through the ordinary key release."
         )
     }
 

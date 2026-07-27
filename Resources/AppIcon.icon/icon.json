@@ -1,0 +1,52 @@
+{
+  "fill" : {
+    "linear-gradient" : [
+      "extended-srgb:0.00000,0.53333,1.00000,1.00000",
+      "display-p3:0.89339,1.00000,0.93066,1.00000"
+    ],
+    "orientation" : {
+      "start" : {
+        "x" : 0.5,
+        "y" : 1
+      },
+      "stop" : {
+        "x" : 0.5,
+        "y" : 0.3
+      }
+    }
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "4 — Prompt & Syntax.svg",
+          "name" : "4 — Prompt & Syntax"
+        },
+        {
+          "glass" : false,
+          "image-name" : "3 — Terminal Window.svg",
+          "name" : "3 — Terminal Window"
+        },
+        {
+          "glass" : false,
+          "image-name" : "2 — Floating Shell.svg",
+          "name" : "2 — Floating Shell"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

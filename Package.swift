@@ -1,7 +1,7 @@
 // swift-tools-version:6.2
 import PackageDescription
 
-// SpiceMac — a native macOS SPICE client that opens Proxmox VE `.vv` consoles by
+// Maspice — a native macOS SPICE client that opens Proxmox VE `.vv` consoles by
 // wrapping (a forked) CocoaSpice.
 //
 // BUILD REQUIREMENTS:
@@ -9,7 +9,7 @@ import PackageDescription
 //    .metal shader, which needs the Metal toolchain that only ships with Xcode.
 //  * The native SPICE frameworks must be staged under ./Frameworks first:
 //        ./scripts/fetch-sysroot.sh
-//  * Build & bundle into SpiceMac.app with:  ./scripts/build-app.sh
+//  * Build & bundle into Maspice.app with:  ./scripts/build-app.sh
 //
 // The pure-Swift libraries build and test on their own
 // with just the toolchain — see their packages under Packages/.
@@ -63,10 +63,10 @@ spiceTestLinkFlags += [
 let nativeSpiceTestLinkerSettings: [LinkerSetting] = [.unsafeFlags(spiceTestLinkFlags)]
 
 let package = Package(
-    name: "SpiceMac",
+    name: "Maspice",
     platforms: [.macOS(.v26)],
     products: [
-        .executable(name: "SpiceMac", targets: ["SpiceMac"]),
+        .executable(name: "Maspice", targets: ["Maspice"]),
     ],
     dependencies: [
         .package(path: "Packages/VVConfig"),
@@ -98,7 +98,7 @@ let package = Package(
         ),
         // The SwiftUI application with a narrow AppKit/Metal display bridge.
         .executableTarget(
-            name: "SpiceMac",
+            name: "Maspice",
             dependencies: [
                 "SpiceController",
                 "SpiceCursorLogic",
@@ -108,15 +108,15 @@ let package = Package(
                 .product(name: "CocoaSpice", package: "CocoaSpice"),
                 .product(name: "CocoaSpiceRenderer", package: "CocoaSpice"),
             ],
-            path: "Sources/SpiceMac",
+            path: "Sources/Maspice",
             linkerSettings: nativeSpiceLinkerSettings
         ),
         .testTarget(
-            name: "SpiceMacTests",
+            name: "MaspiceTests",
             dependencies: [
                 .product(name: "CocoaSpice", package: "CocoaSpice"),
             ],
-            path: "Tests/SpiceMacTests",
+            path: "Tests/MaspiceTests",
             linkerSettings: nativeSpiceTestLinkerSettings
         ),
     ],
