@@ -8,25 +8,29 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.2.1] — 2026-07-27
 
-### Changed
+### Highlights
 
-- Renamed the application and its internal SwiftPM package, module, executable,
-  source directory, and test target to **Maspice** — “The Spicy SPICE client for
-  Mac.” The new application identity is `io.github.beribeli.Maspice`, and its
-  Icon Composer source is standardized as `Resources/AppIcon.icon`.
+- Renamed the application to **Maspice** — “The Spicy SPICE client for Mac.”
+  The app, executable, SwiftPM targets, source layout, test targets, and tooling
+  now consistently use the Maspice name.
+- Added the new layered macOS 26 application icon and refreshed the README
+  artwork. The application identity is now `io.github.beribeli.Maspice`.
 
-### Fixed
+### Improved
 
-- Updated GitHub Actions to use the macOS 26 / Swift 6.2 runner, restored the
-  complete 58-check test suite, fixed first-time `make all` ordering, and aligned
-  environment checks and contributor documentation with the macOS 26+ codebase.
+- Reduced input latency during long sessions by prioritizing lossless keyboard
+  transitions while coalescing high-frequency pointer and scroll events.
+- Improved modifier-key recovery for remote terminals, editors, and injected
+  keyboard events when macOS does not deliver a matching modifier transition.
+- Updated CI and build tooling for macOS 26 and Swift 6.2, restored the complete
+  automated test suite, and fixed first-time `make all` setup ordering.
 
-### Changed
+### Project
 
-- Moved project operations to `BeriBeli/spice-mac`: application and dependency
-  Releases, security reporting, funding metadata, release tooling, and the
-  pinned sysroot download no longer depend on the original repository. Original
-  authorship, history, and third-party attribution remain intact.
+- Completed the move to the independent `BeriBeli/spice-mac` repository.
+  Releases, security reporting, funding metadata, release tooling, and pinned
+  build dependencies no longer depend on the original repository. Original
+  authorship, history, and third-party attribution remain preserved.
 
 ## [0.2.0] — 2026-07-26
 
