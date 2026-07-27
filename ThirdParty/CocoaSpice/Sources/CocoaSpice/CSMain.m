@@ -20,10 +20,19 @@
 #import <pthread.h>
 #import "gst_ios_init.h"
 
+@class _CSMainBlock;
+
 @interface CSMain ()
 
 @property (nonatomic, readwrite) BOOL running;
 @property (nonatomic) pthread_t spiceThread;
+
+- (void)asyncWithBlock:(_CSMainBlock *)block priority:(gint)priority;
+- (void)enqueueWithBlock:(_CSMainBlock *)block priority:(gint)priority;
+- (void)scheduleInteractiveDrainWithPriority:(gint)priority;
+- (void)drainInteractiveBlocks;
+- (void)scheduleKeyboardDrainWithPriority:(gint)priority;
+- (void)drainNextKeyboardBlock;
 
 @end
 
@@ -38,7 +47,13 @@
 
 @implementation CSMain {
     GMainContext *_main_context;
+    NSMutableArray<dispatch_block_t> *_interactiveBlocks;
+    BOOL _interactiveDrainScheduled;
+    NSMutableArray<dispatch_block_t> *_keyboardBlocks;
+    BOOL _keyboardDrainScheduled;
 }
+
+static const NSUInteger CSInteractiveBurstLimit = 8;
 
 static void logHandler(const gchar *log_domain, GLogLevelFlags log_level,
                        const gchar *message, gpointer user_data)
@@ -129,6 +144,8 @@ void *spice_main_loop(void *args) {
         if ((_main_context = g_main_context_new()) == NULL) {
             return nil;
         }
+        _interactiveBlocks = [NSMutableArray array];
+        _keyboardBlocks = [NSMutableArray array];
         g_log_set_default_handler(logHandler, NULL);
     }
     return self;
@@ -195,19 +212,136 @@ static void cleanupBlock(gpointer data) {
     }
 }
 
-- (void)asyncWithBlock:(_CSMainBlock *)block {
+- (void)asyncWithBlock:(_CSMainBlock *)block priority:(gint)priority {
     gpointer data = (__bridge_retained void *)block;
     g_main_context_invoke_full(self.glibMainContext,
-                               G_PRIORITY_DEFAULT,
+                               priority,
                                callBlockInMainContext,
                                data,
                                cleanupBlock);
 }
 
+/// Unlike g_main_context_invoke_full(), attaching an idle source always defers
+/// execution to a future main-context iteration, even when called by its owner.
+- (void)enqueueWithBlock:(_CSMainBlock *)block priority:(gint)priority {
+    gpointer data = (__bridge_retained void *)block;
+    GSource *source = g_idle_source_new();
+    g_source_set_priority(source, priority);
+    g_source_set_callback(source, callBlockInMainContext, data, cleanupBlock);
+    g_source_attach(source, self.glibMainContext);
+    g_source_unref(source);
+}
+
 - (void)asyncWith:(dispatch_block_t)block {
     _CSMainBlock *_block = [[_CSMainBlock alloc] init];
     _block.userBlock = block;
-    [self asyncWithBlock:_block];
+    [self asyncWithBlock:_block priority:G_PRIORITY_DEFAULT];
+}
+
+/// Give a newly active input stream one short high-priority burst, then drain
+/// subsequent batches at the normal GLib priority. This lowers first-event
+/// latency without allowing sustained input to starve socket/display sources.
+- (void)scheduleInteractiveDrainWithPriority:(gint)priority {
+    _CSMainBlock *_block = [[_CSMainBlock alloc] init];
+    __weak CSMain *weakSelf = self;
+    _block.userBlock = ^{
+        [weakSelf drainInteractiveBlocks];
+    };
+    [self enqueueWithBlock:_block priority:priority];
+}
+
+- (void)asyncUserInteractiveWith:(dispatch_block_t)block {
+    BOOL needsDrain = NO;
+    @synchronized (self) {
+        [_interactiveBlocks addObject:[block copy]];
+        if (!_interactiveDrainScheduled) {
+            _interactiveDrainScheduled = YES;
+            needsDrain = YES;
+        }
+    }
+    if (needsDrain) {
+        [self scheduleInteractiveDrainWithPriority:G_PRIORITY_HIGH];
+    }
+}
+
+/// Keyboard transitions are lossless and order-sensitive. Keep them out of the
+/// generic interactive burst so a synthetic typing burst cannot submit several
+/// press/release messages in one GLib iteration before the channel gets a chance
+/// to service its socket. The first transition retains low input latency; each
+/// continuation yields at normal priority before submitting the next one.
+- (void)scheduleKeyboardDrainWithPriority:(gint)priority {
+    _CSMainBlock *_block = [[_CSMainBlock alloc] init];
+    __weak CSMain *weakSelf = self;
+    _block.userBlock = ^{
+        [weakSelf drainNextKeyboardBlock];
+    };
+    [self enqueueWithBlock:_block priority:priority];
+}
+
+- (void)asyncKeyboardWith:(dispatch_block_t)block {
+    BOOL needsDrain = NO;
+    @synchronized (self) {
+        [_keyboardBlocks addObject:[block copy]];
+        if (!_keyboardDrainScheduled) {
+            _keyboardDrainScheduled = YES;
+            needsDrain = YES;
+        }
+    }
+    if (needsDrain) {
+        [self scheduleKeyboardDrainWithPriority:G_PRIORITY_HIGH];
+    }
+}
+
+- (void)drainNextKeyboardBlock {
+    dispatch_block_t block = nil;
+    @synchronized (self) {
+        if (_keyboardBlocks.count > 0) {
+            block = _keyboardBlocks.firstObject;
+            [_keyboardBlocks removeObjectAtIndex:0];
+        }
+    }
+
+    if (block) {
+        block();
+    }
+
+    BOOL needsContinuation;
+    @synchronized (self) {
+        needsContinuation = _keyboardBlocks.count > 0;
+        if (!needsContinuation) {
+            _keyboardDrainScheduled = NO;
+        }
+    }
+    if (needsContinuation) {
+        [self scheduleKeyboardDrainWithPriority:G_PRIORITY_DEFAULT];
+    }
+}
+
+- (void)drainInteractiveBlocks {
+    NSArray<dispatch_block_t> *batch;
+    @synchronized (self) {
+        NSUInteger count = MIN(CSInteractiveBurstLimit, _interactiveBlocks.count);
+        batch = [_interactiveBlocks subarrayWithRange:NSMakeRange(0, count)];
+        [_interactiveBlocks removeObjectsInRange:NSMakeRange(0, count)];
+    }
+
+    for (dispatch_block_t block in batch) {
+        block();
+    }
+
+    BOOL needsContinuation;
+    @synchronized (self) {
+        // Keep the drain marked active while executing the batch. Input arriving
+        // during that window joins a normal-priority continuation instead of
+        // starting another high-priority burst and starving normal GLib sources.
+        needsContinuation = _interactiveBlocks.count > 0;
+        if (!needsContinuation) {
+            _interactiveDrainScheduled = NO;
+        }
+    }
+    if (needsContinuation) {
+        [self scheduleInteractiveDrainWithPriority:G_PRIORITY_DEFAULT];
+    }
 }
 
 - (void)syncWith:(dispatch_block_t)block {
@@ -219,7 +353,7 @@ static void cleanupBlock(gpointer data) {
         dispatch_group_enter(mainContextGroup);
         _block.userBlock = block;
         _block.group = mainContextGroup;
-        [self asyncWithBlock:_block];
+        [self asyncWithBlock:_block priority:G_PRIORITY_DEFAULT];
         dispatch_group_wait(mainContextGroup, DISPATCH_TIME_FOREVER);
     }
 }

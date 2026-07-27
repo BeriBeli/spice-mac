@@ -49,11 +49,19 @@ typedef NS_ENUM(NSUInteger, _CSInputPointerKind) {
 @implementation _CSInputScrollBatch
 @end
 
+/// Internal scheduling seam. Keep it out of CocoaSpice's public CSMain API so
+/// unrelated consumers cannot submit arbitrary high-priority worker tasks.
+@interface CSMain (InputScheduling)
+- (void)asyncUserInteractiveWith:(dispatch_block_t)block;
+- (void)asyncKeyboardWith:(dispatch_block_t)block;
+@end
+
 @interface CSInput ()
 
 @property (nonatomic, readwrite) SpiceInputsChannel *channel;
 
 - (void)enqueueBoundaryWithBlock:(dispatch_block_t)block;
+- (void)enqueueKeyboard:(dispatch_block_t)block;
 - (void)enqueueCoalescedPointer:(_CSInputPointerKind)kind
                            point:(CGPoint)point
                       buttonMask:(CSInputButton)buttonMask
@@ -95,7 +103,7 @@ typedef NS_ENUM(NSUInteger, _CSInputPointerKind) {
     if (!self.channel) {
         return;
     }
-    [self enqueueBoundaryWithBlock:^{
+    [self enqueueKeyboard:^{
         SpiceInputsChannel *inputs = self.channel;
         /* Send proper scancodes. This will send same scancodes
          * as hardware.
@@ -129,7 +137,7 @@ typedef NS_ENUM(NSUInteger, _CSInputPointerKind) {
     m = (1u << b);
     g_return_if_fail(i < SPICE_N_ELEMENTS(self->_key_state));
     
-    [self enqueueBoundaryWithBlock:^{
+    [self enqueueKeyboard:^{
         SpiceInputsChannel *inputs = self.channel;
         switch (type) {
             case kCSInputKeyPress:
@@ -155,20 +163,26 @@ typedef NS_ENUM(NSUInteger, _CSInputPointerKind) {
 }
 
 - (void)releaseKeys {
-    uint32_t i, b;
-    
     SPICE_DEBUG("%s", __FUNCTION__);
-    for (i = 0; i < SPICE_N_ELEMENTS(self->_key_state); i++) {
-        if (!self->_key_state[i]) {
-            continue;
-        }
-        for (b = 0; b < 32; b++) {
-            unsigned int scancode = i * 32 + b;
-            if (scancode != 0) {
-                [self sendKey:kCSInputKeyRelease code:scancode];
+    if (!self.channel) {
+        return;
+    }
+    [self enqueueKeyboard:^{
+        SpiceInputsChannel *inputs = self.channel;
+        for (uint32_t i = 0; i < SPICE_N_ELEMENTS(self->_key_state); i++) {
+            if (!self->_key_state[i]) {
+                continue;
+            }
+            for (uint32_t b = 0; b < 32; b++) {
+                uint32_t m = (1u << b);
+                if (self->_key_state[i] & m) {
+                    unsigned int scancode = i * 32 + b;
+                    spice_inputs_channel_key_release(inputs, scancode);
+                    self->_key_state[i] &= ~m;
+                }
             }
         }
-    }
+    }];
 }
 
 - (CSInputKeyLock)keyLock {
@@ -263,7 +277,18 @@ static int cs_button_to_spice(CSInputButton button)
     @synchronized (self) {
         _pendingPointerBatch = nil;
         _pendingScrollBatch = nil;
-        [CSMain.sharedInstance asyncWith:block];
+        [CSMain.sharedInstance asyncUserInteractiveWith:block];
+    }
+}
+
+/// Preserve every key transition in FIFO order while allowing the GLib loop to
+/// service the inputs channel between transitions. Unlike pointer and scroll
+/// events, keyboard transitions must never be coalesced or dropped.
+- (void)enqueueKeyboard:(dispatch_block_t)block {
+    @synchronized (self) {
+        _pendingPointerBatch = nil;
+        _pendingScrollBatch = nil;
+        [CSMain.sharedInstance asyncKeyboardWith:block];
     }
 }
 
@@ -295,7 +320,7 @@ static int cs_button_to_spice(CSInputButton button)
         }
         batch.buttonMask = buttonMask;
         if (needsSubmission) {
-            [CSMain.sharedInstance asyncWith:^{
+            [CSMain.sharedInstance asyncUserInteractiveWith:^{
                 CGPoint coalescedPoint;
                 CSInputButton coalescedButtonMask;
                 NSInteger coalescedMonitorID;
@@ -356,7 +381,7 @@ static int cs_button_to_spice(CSInputButton button)
         }
         batch.buttonMask = buttonMask;
         if (needsSubmission) {
-            [CSMain.sharedInstance asyncWith:^{
+            [CSMain.sharedInstance asyncUserInteractiveWith:^{
                 CGFloat coalescedDeltaY;
                 CSInputButton coalescedButtonMask;
                 @synchronized (self) {

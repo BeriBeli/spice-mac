@@ -44,6 +44,7 @@ public final class SpiceInputRouter {
 
     private var buttonMask: CSInputButton = []
     private var heldModifiers: Set<UInt16> = []
+    private var syntheticModifiersByKey: [UInt16: [UInt16]] = [:]
 
     public init(input: CSInput? = nil) {
         self.input = input
@@ -55,6 +56,7 @@ public final class SpiceInputRouter {
         // Recover any modifier that was released while we weren't getting events
         // (e.g. a ⌘-combo the system intercepted) before sending the key.
         reconcileModifiers(event.modifierFlags)
+        synthesizeMissingModifiers(for: event)
         // Auto-repeats are forwarded as additional presses, which the guest expects.
         sendKey(event.keyCode, pressed: true)
     }
@@ -62,6 +64,7 @@ public final class SpiceInputRouter {
     public func keyUp(_ event: NSEvent) {
         reconcileModifiers(event.modifierFlags)
         sendKey(event.keyCode, pressed: false)
+        releaseSyntheticModifiers(for: event.keyCode)
     }
 
     private func sendKeyTransition(_ transition: SpiceKeyTransition) {
@@ -111,13 +114,56 @@ public final class SpiceInputRouter {
     /// Release any held modifier whose macOS flag is no longer set — recovers from
     /// a missed key-up so a modifier never stays "stuck down" on the guest.
     private func reconcileModifiers(_ flags: NSEvent.ModifierFlags) {
+        let syntheticModifiers = Set(syntheticModifiersByKey.values.joined())
         let stuck = heldModifiers.filter { kc in
+            guard !syntheticModifiers.contains(kc) else { return false }
             guard let flag = Self.modifierFlag(for: kc) else { return false }
             return !flags.contains(flag)
         }
         for kc in stuck {
             heldModifiers.remove(kc)
             sendKey(kc, pressed: false)
+        }
+    }
+
+    /// Some CGEvent injectors put modifier state on keyDown/keyUp without
+    /// emitting flagsChanged. Synthesize only the missing modifier classes and
+    /// keep them held until this ordinary key's release reaches the FIFO.
+    private func synthesizeMissingModifiers(for event: NSEvent) {
+        guard !event.isARepeat,
+              Self.modifierFlag(for: event.keyCode) == nil,
+              syntheticModifiersByKey[event.keyCode] == nil else { return }
+
+        let candidates: [(NSEvent.ModifierFlags, UInt16)] = [
+            (.control, MacVirtualKey.control),
+            (.option, MacVirtualKey.option),
+            (.shift, MacVirtualKey.shift),
+            (.command, MacVirtualKey.command),
+            (.function, MacVirtualKey.function),
+        ]
+        var synthesized: [UInt16] = []
+        for (flag, keyCode) in candidates where event.modifierFlags.contains(flag) {
+            let alreadyHeld = heldModifiers.contains {
+                Self.modifierFlag(for: $0) == flag
+            }
+            if !alreadyHeld {
+                heldModifiers.insert(keyCode)
+                synthesized.append(keyCode)
+                sendKey(keyCode, pressed: true)
+            }
+        }
+        if !synthesized.isEmpty {
+            syntheticModifiersByKey[event.keyCode] = synthesized
+        }
+    }
+
+    private func releaseSyntheticModifiers(for keyCode: UInt16) {
+        guard let synthesized = syntheticModifiersByKey.removeValue(forKey: keyCode) else {
+            return
+        }
+        for modifierKeyCode in synthesized.reversed() {
+            heldModifiers.remove(modifierKeyCode)
+            sendKey(modifierKeyCode, pressed: false)
         }
     }
 
@@ -155,6 +201,7 @@ public final class SpiceInputRouter {
             input.releaseKeys()
         }
         heldModifiers.removeAll()
+        syntheticModifiersByKey.removeAll()
         buttonMask = []
     }
 
