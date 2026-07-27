@@ -1,8 +1,8 @@
 {
   "fill" : {
     "linear-gradient" : [
-      "extended-srgb:0.00000,0.53333,1.00000,1.00000",
-      "display-p3:0.89339,1.00000,0.93066,1.00000"
+      "extended-srgb:0.38039,0.33333,0.96078,1.00000",
+      "extended-srgb:0.00000,0.76471,0.81569,1.00000"
     ],
     "orientation" : {
       "start" : {
@@ -19,8 +19,8 @@
     {
       "layers" : [
         {
-          "image-name" : "4 — Prompt & Syntax.svg",
-          "name" : "4 — Prompt & Syntax"
+          "image-name" : "04.svg",
+          "name" : "04"
         },
         {
           "glass" : false,

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="design/icon/icon.png" width="168" height="168" alt="Maspice app icon">
+  <img src="design/icon/icon.png?v=0.2.1-r2" width="168" height="168" alt="Maspice app icon">
 </p>
 
 # Maspice
