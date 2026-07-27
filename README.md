@@ -161,8 +161,8 @@ script fails closed on a checksum mismatch.
 
 Alternatives (rarely needed):
 
-- **Your own tarball:** set `SPICEMAC_SYSROOT_URL` (+ `SPICEMAC_SYSROOT_SHA256`).
-- **A fresh UTM CI build:** `SPICEMAC_SYSROOT_FROM_GH=1 ./scripts/fetch-sysroot.sh`
+- **Your own tarball:** set `MASPICE_SYSROOT_URL` (+ `MASPICE_SYSROOT_SHA256`).
+- **A fresh UTM CI build:** `MASPICE_SYSROOT_FROM_GH=1 ./scripts/fetch-sysroot.sh`
   (needs `gh auth login`; UTM artifacts expire ~90 days). That sysroot ships the EOL
   OpenSSL 1.1.1b, so follow it with `./scripts/upgrade-openssl.sh` (→ 3.5.6 LTS; see
   [SECURITY.md](SECURITY.md)).

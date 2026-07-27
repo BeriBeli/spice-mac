@@ -48,19 +48,19 @@ See [README.md](README.md) for prerequisites and details.
 
 ### Environment variables
 
-The scripts read these `SPICEMAC_*` knobs (none are needed for the default path):
+The scripts read these `MASPICE_*` knobs (none are needed for the default path):
 
 | Variable | Script | Default | When to set |
 |----------|--------|---------|-------------|
-| `SPICEMAC_SYSROOT_URL` | fetch-sysroot | (pinned default) | Use your own sysroot tarball |
-| `SPICEMAC_SYSROOT_SHA256` | fetch-sysroot | (pinned default) | Required digest for a custom URL |
-| `SPICEMAC_SYSROOT_FROM_GH` | fetch-sysroot | `0` | `1` = pull a fresh UTM CI artifact (needs `gh`) |
-| `SPICEMAC_SYSROOT_ARTIFACT` | fetch-sysroot | `Sysroot-macos-arm64` | UTM artifact name (GH path) |
-| `SPICEMAC_SYSROOT_ARTIFACT_ID` | fetch-sysroot | (latest) | Pin a specific UTM artifact id |
-| `SPICEMAC_UTM_REPO` | fetch-sysroot | `utmapp/UTM` | Alternate UTM repo (GH path) |
-| `SPICEMAC_SYSROOT_SHA256_INSECURE` | fetch-sysroot | unset | `1` = skip the digest check (unsafe; testing only) |
-| `SPICEMAC_ASSUME_YES` | run-as-root, release | unset | `1` = skip confirmation prompts |
-| `SPICEMAC_LOG` | debug-run | unset | Spice log domains (e.g. `all`) |
+| `MASPICE_SYSROOT_URL` | fetch-sysroot | (pinned default) | Use your own sysroot tarball |
+| `MASPICE_SYSROOT_SHA256` | fetch-sysroot | (pinned default) | Required digest for a custom URL |
+| `MASPICE_SYSROOT_FROM_GH` | fetch-sysroot | `0` | `1` = pull a fresh UTM CI artifact (needs `gh`) |
+| `MASPICE_SYSROOT_ARTIFACT` | fetch-sysroot | `Sysroot-macos-arm64` | UTM artifact name (GH path) |
+| `MASPICE_SYSROOT_ARTIFACT_ID` | fetch-sysroot | (latest) | Pin a specific UTM artifact id |
+| `MASPICE_UTM_REPO` | fetch-sysroot | `utmapp/UTM` | Alternate UTM repo (GH path) |
+| `MASPICE_SYSROOT_SHA256_INSECURE` | fetch-sysroot | unset | `1` = skip the digest check (unsafe; testing only) |
+| `MASPICE_ASSUME_YES` | run-as-root, release | unset | `1` = skip confirmation prompts |
+| `MASPICE_LOG` | debug-run | unset | Spice log domains (e.g. `all`) |
 | `ALLOW_NO_METAL` | build-app | unset | `1` = build a non-rendering app without the Metal toolchain |
 
 ## Cutting a release (maintainers)

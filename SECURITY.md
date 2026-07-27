@@ -48,7 +48,7 @@ gate any wider distribution.
   (`swift run vvcheck`) assert it never crashes on arbitrary input.
 - **Mandatory sysroot integrity** — `fetch-sysroot.sh` downloads a **pinned,
   SHA-256-checksummed** sysroot by default and refuses any URL download whose digest
-  doesn't match (a custom `SPICEMAC_SYSROOT_URL` still requires `SPICEMAC_SYSROOT_SHA256`).
+  doesn't match (a custom `MASPICE_SYSROOT_URL` still requires `MASPICE_SYSROOT_SHA256`).
 - **OpenSSL upgraded to 3.5.6 (LTS, maintained to 2030)** — `scripts/upgrade-openssl.sh`
   builds OpenSSL 3.5 from (SHA-256-verified) source and installs it under the old
   `ssl.1.1`/`crypto.1.1` names (a "masquerade"), so spice-gtk — compiled against

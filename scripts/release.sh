@@ -23,7 +23,7 @@ VER="${1:-}"
 [[ "$VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "version must be semver X.Y.Z (got '$VER')"
 ASSUME_YES=0
 [ "${2:-}" = "--yes" ] && ASSUME_YES=1
-[ "${SPICEMAC_ASSUME_YES:-0}" = "1" ] && ASSUME_YES=1
+[ "${MASPICE_ASSUME_YES:-0}" = "1" ] && ASSUME_YES=1
 
 # --- Preflight (all reversible to here) ------------------------------------
 log "preflight"

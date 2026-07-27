@@ -11,16 +11,16 @@
 # CocoaSpice's gst_ios_init.m registers.
 #
 # Sources, in order of preference:
-#   1) $SPICEMAC_SYSROOT_URL — direct URL to a sysroot tarball (set
-#      $SPICEMAC_SYSROOT_SHA256 to verify it).
+#   1) $MASPICE_SYSROOT_URL — direct URL to a sysroot tarball (set
+#      $MASPICE_SYSROOT_SHA256 to verify it).
 #   2) DEFAULT (no env needed): the pinned, checksummed sysroot published on this
 #      repo's releases (DEFAULT_SYSROOT_URL below) — the 26-framework + 19-plugin
 #      build/runtime closure, OpenSSL already 3.5.6 (LTS), no GPL. This is what makes a
 #      fresh clone build without `gh`/UTM. Re-pin: upload a new tarball, bump
 #      DEFAULT_SYSROOT_URL/_SHA256.
-#   3) $SPICEMAC_SYSROOT_FROM_GH=1 — gh download of a fresh UTM CI
+#   3) $MASPICE_SYSROOT_FROM_GH=1 — gh download of a fresh UTM CI
 #      "Sysroot-macos-arm64" artifact (needs `gh auth login`; artifacts expire).
-#      Override the id with $SPICEMAC_SYSROOT_ARTIFACT_ID, else latest by name.
+#      Override the id with $MASPICE_SYSROOT_ARTIFACT_ID, else latest by name.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -29,8 +29,8 @@ PLUGINS_DIR="$FRAMEWORKS_DIR/gstreamer-1.0"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-UTM_REPO="${SPICEMAC_UTM_REPO:-utmapp/UTM}"
-SYSROOT_ARTIFACT="${SPICEMAC_SYSROOT_ARTIFACT:-Sysroot-macos-arm64}"
+UTM_REPO="${MASPICE_UTM_REPO:-utmapp/UTM}"
+SYSROOT_ARTIFACT="${MASPICE_SYSROOT_ARTIFACT:-Sysroot-macos-arm64}"
 
 # Pinned default sysroot (this repo's release). The 26-framework + 19-plugin
 # closure Maspice links/embeds; LGPL/MIT/BSD/OpenSSL only (no GPL); OpenSSL 3.5.6 (LTS).
@@ -83,31 +83,31 @@ stage() {
 from_url() {
     local url="$1" out="$WORK/sysroot.tgz"
     # The sysroot is the entire native TLS + parser stack; a tampered download is
-    # game over. Require a pinned SHA256 and fail closed (set SPICEMAC_SYSROOT_SHA256_INSECURE=1
+    # game over. Require a pinned SHA256 and fail closed (set MASPICE_SYSROOT_SHA256_INSECURE=1
     # to deliberately bypass for a one-off local test).
-    if [ -z "${SPICEMAC_SYSROOT_SHA256:-}" ] && [ "${SPICEMAC_SYSROOT_SHA256_INSECURE:-}" != "1" ]; then
-        die "refusing to download an unverified sysroot — set SPICEMAC_SYSROOT_SHA256 to the pinned digest"
+    if [ -z "${MASPICE_SYSROOT_SHA256:-}" ] && [ "${MASPICE_SYSROOT_SHA256_INSECURE:-}" != "1" ]; then
+        die "refusing to download an unverified sysroot — set MASPICE_SYSROOT_SHA256 to the pinned digest"
     fi
     log "downloading $url"
     curl -fL --retry 3 -o "$out" "$url" || die "download failed"
-    if [ -n "${SPICEMAC_SYSROOT_SHA256:-}" ]; then
-        echo "${SPICEMAC_SYSROOT_SHA256}  $out" | shasum -a 256 -c - || die "checksum mismatch"
+    if [ -n "${MASPICE_SYSROOT_SHA256:-}" ]; then
+        echo "${MASPICE_SYSROOT_SHA256}  $out" | shasum -a 256 -c - || die "checksum mismatch"
     else
-        log "WARNING: SPICEMAC_SYSROOT_SHA256_INSECURE=1 — skipping integrity check (unsafe)"
+        log "WARNING: MASPICE_SYSROOT_SHA256_INSECURE=1 — skipping integrity check (unsafe)"
     fi
     mkdir -p "$WORK/x"; tar -xzf "$out" -C "$WORK/x"
     stage "$(find_sysroot_root "$WORK/x")"
 }
 
 from_gh() {
-    command -v gh >/dev/null 2>&1 || die "gh not found; set SPICEMAC_SYSROOT_URL"
-    gh auth status >/dev/null 2>&1 || die "gh not authenticated; run 'gh auth login' or set SPICEMAC_SYSROOT_URL"
-    local id="${SPICEMAC_SYSROOT_ARTIFACT_ID:-}"
+    command -v gh >/dev/null 2>&1 || die "gh not found; set MASPICE_SYSROOT_URL"
+    gh auth status >/dev/null 2>&1 || die "gh not authenticated; run 'gh auth login' or set MASPICE_SYSROOT_URL"
+    local id="${MASPICE_SYSROOT_ARTIFACT_ID:-}"
     if [ -z "$id" ]; then
         log "finding latest '$SYSROOT_ARTIFACT' artifact in $UTM_REPO"
         id="$(gh api -X GET "repos/$UTM_REPO/actions/artifacts?per_page=100" \
               --jq ".artifacts[] | select(.name==\"$SYSROOT_ARTIFACT\" and .expired==false) | .id" 2>/dev/null | head -1 || true)"
-        [ -n "$id" ] || die "no non-expired '$SYSROOT_ARTIFACT' artifact found; set SPICEMAC_SYSROOT_URL"
+        [ -n "$id" ] || die "no non-expired '$SYSROOT_ARTIFACT' artifact found; set MASPICE_SYSROOT_URL"
     fi
     log "downloading artifact id $id (large; retrying on flaky network)"
     local zip="$WORK/artifact.zip" ok=
@@ -116,20 +116,20 @@ from_gh() {
            && [ "$(stat -f%z "$zip" 2>/dev/null || echo 0)" -gt 1000000 ]; then ok=1; break; fi
         log "  attempt $i failed; retrying"
     done
-    [ -n "$ok" ] || die "artifact download failed; set SPICEMAC_SYSROOT_URL"
+    [ -n "$ok" ] || die "artifact download failed; set MASPICE_SYSROOT_URL"
     mkdir -p "$WORK/x"; unzip -q "$zip" -d "$WORK/x"
     stage "$(find_sysroot_root "$WORK/x")"
 }
 
 main() {
     log "target: $FRAMEWORKS_DIR (arm64)"
-    if [ -n "${SPICEMAC_SYSROOT_URL:-}" ]; then
-        from_url "$SPICEMAC_SYSROOT_URL"
-    elif [ "${SPICEMAC_SYSROOT_FROM_GH:-}" = "1" ]; then
+    if [ -n "${MASPICE_SYSROOT_URL:-}" ]; then
+        from_url "$MASPICE_SYSROOT_URL"
+    elif [ "${MASPICE_SYSROOT_FROM_GH:-}" = "1" ]; then
         from_gh
     else
-        log "using pinned default sysroot (set SPICEMAC_SYSROOT_FROM_GH=1 for a fresh UTM build)"
-        SPICEMAC_SYSROOT_SHA256="$DEFAULT_SYSROOT_SHA256"
+        log "using pinned default sysroot (set MASPICE_SYSROOT_FROM_GH=1 for a fresh UTM build)"
+        MASPICE_SYSROOT_SHA256="$DEFAULT_SYSROOT_SHA256"
         from_url "$DEFAULT_SYSROOT_URL"
     fi
     log "done. Build with: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./scripts/build-app.sh"

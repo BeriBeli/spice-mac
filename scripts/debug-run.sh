@@ -14,7 +14,7 @@ APP_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$PLIST")"
 EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$PLIST")"
 APP="$ROOT/build/$APP_NAME.app/Contents/MacOS/$EXECUTABLE_NAME"
 VV="${1:?usage: debug-run.sh <connection.vv>}"
-LOG="${SPICEMAC_LOG:-/tmp/spicemac-debug.log}"
+LOG="${MASPICE_LOG:-/tmp/maspice-debug.log}"
 
 [ -x "$APP" ] || { echo "build first: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./scripts/build-app.sh"; exit 1; }
 

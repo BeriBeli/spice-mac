@@ -95,7 +95,7 @@ recoverable from, each release's `Frameworks/`):
     ............................... as shipped in the pinned sysroot
 
 The exact version of every component in a given release is fixed by the pinned,
-SHA-256-checksummed sysroot tarball (`SPICEMAC_SYSROOT_URL`/`_SHA256`,
+SHA-256-checksummed sysroot tarball (`MASPICE_SYSROOT_URL`/`_SHA256`,
 scripts/fetch-sysroot.sh) plus scripts/upgrade-openssl.sh.
 
 

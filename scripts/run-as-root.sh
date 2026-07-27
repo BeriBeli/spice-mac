@@ -25,10 +25,10 @@
 # skipped under root, so your .vv is left in place rather than moved to root's Trash.)
 #
 # Usage: ./scripts/run-as-root.sh [-y] <connection.vv>
-#   -y  (or SPICEMAC_ASSUME_YES=1)   skip the confirmation prompt
+#   -y  (or MASPICE_ASSUME_YES=1)   skip the confirmation prompt
 set -euo pipefail
 
-ASSUME_YES="${SPICEMAC_ASSUME_YES:-0}"
+ASSUME_YES="${MASPICE_ASSUME_YES:-0}"
 [ "${1:-}" = "-y" ] && { ASSUME_YES=1; shift; }
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
