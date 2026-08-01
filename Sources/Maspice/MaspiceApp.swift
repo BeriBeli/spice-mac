@@ -21,7 +21,7 @@ struct MaspiceApp: App {
                 ContentUnavailableView(
                     "No Connection",
                     systemImage: "display.trianglebadge.exclamationmark",
-                    description: Text("Open a fresh Proxmox .vv file."))
+                    description: Text("Open a direct SPICE .vv file."))
             }
         }
         .defaultSize(width: 1024, height: 768)

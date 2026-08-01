@@ -1,96 +1,63 @@
 # Contributing to Maspice
 
-Thanks for your interest! Maspice is a native macOS 26+ SPICE client for
-Proxmox VE and Ravada portals.
+Maspice is a macOS 26+ direct SPICE client for standard QEMU and Ravada.
 
 ## Ground rules
 
-- Be respectful — see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
-- By contributing, you agree your changes are licensed under the project's
-  [MIT License](LICENSE).
-- Keep the dependency-light Swift test suite green (CI runs it on macOS 26).
+- Follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+- Contributions are licensed under [LICENSE](LICENSE).
+- Do not add Proxmox/PVE, proxy, or USB product paths.
+- Send SwiftSpice changes to
+  [BeriBeli/spice-swift](https://github.com/BeriBeli/spice-swift), publish a new
+  upstream release, and then update Maspice's exact SwiftPM version.
+- Do not rewrite Homebrew install names in Maspice. Relocatability must be fixed
+  where the SwiftSpice native artifacts are produced.
+- Preserve the product boundary: direct TCP/TLS only, no Proxmox/PVE proxy or
+  automatic host-resource sharing.
 
-## Project layout
+## Layout
 
-| Path | What |
-|------|------|
-| `Sources/Maspice` | SwiftUI app + narrow AppKit/Metal/WebKit bridges |
-| `Packages/SpiceController` | connection lifecycle, input, clipboard glue |
-| `Packages/VVConfig`, `Packages/SpiceInputMap` | connection parsing and input routing |
-| `Packages/SpiceClipboardLogic`, `Packages/SpiceCursorLogic` | clipboard and cursor policy |
-| `Packages/SpiceSessionLogic` | session cleanup and command-state policy |
-| `ThirdParty/CocoaSpice` | vendored Apache-2.0 fork (Proxmox patch + security fixes) |
+| Path | Purpose |
+|---|---|
+| `Sources/Maspice` | SwiftUI app, Ravada WebKit portal, and AppKit window bridge |
+| `Packages/SpiceController` | SwiftSpice lifecycle and ordered input façade |
+| `Packages/VVConfig` | `.vv` parser and direct-connection policy |
+| `Packages/SpiceSessionLogic` | Session lifecycle and command-state policy |
+| `Package.swift` | exact upstream SwiftSpice release dependency |
+| `Package.resolved` | reviewed SwiftSpice release revision lock |
+| `scripts` | build, packaging, dependency-audit, and release commands |
 
-## Building & testing
+## Development
 
-`make help` lists every task. The dependency-light libraries build and test
-without the native SPICE sysroot:
-
-```sh
-make test     # 58 parser, input, clipboard, cursor, and session checks
-```
-
-The full app needs **Xcode** + the **Metal toolchain component**
-(`xcodebuild -downloadComponent MetalToolchain`) + the native SPICE frameworks:
-
-```sh
-make doctor   # checks the above and prints fixes if anything's missing
-make all      # fetch the sysroot, then build → build/Maspice.app
-make test-stutter  # native CocoaSpice stutter-risk regression checks
-make test-worker   # SPICE worker lifecycle and autorelease-pool checks
-```
-
-The two native test targets are local release gates. They link CocoaSpice and its
-staged frameworks, so the dependency-light GitHub Actions job intentionally does
-not run them.
-
-See [README.md](README.md) for prerequisites and details.
-
-### Environment variables
-
-The scripts read these `MASPICE_*` knobs (none are needed for the default path):
-
-| Variable | Script | Default | When to set |
-|----------|--------|---------|-------------|
-| `MASPICE_SYSROOT_URL` | fetch-sysroot | (pinned default) | Use your own sysroot tarball |
-| `MASPICE_SYSROOT_SHA256` | fetch-sysroot | (pinned default) | Required digest for a custom URL |
-| `MASPICE_SYSROOT_FROM_GH` | fetch-sysroot | `0` | `1` = pull a fresh UTM CI artifact (needs `gh`) |
-| `MASPICE_SYSROOT_ARTIFACT` | fetch-sysroot | `Sysroot-macos-arm64` | UTM artifact name (GH path) |
-| `MASPICE_SYSROOT_ARTIFACT_ID` | fetch-sysroot | (latest) | Pin a specific UTM artifact id |
-| `MASPICE_UTM_REPO` | fetch-sysroot | `utmapp/UTM` | Alternate UTM repo (GH path) |
-| `MASPICE_SYSROOT_SHA256_INSECURE` | fetch-sysroot | unset | `1` = skip the digest check (unsafe; testing only) |
-| `MASPICE_ASSUME_YES` | run-as-root, release | unset | `1` = skip confirmation prompts |
-| `MASPICE_LOG` | debug-run | unset | Spice log domains (e.g. `all`) |
-| `ALLOW_NO_METAL` | build-app | unset | `1` = build a non-rendering app without the Metal toolchain |
-
-## Cutting a release (maintainers)
-
-One command does the whole ceremony — bump both `Info.plist` version fields, roll
-`CHANGELOG.md` (`Unreleased` → the new version + compare-links), build the signed
-`.app` + `.zip` + `.sha256`, and (after a y/N confirm) commit, tag, push, and create
-the GitHub release:
+Use full Xcode with Swift 6.3, the macOS 26 SDK, and the Metal Toolchain. Install
+the last component with `xcodebuild -downloadComponent MetalToolchain`.
 
 ```sh
-# Put the changes under '## [Unreleased]' in CHANGELOG.md first, then:
-make release VERSION=0.2.1
+swift package resolve
+make doctor
+make test
+make build
 ```
 
-It refuses to run on a dirty tree, off `main`, with an existing tag, a non-increasing
-version, or an empty `## [Unreleased]`. It stops and shows the diff **before** the
-irreversible publish. To back out after preparing but before publishing:
-`git checkout Resources/Info.plist CHANGELOG.md`. `make check-version` (also a CI
-gate) asserts `Info.plist` / `CHANGELOG` / the tag stay in agreement.
+Keep pull requests focused and report each kind of evidence separately. Package
+tests and a local app build do not replace a live guest test, clean-machine
+packaging test, signing check, or benchmark.
 
-## Touching the vendored fork
+For app or native-dependency changes, run `make build` and confirm both the
+Mach-O audit and `codesign --verify --deep --strict` pass. The builder must fail
+if a selected SwiftSpice release introduces absolute Homebrew or build-host
+paths; fix those artifacts upstream rather than rewriting them in Maspice.
 
-`ThirdParty/CocoaSpice` is a fork. If you change it, **record the change in
-`ThirdParty/CocoaSpice/FORK-NOTES.md`** so it survives a rebase onto upstream. Keep
-fork changes minimal and well-justified (the Proxmox patch + the security fixes are
-the existing ones).
+## Releases
 
-## Pull requests
+Add user-facing notes under `## [Unreleased]` in `CHANGELOG.md`. From a clean
+`main` branch, maintainers can then run:
 
-- Keep PRs focused; explain the "why".
-- Run `make test`; for input, clipboard, renderer, or GLib scheduling changes,
-  also run `make test-stutter`, `make test-worker`, and a full app build.
-- Note any security implications — see [SECURITY.md](SECURITY.md).
+```sh
+make release VERSION=X.Y.Z
+```
+
+The release command updates bundle versions and changelog links, builds and
+checks the app, then asks before committing, tagging, pushing, and publishing.
+A release still requires live direct Ravada/standard-QEMU acceptance and a
+clean macOS 26 machine without Homebrew.

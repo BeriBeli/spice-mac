@@ -3,127 +3,28 @@ Maspice — Third-Party Licenses and Attribution
 
 Maspice itself is licensed under the MIT License (see LICENSE).
 
-This file attributes the third-party components Maspice uses. Note the split:
+Active source dependency
+------------------------
 
-  * ThirdParty/CocoaSpice/ is VENDORED in this repository (a fork — see
-    ThirdParty/CocoaSpice/FORK-NOTES.md) and ships with its own LICENSE.
-  * The native SPICE stack (glib, spice-gtk, gstreamer, OpenSSL, …) is NOT in
-    this repository. It is fetched at build time by scripts/fetch-sysroot.sh and,
-    in a built Maspice.app, bundled under Contents/Frameworks/. This source
-    release does not distribute those binaries; anyone who distributes a built
-    .app assumes the redistribution obligations below.
+SwiftSpice (https://github.com/BeriBeli/spice-swift)
+  Version:   v0.1.2 (exact SwiftPM release dependency)
+  License:   MIT
+  Copyright: Copyright (c) 2026 BeriBeli
+  Text:      https://github.com/BeriBeli/spice-swift/blob/v0.1.2/LICENSE
 
-Full verbatim license texts are in the `licenses/` directory of this repository
-and are copied into every built Maspice.app at `Contents/Resources/Licenses/`, so
-a distributed binary self-carries the LGPL-2.1, Apache-2.0, OpenSSL/SSLeay,
-BSD-3-Clause, and MIT texts together with this attribution file.
+Native dependency closure
+-------------------------
 
+SwiftSpice supplies arm64 static XCFrameworks built from pinned,
+checksum-verified sources:
 
-1. Vendored in this repository
-------------------------------
+  libjpeg-turbo 3.2.0 ........ IJG, zlib, and BSD-3-Clause
+  spice-common QUIC 0.42 ..... LGPL-2.1-or-later
+  usbredir 0.15.0 ............ LGPL-2.1-or-later library components
+  libusb 1.0.30 .............. LGPL-2.1-or-later
 
-CocoaSpice (fork of github.com/utmapp/CocoaSpice)
-  Path:      ThirdParty/CocoaSpice/
-  License:   Apache-2.0  (SPDX: Apache-2.0)
-  Copyright: © osy and CocoaSpice contributors
-  Notes:     Modified — see ThirdParty/CocoaSpice/FORK-NOTES.md. Upstream ships
-             no NOTICE file. Per Apache-2.0 §4, the LICENSE is retained and the
-             modifications are flagged. License text: ThirdParty/CocoaSpice/LICENSE.
-
-The vendored Sources/CocoaSpice/ExternalHeaders/ are build-time headers for the
-LGPL libraries below (glib, gstreamer, libusb, spice) and carry their upstream
-LGPL/BSD licenses.
-
-
-2. Native libraries fetched at build time and bundled into a built .app
------------------------------------------------------------------------
-
-The build bundles only the runtime closure (scripts/build-app.sh allowlist). The
-GPL-2.0 components in the upstream UTM sysroot (QEMU, spice-server, swtpm, …) are
-NOT bundled and NOT used.
-
-LGPL-2.1-or-later  (SPDX: LGPL-2.1-or-later) — https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
-  glib, gobject, gio, gmodule .............. © GNOME / GLib contributors
-  spice-client-glib (spice-gtk) ............ © Red Hat, Inc. and the SPICE project
-  gstreamer + base/good plugins (the bundled
-    adder, app, audioconvert, audiorate,
-    audioresample, audiotestsrc, autodetect,
-    coreelements, gio, jpeg, osxaudio,
-    playback, typefindfunctions, videoconvert,
-    videofilter, videorate, videoscale,
-    videotestsrc, volume) .................. © GStreamer contributors (all LGPL; no GPL plugin is linked)
-  libsoup .................................. © GNOME / libsoup contributors
-  phodav ................................... © Red Hat, Inc.
-  json-glib ................................ © GNOME / json-glib contributors
-  libusb ................................... © libusb contributors
-  usbredirhost, usbredirparser ............. © Red Hat, Inc. and the usbredir project
-  GNU libintl (gettext runtime) ............ © Free Software Foundation, Inc.
-  GNU libiconv ............................. © Free Software Foundation, Inc.
-
-OpenSSL  (SPDX: OpenSSL — dual OpenSSL + original SSLeay license) — https://www.openssl.org/source/license-openssl-ssleay.txt
-  openssl 1.1.1w (libssl, libcrypto) ....... © 1998-2023 The OpenSSL Project; © 1995-1998 Eric A. Young, Tim J. Hudson
-  Required acknowledgements:
-    "This product includes software developed by the OpenSSL Project for use in
-     the OpenSSL Toolkit (http://www.openssl.org/)"
-    "This product includes cryptographic software written by Eric Young
-     (eay@cryptsoft.com)"
-
-MIT  (SPDX: MIT)
-  pixman ................................... © Red Hat, Inc., SUSE, and contributors
-  libffi ................................... © Anthony Green and contributors
-
-BSD-3-Clause  (SPDX: BSD-3-Clause)
-  opus ..................................... © Xiph.Org, Skype Limited, et al.
-  libjpeg-turbo ............................ © D. R. Commander, the IJG, and contributors (BSD-3-Clause + IJG)
-
-
-3. Bundled versions (this release's sysroot)
---------------------------------------------
-
-The native libraries come from a prebuilt UTM arm64 sysroot pinned per release.
-Versions determined for the current build (the rest are recorded in, and
-recoverable from, each release's `Frameworks/`):
-
-  spice-client-glib (spice-gtk) .... 0.42
-  glib / gobject / gio / gmodule ... 2.69.0
-  gstreamer + base/good plugins .... 1.19.1
-  libsoup .......................... 3.x (3.6.0)
-  json-glib ........................ 1.0.x
-  opus ............................. 1.3.x
-  openssl .......................... 1.1.1w  (built by scripts/upgrade-openssl.sh)
-  libusb, usbredir, phodav, pixman, libffi, libjpeg-turbo, libintl, libiconv
-    ............................... as shipped in the pinned sysroot
-
-The exact version of every component in a given release is fixed by the pinned,
-SHA-256-checksummed sysroot tarball (`MASPICE_SYSROOT_URL`/`_SHA256`,
-scripts/fetch-sysroot.sh) plus scripts/upgrade-openssl.sh.
-
-
-4. LGPL-2.1 — notices and §6 written offer
-------------------------------------------
-
-The LGPL-2.1+ libraries above are used as dynamically-linked frameworks; the
-GStreamer base/good plugins are statically linked into the SpiceMac executable.
-A distributed Maspice.app therefore carries, under `Contents/Resources/Licenses/`,
-a copy of the LGPL-2.1 license text and this notice (LGPL-2.1 §6 / §1).
-
-Relinking with a modified library is supported and documented: Maspice is fully
-open source (MIT). A recipient of a binary can rebuild it against their own
-modified LGPL library — replace the relevant `.framework` under
-`Contents/Frameworks/` (dynamic libraries) or rebuild from source with a modified
-static archive (the statically-linked gst plugins) and re-run
-`scripts/build-app.sh`, then re-sign. The complete build recipe is in the repo
-(Package.swift, scripts/build-app.sh). This provides the §6(b)/§6(a) relink path.
-
-WRITTEN OFFER (valid to any third party). For at least three (3) years from the
-date you received a given Maspice binary, the maintainer will provide, to any
-third party, the complete corresponding machine-readable source code for the
-LGPL-2.1+ libraries it bundles, for the exact versions in that release, for a
-charge no more than the cost of physically performing source distribution.
-Request it by opening an issue at https://github.com/BeriBeli/spice-mac (or
-contacting the maintainer via GitHub). Upstream sources for these versions are
-also publicly available from the GNOME (glib, gio, json-glib, libsoup), GStreamer,
-freedesktop.org / SPICE (spice-gtk, usbredir, phodav, pixman), libusb, and GNU
-(gettext/libintl, libiconv) projects.
-
-For any other licensing question, open an issue at the URL above.
+Source URLs, checksums, and the reproducible build recipe are in
+the v0.1.2 `Scripts/build-native-dependencies.sh`. The precise
+upstream license texts are embedded in the XCFrameworks and copied into the app.
+Maspice independently verifies that the final Mach-O closure has no build-host
+absolute dynamic-library paths.

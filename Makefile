@@ -8,16 +8,13 @@ APP_NAME := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleName' Resources/I
 
 .DEFAULT_GOAL := help
 
-.PHONY: help doctor setup build run test test-clipboard test-cursor test-session test-stutter test-worker all openssl icon debug root release check-version clean distclean
+.PHONY: help doctor build run test test-session all icon debug release check-version clean distclean
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-14s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 
-doctor: ## Check the build environment (Xcode, Metal toolchain, frameworks)
+doctor: ## Check Xcode, Swift, SDK, and the SwiftSpice release
 	@./scripts/doctor.sh
-
-setup: ## Stage the native SPICE frameworks (pinned, checksummed sysroot)
-	@./scripts/fetch-sysroot.sh
 
 build: ## Build and assemble build/Maspice.app
 	@./scripts/build-app.sh
@@ -25,43 +22,24 @@ build: ## Build and assemble build/Maspice.app
 run: ## Open build/Maspice.app
 	@open "build/$(APP_NAME).app"
 
-test: ## Run all dependency-light checks (58 tests)
-	@( cd Packages/VVConfig && swift run vvcheck )
-	@( cd Packages/SpiceInputMap && swift run inputcheck )
-	@swift test --package-path Packages/SpiceClipboardLogic
-	@swift test --package-path Packages/SpiceCursorLogic
-	@swift test --package-path Packages/SpiceSessionLogic
-
-test-clipboard: ## Run focused clipboard sharing-gate tests
-	@swift test --package-path Packages/SpiceClipboardLogic
-
-test-cursor: ## Run focused cursor policy and lifecycle tests
-	@swift test --package-path Packages/SpiceCursorLogic
+test: ## Run VV parsing, session logic, and SwiftSpice integration tests
+	@( cd Packages/VVConfig && swift run --disable-sandbox vvcheck )
+	@swift test --disable-sandbox --package-path Packages/SpiceSessionLogic
+	@swift test --disable-sandbox
 
 test-session: ## Run focused session cleanup and command-state tests
-	@swift test --package-path Packages/SpiceSessionLogic
+	@swift test --disable-sandbox --package-path Packages/SpiceSessionLogic
 
-test-stutter: ## Run focused regression tests for known stutter risks
-	@swift test --filter StutterRiskRegressionTests
-
-test-worker: ## Run focused SPICE worker lifecycle tests
-	@swift test --filter CSMainWorkerLifecycleTests
-
-all: setup ## Fetch the sysroot, verify the environment, and build
+all: ## Verify the environment, test, and assemble the app
 	@$(MAKE) doctor
+	@$(MAKE) test
 	@$(MAKE) build
-
-openssl: ## Upgrade the bundled OpenSSL (only needed on a raw UTM sysroot)
-	@./scripts/upgrade-openssl.sh
 
 icon: ## Validate Resources/AppIcon.icon and refresh the README preview
 	@./scripts/make-icon.sh
 
-debug: ## Launch with verbose SPICE/CocoaSpice logging:  make debug VV=conn.vv
+debug: ## Launch a direct SPICE connection from the terminal: make debug VV=conn.vv
 	@./scripts/debug-run.sh $(VV)
-
-root: ## Launch as root for USB capture (kernel-claimed devices):  make root VV=conn.vv
-	@./scripts/run-as-root.sh $(VV)
 
 release: ## Cut a release (prompts before publishing):  make release VERSION=0.2.1
 	@test -n "$(VERSION)" || { echo "usage: make release VERSION=X.Y.Z"; exit 1; }
@@ -73,5 +51,6 @@ check-version: ## Assert Info.plist / CHANGELOG / tag versions agree
 clean: ## Remove build output (build/)
 	@rm -rf build/ && echo "removed build/"
 
-distclean: clean ## Also remove the staged native frameworks (Frameworks/)
-	@find Frameworks -mindepth 1 ! -name '.gitkeep' -maxdepth 1 -exec rm -rf {} + && echo "removed Frameworks/*"
+distclean: clean ## Also remove generated SwiftPM state
+	@rm -rf .build/ .swiftpm/ Packages/VVConfig/.build/ Packages/VVConfig/.swiftpm/ Packages/SpiceSessionLogic/.build/ Packages/SpiceSessionLogic/.swiftpm/
+	@echo "removed generated SwiftPM state"

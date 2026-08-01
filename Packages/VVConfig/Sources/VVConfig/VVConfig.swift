@@ -1,16 +1,9 @@
 // SPDX-License-Identifier: MIT
 import Foundation
 
-/// A parsed virt-viewer connection file (`.vv`), as emitted by Proxmox VE's
-/// `spiceproxy` endpoint (and by other SPICE servers via `remote-viewer`).
-///
-/// The file is INI-shaped with a single `[virt-viewer]` group. Proxmox fills it
-/// with a short-lived, single-use SPICE ticket and routes the real connection
-/// through the node's `spiceproxy` on port 3128, so the `host` value is an
-/// **opaque token** (`pvespiceproxy:...`) — never a TCP hostname — and the
-/// reachable endpoint lives in `proxy`.
-///
-/// Reference: virt-viewer `.vv` format and Proxmox `spice-example-sh`.
+/// A parsed virt-viewer connection file (`.vv`). Parsing preserves unsupported
+/// fields so validation can reject them explicitly instead of silently weakening
+/// transport or certificate policy.
 public struct VVConfig: Equatable, Sendable {
     /// Connection type. For SPICE this is `"spice"`.
     public var type: String?
@@ -92,6 +85,14 @@ public enum VVConfigError: Error, Equatable, CustomStringConvertible {
     case missingPort
     /// No `host` value was present.
     case missingHost
+    /// Proxy transports, including Proxmox spiceproxy, are outside this product.
+    case unsupportedProxy
+    /// A Proxmox opaque host token is not a directly reachable SPICE hostname.
+    case unsupportedProxmoxHost
+    /// A custom CA is meaningful only for a TLS endpoint.
+    case customCARequiresTLS
+    /// A host-subject override needs the connection file's CA and a TLS endpoint.
+    case hostSubjectRequiresCustomTLS
     /// The file is larger than `VVConfig.maxFileBytes` — almost certainly not a `.vv`.
     case fileTooLarge
     /// The file is not valid UTF-8 text.
@@ -107,6 +108,14 @@ public enum VVConfigError: Error, Equatable, CustomStringConvertible {
             return "Connection file has neither 'tls-port' nor 'port'."
         case .missingHost:
             return "Connection file is missing 'host'."
+        case .unsupportedProxy:
+            return "Proxy connections are not supported; remove 'proxy=' and use a direct SPICE endpoint."
+        case .unsupportedProxmoxHost:
+            return "Proxmox spiceproxy connection files are not supported."
+        case .customCARequiresTLS:
+            return "A per-file CA certificate requires 'tls-port'."
+        case .hostSubjectRequiresCustomTLS:
+            return "A certificate subject override requires both 'tls-port' and a per-file CA certificate."
         case .fileTooLarge:
             return "Connection file is too large to be a .vv (over \(VVConfig.maxFileBytes / 1024) KiB)."
         case .notUTF8:
@@ -231,11 +240,22 @@ extension VVConfig {
     /// Validate that this config is a usable SPICE connection. Throws a
     /// `VVConfigError` describing the first problem found.
     public func validate() throws {
-        // Proxmox always sets type=spice; some emitters omit it but still mean SPICE.
         if let t = type, t.lowercased() != "spice" {
             throw VVConfigError.unsupportedType(t)
         }
         guard let host, host.isEmpty == false else { throw VVConfigError.missingHost }
+        if proxy?.isEmpty == false { throw VVConfigError.unsupportedProxy }
+        if host.lowercased().hasPrefix("pvespiceproxy:") {
+            throw VVConfigError.unsupportedProxmoxHost
+        }
+        if caCertificate?.isEmpty == false, tlsPort == nil {
+            throw VVConfigError.customCARequiresTLS
+        }
+        if let hostSubject, hostSubject.isEmpty == false {
+            guard tlsPort != nil, caCertificate?.isEmpty == false else {
+                throw VVConfigError.hostSubjectRequiresCustomTLS
+            }
+        }
         guard (tlsPort != nil) || (port != nil) else { throw VVConfigError.missingPort }
     }
 

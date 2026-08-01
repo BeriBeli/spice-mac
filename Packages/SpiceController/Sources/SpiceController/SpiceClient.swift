@@ -1,16 +1,12 @@
 // SPDX-License-Identifier: MIT
+import Combine
 import Foundation
+import SwiftSpice
 import VVConfig
-@preconcurrency import CocoaSpice
-import CocoaSpiceRenderer
 
-/// Drives a single SPICE session on top of (the forked) CocoaSpice: starts the
-/// GLib worker, builds and configures the `CSConnection` (including the Proxmox
-/// TLS-via-proxy knobs), implements `CSConnectionDelegate`, and surfaces state to
-/// the UI. Delegate callbacks arrive on the GLib worker thread, so all observable
-/// state is mutated on the main queue.
-public final class SpiceClient: NSObject, ObservableObject, @unchecked Sendable {
-
+/// Main-actor façade over the public SwiftSpice API used by Maspice.
+@MainActor
+public final class SpiceClient: ObservableObject {
     public enum Status: Equatable {
         case idle
         case connecting
@@ -19,227 +15,237 @@ public final class SpiceClient: NSObject, ObservableObject, @unchecked Sendable 
         case failed(String)
     }
 
-    /// High-level connection state, for the UI.
     @Published public private(set) var status: Status = .idle
-    /// Whether the guest SPICE agent (vdagent) is connected — required for
-    /// clipboard sharing and dynamic resolution.
+    @Published public private(set) var frame: SpiceFrame?
+    @Published public private(set) var cursor: SpiceCursorState?
+    @Published public private(set) var pointerMode: SpicePointerMode = .absolute
     @Published public private(set) var agentConnected = false
-    /// Whether the connected agent advertises dynamic monitor configuration.
     @Published public private(set) var supportsDynamicResolution = false
+    @Published public private(set) var isInputAvailable = false
 
-    // The UI sets these to receive channel lifecycle on the main thread.
-    public var onDisplayCreated: ((CSDisplay) -> Void)?
-    public var onDisplayUpdated: ((CSDisplay) -> Void)?
-    public var onDisplayDestroyed: ((CSDisplay) -> Void)?
-    public var onInputAvailable: ((CSInput) -> Void)?
-    public var onInputUnavailable: ((CSInput) -> Void)?
-
-    public private(set) var connection: CSConnection?
-    /// The most recently announced inputs channel (keyboard/mouse).
-    public private(set) var primaryInput: CSInput?
-
-    /// Whether to share the clipboard with the guest (both directions). Changes
-    /// apply to an active connection immediately. While on, anything copied on the
-    /// host is sent to the guest, so disable it for untrusted VMs.
-    public var shareClipboard: Bool = true {
-        didSet { onMain { self.applyClipboardSharing() } }
+    public var shareClipboard = true {
+        didSet {
+            guard oldValue != shareClipboard, let agentManager else { return }
+            let enabled = shareClipboard
+            Task { await agentManager.setPasteboardSynchronizationEnabled(enabled) }
+        }
     }
 
-    /// USB redirection manager for the active connection, if any.
-    public var usbManager: CSUSBManager? { connection?.usbManager }
-
-    private let parameters: SpiceConnectionParameters
-    private let pasteboard: SpicePasteboardBridge
-    /// Whether a connection attempt has already been made. The Proxmox ticket is
-    /// single-use, so we never silently reconnect with the same parameters — the
-    /// user must open a fresh `.vv`.
-    private var didAttemptConnect = false
-
-    public init(parameters: SpiceConnectionParameters,
-                pasteboard: SpicePasteboardBridge = SpicePasteboardBridge()) {
-        self.parameters = parameters
-        self.pasteboard = pasteboard
-        super.init()
-    }
-
-    /// The window title hint from the `.vv` file, if any.
     public var title: String? { parameters.title }
-    /// Whether the `.vv` requested fullscreen.
     public var prefersFullscreen: Bool { parameters.fullscreen }
 
-    // MARK: - Lifecycle
+    private let parameters: SpiceConnectionParameters
+    private var session: SpiceSession?
+    private var agentManager: SpiceAgentManager?
+    private var playbackSink: SpiceAudioPlaybackSink?
+    private var inputPump: OrderedSpiceInputPump?
+    private var connectionTask: Task<Void, Never>?
+    private var eventTask: Task<Void, Never>?
+    private var supportTask: Task<Void, Never>?
+    private var generation: UInt64 = 0
 
-    /// Build the connection and start connecting. Safe to call once; subsequent
-    /// calls are ignored (the SPICE ticket is single-use). Always runs on the main
-    /// queue so observable state is mutated there.
+    public init(parameters: SpiceConnectionParameters) {
+        self.parameters = parameters
+    }
+
     public func connect() {
-        onMain { self.performConnect() }
-    }
-
-    private func performConnect() {
-        guard connection == nil, !didAttemptConnect else { return }
-        didAttemptConnect = true
-
-        // Fail closed: certificate-subject verification is meaningless without a CA
-        // to anchor the chain. (A real Proxmox .vv always provides both; this guards
-        // a malformed/hostile file from a weakened-verification connect.)
-        if parameters.isTLS && parameters.verifySubject && (parameters.caPEM?.isEmpty ?? true) {
-            status = .failed("Refusing to connect: the file requests certificate-subject verification but supplies no CA certificate.")
-            return
-        }
-
-        let main = CSMain.shared
-        if !main.running {
-            guard main.spiceStart() else {
-                status = .failed("Could not start the SPICE worker thread.")
-                return
-            }
-        }
-
+        guard connectionTask == nil, session == nil else { return }
+        generation &+= 1
+        let currentGeneration = generation
+        let session = SpiceSession()
+        self.session = session
         status = .connecting
+        frame = nil
+        cursor = nil
 
-        let conn: CSConnection
-        if parameters.isTLS {
-            // TLS path. For Proxmox we verify by certificate subject + CA rather
-            // than a pinned public key, so pass an empty key and override
-            // verification below via the fork's setProxy:ca:certSubject:.
-            conn = CSConnection(host: parameters.host,
-                                tlsPort: String(parameters.tlsPort ?? 0),
-                                serverPublicKey: Data())
-        } else {
-            conn = CSConnection(host: parameters.host,
-                                port: String(parameters.port ?? 0))
+        eventTask = Task { [weak self] in
+            for await event in session.events {
+                guard !Task.isCancelled else { return }
+                self?.consume(event, generation: currentGeneration)
+            }
         }
-
-        conn.delegate = self
-        conn.password = parameters.password
-        conn.audioEnabled = true
-
-        if parameters.requiresProxyExtension {
-            conn.setProxy(parameters.proxy,
-                          ca: parameters.caPEM,
-                          certSubject: parameters.certSubject)
+        connectionTask = Task { [weak self] in
+            await self?.establish(session, generation: currentGeneration)
         }
-
-        // Clipboard sharing (opt-out; requires the guest vdagent to take effect).
-        conn.session.shareClipboard = shareClipboard
-        conn.session.pasteboardDelegate = pasteboard
-
-        connection = conn
-
-        if !conn.connect() {
-            status = .failed("Failed to initiate the SPICE connection.")
-            connection = nil
-            return
-        }
-
-        applyClipboardSharing()
     }
 
-    /// Request disconnect. Final teardown is reported via `spiceDisconnected:`.
     public func disconnect() {
-        onMain { self.connection?.disconnect() }
-    }
+        guard session != nil || connectionTask != nil else { return }
+        generation &+= 1
+        connectionTask?.cancel()
+        connectionTask = nil
+        eventTask?.cancel()
+        eventTask = nil
+        supportTask?.cancel()
+        supportTask = nil
 
-    private func onMain(_ work: @escaping @MainActor @Sendable () -> Void) {
-        if Thread.isMainThread {
-            MainActor.assumeIsolated { work() }
-        } else {
-            DispatchQueue.main.async { work() }
+        let oldInputPump = inputPump
+        inputPump = nil
+        let oldSession = session
+        let oldManager = agentManager
+        let oldSink = playbackSink
+        session = nil
+        agentManager = nil
+        playbackSink = nil
+        resetRuntimeState(stoppingInput: false)
+        status = .disconnected
+
+        Task {
+            if let oldInputPump { await oldInputPump.shutdown() }
+            if let oldManager { await oldManager.stop() }
+            if let oldSink { await oldSink.stop() }
+            if let oldSession { await oldSession.disconnect() }
         }
     }
 
-    /// Apply the preference to an already-created session as well as the host
-    /// pasteboard poller. This makes the Connection menu effective immediately,
-    /// rather than only for the next single-use `.vv` connection.
-    private func applyClipboardSharing() {
-        guard let connection else { return }
-        let enabled = shareClipboard
-        if enabled {
-            // Serialize the non-atomic Objective-C property with every SPICE
-            // clipboard callback before allowing host pasteboard access.
-            CSMain.shared.sync {
-                connection.session.shareClipboard = true
+    public func submit(_ input: SpiceClientInput) {
+        inputPump?.submit(input)
+    }
+
+    public func sendCtrlAltDelete() {
+        inputPump?.sendChord([0x1d, 0x38, 0x153])
+    }
+
+    public func releaseAllInput() {
+        inputPump?.releaseAll()
+    }
+
+    public func requestResolution(width: Int, height: Int) {
+        guard supportsDynamicResolution, let agentManager else { return }
+        Task {
+            do {
+                try await agentManager.requestResolution(width: width, height: height)
+            } catch {
+                NSLog("Maspice: resolution request failed: \(String(describing: error))")
             }
-            pasteboard.setSharingEnabled(true)
-        } else {
-            // Close the AppKit-side gate first, then invalidate pending guest
-            // responses in the SPICE context before returning to the menu action.
-            pasteboard.setSharingEnabled(false)
-            CSMain.shared.sync {
-                connection.session.shareClipboard = false
+        }
+    }
+
+    private func establish(_ session: SpiceSession, generation: UInt64) async {
+        do {
+            let endpoint = try makeEndpoint()
+            let info = try await session.connect(
+                endpoint: endpoint,
+                credentials: SpiceCredentials(password: parameters.password ?? "")
+            )
+            guard generation == self.generation, self.session === session else { return }
+
+            pointerMode = SpicePointerMode(spiceMouseMode: info.currentMouseMode)
+            isInputAvailable = info.channels.contains { $0.type == 3 && $0.id == 0 }
+            if isInputAvailable {
+                inputPump = OrderedSpiceInputPump(session: session) { [weak self] error in
+                    self?.fail(error.description, generation: generation)
+                }
             }
-        }
-    }
-}
 
-// MARK: - CSConnectionDelegate
+            if info.channels.contains(where: { $0.type == 5 && $0.id == 0 }) {
+                let sink = SpiceAudioPlaybackSink()
+                playbackSink = sink
+                do {
+                    try await sink.start(session: session)
+                } catch {
+                    playbackSink = nil
+                    NSLog("Maspice: audio playback unavailable: \(String(describing: error))")
+                }
+            }
 
-extension SpiceClient: CSConnectionDelegate {
+            let manager = SpiceAgentManager(
+                automaticallySynchronizesPasteboard: true,
+                pasteboardSynchronizationEnabled: shareClipboard
+            )
+            agentManager = manager
+            agentConnected = info.agentConnected
+            supportTask = Task { [weak self] in
+                for await support in manager.displayConfigurationSupportEvents {
+                    guard !Task.isCancelled else { return }
+                    guard generation == self?.generation else { return }
+                    self?.agentConnected = support.agentConnected
+                    self?.supportsDynamicResolution = support.agentConnected
+                        && support.supportsMonitorConfiguration
+                }
+            }
+            do {
+                try await manager.start(session: session)
+            } catch {
+                NSLog("Maspice: guest-agent services unavailable: \(String(describing: error))")
+            }
 
-    public func spiceConnected(_ connection: CSConnection) {
-        onMain { self.status = .connected }
-    }
-
-    public func spiceDisconnected(_ connection: CSConnection) {
-        onMain {
-            // Also invalidate guest writes already queued for AppKit; merely
-            // stopping the host poller would leave those closures authorized.
-            self.pasteboard.setSharingEnabled(false)
-            self.status = .disconnected
-            self.agentConnected = false
-            self.supportsDynamicResolution = false
-            self.primaryInput = nil
-            self.connection = nil
-        }
-    }
-
-    public func spiceError(_ connection: CSConnection, code: CSConnectionError, message: String?) {
-        onMain {
-            self.status = .failed(message ?? "SPICE connection error (code \(code.rawValue)).")
-        }
-    }
-
-    public func spiceInputAvailable(_ connection: CSConnection, input: CSInput) {
-        onMain {
-            self.primaryInput = input
-            self.onInputAvailable?(input)
-        }
-    }
-
-    public func spiceInputUnavailable(_ connection: CSConnection, input: CSInput) {
-        onMain {
-            if self.primaryInput === input { self.primaryInput = nil }
-            self.onInputUnavailable?(input)
-        }
-    }
-
-    public func spiceDisplayCreated(_ connection: CSConnection, display: CSDisplay) {
-        onMain { self.onDisplayCreated?(display) }
-    }
-
-    public func spiceDisplayUpdated(_ connection: CSConnection, display: CSDisplay) {
-        onMain { self.onDisplayUpdated?(display) }
-    }
-
-    public func spiceDisplayDestroyed(_ connection: CSConnection, display: CSDisplay) {
-        onMain { self.onDisplayDestroyed?(display) }
-    }
-
-    public func spiceAgentConnected(_ connection: CSConnection, supportingFeatures features: CSConnectionAgentFeature) {
-        onMain {
-            self.agentConnected = true
-            self.supportsDynamicResolution = features.contains(.monitorsConfig)
+            guard generation == self.generation else { return }
+            status = .connected
+            connectionTask = nil
+        } catch is CancellationError {
+            return
+        } catch let error as SpiceError {
+            fail(error.description, generation: generation)
+        } catch {
+            fail(String(describing: error), generation: generation)
         }
     }
 
-    public func spiceAgentDisconnected(_ connection: CSConnection) {
-        onMain {
-            self.agentConnected = false
-            self.supportsDynamicResolution = false
+    private func consume(_ event: SpiceSessionEvent, generation: UInt64) {
+        guard generation == self.generation else { return }
+        switch event {
+        case let .frame(frame):
+            self.frame = frame
+        case let .surfaceDestroyed(surfaceID):
+            if frame?.surfaceID == surfaceID { frame = nil }
+        case let .cursor(cursor):
+            self.cursor = cursor
+        case let .mouseMode(_, current):
+            pointerMode = SpicePointerMode(spiceMouseMode: current)
+        case let .failed(error):
+            fail(error.description, generation: generation)
+        case .disconnected:
+            resetRuntimeState()
+            status = .disconnected
+        case .displayConfiguration, .keyboardModifiers, .mouseMotionAcknowledged, .migration:
+            break
         }
     }
 
-    public func spiceForwardedPortOpened(_ connection: CSConnection, port: CSPort) {}
-    public func spiceForwardedPortClosed(_ connection: CSConnection, port: CSPort) {}
+    private func makeEndpoint() throws -> SpiceEndpoint {
+        let selectedPort = parameters.tlsPort ?? parameters.port
+        guard let selectedPort, let port = UInt16(exactly: selectedPort) else {
+            throw SpiceError.connectionFailed("connection file has no valid port")
+        }
+        let tlsPolicy: TLSTrustPolicy?
+        if parameters.tlsPort == nil {
+            tlsPolicy = nil
+        } else if let ca = parameters.caCertificate, ca.isEmpty == false {
+            if let subject = parameters.certificateSubject, subject.isEmpty == false {
+                tlsPolicy = .virtViewerCertificateAuthority(
+                    certificates: [Data(ca.utf8)],
+                    expectedSubject: subject
+                )
+            } else {
+                tlsPolicy = .customCertificateAuthority(
+                    certificates: [Data(ca.utf8)]
+                )
+            }
+        } else {
+            tlsPolicy = .system
+        }
+        return SpiceEndpoint(
+            host: parameters.host,
+            port: port,
+            tlsPolicy: tlsPolicy
+        )
+    }
+
+    private func fail(_ message: String, generation: UInt64) {
+        guard generation == self.generation else { return }
+        connectionTask = nil
+        resetRuntimeState()
+        status = .failed(message)
+    }
+
+    private func resetRuntimeState(stoppingInput: Bool = true) {
+        if stoppingInput { inputPump?.stop() }
+        inputPump = nil
+        frame = nil
+        cursor = nil
+        isInputAvailable = false
+        agentConnected = false
+        supportsDynamicResolution = false
+    }
 }

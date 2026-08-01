@@ -3,7 +3,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage(Preferences.shareClipboardKey) private var shareClipboard = true
-    @AppStorage(Preferences.trashConnectionFileAfterUseKey) private var trashAfterUse = true
+    @AppStorage(Preferences.trashConnectionFileAfterUseKey) private var trashAfterUse = false
     @AppStorage(Preferences.ravadaPortalURLKey) private var ravadaPortalURL = ""
 
     var body: some View {
@@ -15,7 +15,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
 
                 Toggle("Move .vv files to Trash after connecting", isOn: $trashAfterUse)
-                Text("Proxmox tickets are single-use and the file also contains the cluster CA.")
+                Text("Disabled by default. Enable only if you want connection files removed after use.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

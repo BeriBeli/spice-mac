@@ -11,7 +11,7 @@ enum ConnectionFilePicker {
         panel.canChooseDirectories = false
         panel.allowedContentTypes = VVDocument.contentTypes
         panel.prompt = "Open"
-        panel.message = "Open a Proxmox SPICE connection file (.vv)"
+        panel.message = "Open a direct SPICE connection file (.vv)"
         return panel.runModal() == .OK ? panel.url : nil
     }
 }

@@ -77,24 +77,37 @@ t.test("CA escaped newlines are expanded to real newlines") {
     t.expect(lines.count >= 4, "expected >= 4 PEM lines, got \(lines.count)")
 }
 
-t.test("isProxmox is true and validate passes") {
+t.test("Proxmox proxy files are detected and rejected") {
     let cfg = try VVConfig.parse(proxmoxSample)
     t.expect(cfg.isProxmox, "should be detected as Proxmox")
-    try cfg.validate()
+    t.expectThrows(VVConfigError.unsupportedProxy) { try cfg.validate() }
 }
 
-t.test("derived connection parameters for Proxmox") {
-    let cfg = try VVConfig.parse(proxmoxSample)
-    let p = try SpiceConnectionParameters(from: cfg)
-    t.expectEqual(p.host, cfg.host ?? "")
-    t.expectEqual(p.tlsPort, 61000)
-    t.expectEqual(p.password, "S3cr3tT1ck3t")
-    t.expectEqual(p.proxy, "http://node1.example.com:3128")
-    t.expectEqual(p.certSubject, "OU=PVE Cluster Node,O=Proxmox Virtual Environment,CN=node1.example.com")
-    t.expect(p.verifySubject, "should verify by subject")
-    t.expect(p.requiresProxyExtension, "should require the forked proxy extension")
-    t.expect(p.isTLS, "should be TLS")
-    t.expect(p.caPEM != nil, "should carry the CA PEM")
+t.test("opaque Proxmox host tokens are rejected without a proxy field") {
+    let cfg = try VVConfig.parse("[virt-viewer]\ntype=spice\nhost=pvespiceproxy:token\ntls-port=61000\n")
+    t.expectThrows(VVConfigError.unsupportedProxmoxHost) { try cfg.validate() }
+}
+
+t.test("direct TLS accepts a per-file CA and propagates it") {
+    let ca = try VVConfig.parse("[virt-viewer]\ntype=spice\nhost=direct.example\ntls-port=61000\nca=PEM\n")
+    try ca.validate()
+    let parameters = try SpiceConnectionParameters(from: ca)
+    t.expectEqual(parameters.caCertificate, "PEM")
+}
+
+t.test("complete host-subject is propagated for virt-viewer TLS validation") {
+    let subject = "C=JS,L=WuXi,O=Mucse,CN=192.0.2.10"
+    let cfg = try VVConfig.parse("[virt-viewer]\ntype=spice\nhost=192.0.2.10\ntls-port=61000\nca=PEM\nhost-subject=\(subject)\n")
+    try cfg.validate()
+    let parameters = try SpiceConnectionParameters(from: cfg)
+    t.expectEqual(parameters.certificateSubject, subject)
+}
+
+t.test("custom CA and host-subject validation fail closed") {
+    let plaintextCA = try VVConfig.parse("[virt-viewer]\ntype=spice\nhost=direct.example\nport=5900\nca=PEM\n")
+    t.expectThrows(VVConfigError.customCARequiresTLS) { try plaintextCA.validate() }
+    let noCA = try VVConfig.parse("[virt-viewer]\ntype=spice\nhost=direct.example\ntls-port=61000\nhost-subject=CN=other.example\n")
+    t.expectThrows(VVConfigError.hostSubjectRequiresCustomTLS) { try noCA.validate() }
 }
 
 t.test("CRLF line endings handled, no stray CR in values") {
@@ -143,8 +156,6 @@ t.test("plain SPICE file is not Proxmox") {
     let p = try SpiceConnectionParameters(from: cfg)
     t.expectEqual(p.host, "10.0.0.5")
     t.expectEqual(p.port, 5900)
-    t.expect(!p.verifySubject, "plain should not verify subject")
-    t.expect(!p.requiresProxyExtension, "plain should not need proxy extension")
     t.expect(!p.isTLS, "plain should not be TLS")
 }
 

@@ -7,8 +7,6 @@ struct FocusedSessionActions {
     let availability: SessionCommandAvailability
     let sendCtrlAltDelete: () -> Void
     let releaseCursor: () -> Void
-    let usbDevices: [USBDeviceItem]
-    let toggleUSBDevice: (String) -> Void
 }
 
 private struct FocusedSessionActionsKey: FocusedValueKey {
@@ -55,27 +53,6 @@ struct SpiceCommands: Commands {
 
             Toggle("Share Clipboard with VM", isOn: $shareClipboard)
 
-            Divider()
-
-            if let sessionActions {
-                if sessionActions.usbDevices.isEmpty {
-                    Text("No USB Devices")
-                } else {
-                    ForEach(sessionActions.usbDevices) { device in
-                        Button {
-                            sessionActions.toggleUSBDevice(device.id)
-                        } label: {
-                            if device.isConnected {
-                                Label(device.label, systemImage: "checkmark")
-                            } else {
-                                Text(device.label)
-                            }
-                        }
-                    }
-                }
-            } else {
-                Text("No Active Session")
-            }
         }
     }
 }

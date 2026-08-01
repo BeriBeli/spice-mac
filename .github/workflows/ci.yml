@@ -5,18 +5,13 @@ on:
     branches: [main]
   pull_request:
 
-# The full app needs Xcode's Metal toolchain and the native SPICE sysroot, neither
-# of which CI fetches. These jobs cover the 58 dependency-light Swift checks:
-# .vv parsing, keyboard input routing, clipboard gating, cursor policy, and
-# session lifecycle/command state.
-# The CocoaSpice fork patch and focused stutter/worker XCTest targets are
-# release-gated locally with `make test-stutter`, `make test-worker`, and
-# `make build`. They need the staged native frameworks plus Xcode's Metal modules,
-# so they cannot run in this dependency-free job.
+# CI runs the Swift package and policy tests against the exact SwiftSpice release
+# in Package.resolved. App assembly, Mach-O closure auditing, live SPICE behavior,
+# and clean-machine portability remain explicit release gates.
 
 jobs:
   swift-tests:
-    name: Swift 6.2 checks
+    name: Swift 6.3 checks
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
@@ -24,7 +19,7 @@ jobs:
       - name: Show toolchain
         run: swift --version
 
-      - name: Dependency-light test suite
+      - name: Test suite
         run: make test
 
       - name: Version consistency (Info.plist / CHANGELOG / links)

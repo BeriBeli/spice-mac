@@ -1,17 +1,11 @@
 // SPDX-License-Identifier: MIT
 import AppKit
 import Combine
-@preconcurrency import CocoaSpice
 import Observation
 import SpiceController
 import SpiceSessionLogic
+import SwiftSpice
 import VVConfig
-
-struct USBDeviceItem: Identifiable, Hashable, Sendable {
-    let id: String
-    let label: String
-    let isConnected: Bool
-}
 
 @MainActor
 @Observable
@@ -24,20 +18,13 @@ final class SessionModel {
     private(set) var status: SpiceClient.Status = .idle
     private(set) var parseFailure: String?
     private(set) var isInputAvailable = false
-    private(set) var usbDevices: [USBDeviceItem] = []
     private(set) var shouldReturnToLauncher = false
     private(set) var terminalFailureMessage: String?
-    var usbError: String?
 
     @ObservationIgnored private var cancellables = Set<AnyCancellable>()
     @ObservationIgnored private var lifecycle = SessionLifecycle()
     @ObservationIgnored private var shouldTrashAfterStart = false
     @ObservationIgnored private var shouldRemoveAfterStart = false
-    @ObservationIgnored private lazy var usbDelegate = USBDelegateProxy { [weak self] message in
-        Task { @MainActor in
-            self?.usbDidChange(message)
-        }
-    }
 
     init(request: SessionRequest) {
         sourceURL = request.url
@@ -52,7 +39,8 @@ final class SessionModel {
             baseTitle = client.title ?? request.url.deletingPathExtension().lastPathComponent
             prefersFullscreen = client.prefersFullscreen
             shouldTrashAfterStart = config.shouldDeleteThisFile(
-                fallback: Preferences.trashConnectionFileAfterUse)
+                fallback: Preferences.trashConnectionFileAfterUse
+            )
             shouldRemoveAfterStart = request.removesFileAfterStart
 
             client.$status
@@ -60,12 +48,14 @@ final class SessionModel {
                 .sink { [weak self] status in
                     MainActor.assumeIsolated {
                         self?.status = status
-                        if status == .connected {
-                            self?.refreshUSBDevices()
-                        } else {
-                            self?.handleTerminalStatus(status)
-                        }
+                        self?.handleTerminalStatus(status)
                     }
+                }
+                .store(in: &cancellables)
+            client.$isInputAvailable
+                .receive(on: RunLoop.main)
+                .sink { [weak self] available in
+                    MainActor.assumeIsolated { self?.isInputAvailable = available }
                 }
                 .store(in: &cancellables)
         } catch {
@@ -83,10 +73,10 @@ final class SessionModel {
 
     var windowTitle: String {
         switch status {
-        case .connecting: return "\(baseTitle) — Connecting…"
-        case .disconnected: return "\(baseTitle) — Disconnected"
-        case .failed: return "\(baseTitle) — Failed"
-        case .connected, .idle: return baseTitle
+        case .connecting: "\(baseTitle) — Connecting…"
+        case .disconnected: "\(baseTitle) — Disconnected"
+        case .failed: "\(baseTitle) — Failed"
+        case .connected, .idle: baseTitle
         }
     }
 
@@ -94,12 +84,12 @@ final class SessionModel {
         if let parseFailure {
             return "Could not open “\(sourceURL.lastPathComponent)”\n\(parseFailure)"
         }
-        switch status {
-        case .idle: return nil
-        case .connecting: return "Connecting…"
-        case .connected: return nil
-        case .disconnected: return "Disconnected.\nOpen a fresh .vv file to reconnect."
-        case .failed(let message): return "Connection failed.\n\(message)"
+        return switch status {
+        case .idle: nil
+        case .connecting: "Connecting…"
+        case .connected: nil
+        case .disconnected: "Disconnected.\nReopen the .vv file to connect again."
+        case let .failed(message): "Connection failed.\n\(message)"
         }
     }
 
@@ -116,13 +106,23 @@ final class SessionModel {
     func stop() {
         guard lifecycle.stop() else { return }
         client?.disconnect()
-        cleanUpRuntimeState()
+        isInputAvailable = false
     }
 
-    private func cleanUpRuntimeState() {
-        client?.usbManager?.delegate = nil
-        usbDevices.removeAll()
-        isInputAvailable = false
+    func setClipboardSharing(_ enabled: Bool) {
+        client?.shareClipboard = enabled
+    }
+
+    func sendCtrlAltDelete() {
+        client?.sendCtrlAltDelete()
+    }
+
+    func releaseAllInput() {
+        client?.releaseAllInput()
+    }
+
+    func requestResolution(width: Int, height: Int) {
+        client?.requestResolution(width: width, height: height)
     }
 
     private func handleTerminalStatus(_ status: SpiceClient.Status) {
@@ -132,7 +132,7 @@ final class SessionModel {
         case .disconnected:
             failureMessage = nil
             needsDisconnect = false
-        case .failed(let message):
+        case let .failed(message):
             failureMessage = "Connection failed.\n\(message)"
             needsDisconnect = true
         case .idle, .connecting, .connected:
@@ -141,58 +141,9 @@ final class SessionModel {
 
         guard lifecycle.connectionDidTerminate() else { return }
         if needsDisconnect { client?.disconnect() }
-        cleanUpRuntimeState()
+        isInputAvailable = false
         terminalFailureMessage = failureMessage
         shouldReturnToLauncher = true
-    }
-
-    func setClipboardSharing(_ enabled: Bool) {
-        client?.shareClipboard = enabled
-    }
-
-    func setInputAvailable(_ available: Bool) {
-        isInputAvailable = available
-    }
-
-    func refreshUSBDevices() {
-        guard let usb = client?.usbManager else {
-            usbDevices = []
-            return
-        }
-        usb.delegate = usbDelegate
-        usbDevices = usb.usbDevices.map { device in
-            USBDeviceItem(
-                id: Self.usbID(device),
-                label: Self.usbLabel(device),
-                isConnected: usb.isUsbDeviceConnected(device))
-        }
-    }
-
-    func toggleUSBDevice(id: String) {
-        guard let usb = client?.usbManager,
-              let device = usb.usbDevices.first(where: { Self.usbID($0) == id }) else { return }
-
-        if usb.isUsbDeviceConnected(device) {
-            usb.disconnectUsbDevice(device) { [weak self] error in
-                let message = error?.localizedDescription
-                Task { @MainActor in self?.usbDidChange(message) }
-            }
-        } else {
-            var message: NSString?
-            guard usb.canRedirectUsbDevice(device, errorMessage: &message) else {
-                usbError = (message as String?) ?? "This USB device cannot be redirected."
-                return
-            }
-            usb.connectUsbDevice(device) { [weak self] error in
-                let message = error?.localizedDescription
-                Task { @MainActor in self?.usbDidChange(message) }
-            }
-        }
-    }
-
-    private func usbDidChange(_ message: String?) {
-        if let message { usbError = message }
-        refreshUSBDevices()
     }
 
     private func trashConnectionFile() {
@@ -211,34 +162,5 @@ final class SessionModel {
         } catch {
             NSLog("Maspice: could not remove temporary \(sourceURL.lastPathComponent): \(error.localizedDescription)")
         }
-    }
-
-    private static func usbID(_ device: CSUSBDevice) -> String {
-        "\(device.usbBusNumber):\(device.usbPortNumber):\(device.usbVendorId):\(device.usbProductId):\(device.usbSerial ?? "")"
-    }
-
-    private static func usbLabel(_ device: CSUSBDevice) -> String {
-        let name = device.name ?? device.usbProductName ?? "USB Device"
-        return String(format: "%@ (%04lx:%04lx)", name, device.usbVendorId, device.usbProductId)
-    }
-}
-
-private final class USBDelegateProxy: NSObject, CSUSBManagerDelegate, @unchecked Sendable {
-    private let onChange: @Sendable (String?) -> Void
-
-    init(onChange: @escaping @Sendable (String?) -> Void) {
-        self.onChange = onChange
-    }
-
-    func spiceUsbManager(_ usbManager: CSUSBManager, deviceAttached device: CSUSBDevice) {
-        onChange(nil)
-    }
-
-    func spiceUsbManager(_ usbManager: CSUSBManager, deviceRemoved device: CSUSBDevice) {
-        onChange(nil)
-    }
-
-    func spiceUsbManager(_ usbManager: CSUSBManager, deviceError error: String, for device: CSUSBDevice) {
-        onChange(error)
     }
 }

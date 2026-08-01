@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Something isn't working when connecting to or using a Proxmox VM
+about: Something is not working with a direct QEMU or Ravada SPICE session
 title: ''
 labels: bug
 assignees: ''
@@ -19,8 +19,8 @@ A clear description of the bug.
 - macOS 26 version + chip (e.g. macOS 26.1, M2):
 - Maspice version / commit:
 - Xcode version used to build:
-- Proxmox VE version:
-- Ravada version / portal URL (if applicable):
+- QEMU or Ravada version (if known):
+- Direct `.vv` or embedded Ravada portal:
 - Guest OS + `spice-vdagent` installed? (yes/no):
 - VM display set to `qxl`/SPICE? (yes/no):
 
@@ -30,13 +30,12 @@ A clear description of the bug.
 - [ ] Mouse / cursor
 - [ ] Clipboard
 - [ ] Audio
-- [ ] USB redirection
 - [ ] Connection / TLS / `.vv` parsing
 - [ ] Ravada portal / WebView / automatic `.vv` handoff
 - [ ] Build
 
 **Logs**
 Relevant console output (run from Terminal: `build/Maspice.app/Contents/MacOS/Maspice`).
-**Do not paste the contents of a `.vv` file** — it contains a live ticket and CA.
+**Do not paste a `.vv` file, password, ticket, CA, portal cookie, or private URL.**
 
 **Additional context**

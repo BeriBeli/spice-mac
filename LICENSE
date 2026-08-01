@@ -21,7 +21,5 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-Maspice vendors a fork of CocoaSpice (Apache-2.0) under ThirdParty/CocoaSpice and
-builds against the LGPL SPICE stack (glib/gstreamer/spice-gtk/…) plus OpenSSL and
-MIT/BSD libraries. See THIRD-PARTY-LICENSES.txt for full attribution and the LGPL
-written offer.
+Maspice consumes the MIT-licensed SwiftSpice release and its native-library
+dependencies. See THIRD-PARTY-LICENSES.txt for attribution.

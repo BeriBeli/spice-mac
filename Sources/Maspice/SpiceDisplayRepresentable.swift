@@ -1,212 +1,200 @@
 // SPDX-License-Identifier: MIT
 import AppKit
-import Combine
-@preconcurrency import CocoaSpice
 import SpiceController
+import SwiftSpice
 import SwiftUI
 
-@MainActor
-private protocol SpiceDisplayActionHandling: AnyObject {
-    func sendCtrlAltDelete()
-    func releaseCursor()
-}
-
-@MainActor
-final class SpiceDisplayActionRouter {
-    fileprivate weak var handler: (any SpiceDisplayActionHandling)?
-
-    func sendCtrlAltDelete() { handler?.sendCtrlAltDelete() }
-    func releaseCursor() { handler?.releaseCursor() }
-}
-
-/// The only view-level AppKit bridge in the SwiftUI application. The coordinator
-/// owns the long-lived `MTKView`; SwiftUI owns the session and visible state.
-struct SpiceDisplayRepresentable: NSViewRepresentable {
+/// SwiftSpice owns the Metal/AppKit desktop surface. This view only adds the
+/// narrow NSWindow lifecycle bridge needed for focus release and guest resize.
+struct SwiftSpiceDesktop: View {
+    @ObservedObject var client: SpiceClient
     let model: SessionModel
-    let actionRouter: SpiceDisplayActionRouter
+
+    var body: some View {
+        SpiceDesktopView(
+            frame: client.frame,
+            cursor: client.cursor,
+            pointerMode: client.pointerMode,
+            onInput: client.submit(_:)
+        )
+        .background {
+            SpiceWindowBridge(
+                displaySize: client.frame.map {
+                    CGSize(width: $0.width, height: $0.height)
+                },
+                prefersFullscreen: model.prefersFullscreen,
+                onReleaseInput: model.releaseAllInput,
+                onResolution: model.requestResolution(width:height:)
+            )
+            .frame(width: 0, height: 0)
+        }
+    }
+}
+
+private struct SpiceWindowBridge: NSViewRepresentable {
+    let displaySize: CGSize?
+    let prefersFullscreen: Bool
+    let onReleaseInput: @MainActor () -> Void
+    let onResolution: @MainActor (Int, Int) -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(model: model)
+        Coordinator(
+            displaySize: displaySize,
+            prefersFullscreen: prefersFullscreen,
+            onReleaseInput: onReleaseInput,
+            onResolution: onResolution
+        )
     }
 
-    func makeNSView(context: Context) -> SpiceDisplayView {
-        actionRouter.handler = context.coordinator
-        return context.coordinator.displayView
+    func makeNSView(context: Context) -> WindowProbeView {
+        let view = WindowProbeView()
+        view.onWindowChanged = { [weak coordinator = context.coordinator] window in
+            coordinator?.attach(to: window)
+        }
+        return view
     }
 
-    func updateNSView(_ nsView: SpiceDisplayView, context: Context) {
-        context.coordinator.attachWindow(nsView.window)
+    func updateNSView(_ nsView: WindowProbeView, context: Context) {
+        context.coordinator.update(
+            displaySize: displaySize,
+            prefersFullscreen: prefersFullscreen,
+            onReleaseInput: onReleaseInput,
+            onResolution: onResolution
+        )
+        context.coordinator.attach(to: nsView.window)
     }
 
-    static func dismantleNSView(_ nsView: SpiceDisplayView, coordinator: Coordinator) {
+    static func dismantleNSView(_ nsView: WindowProbeView, coordinator: Coordinator) {
+        nsView.onWindowChanged = nil
         coordinator.stop()
     }
 
     @MainActor
-    final class Coordinator: NSObject {
-        let displayView = SpiceDisplayView()
+    final class Coordinator {
+        private weak var window: NSWindow?
+        private var observers: [NSObjectProtocol] = []
+        private var displaySize: CGSize?
+        private var prefersFullscreen: Bool
+        private var onReleaseInput: @MainActor () -> Void
+        private var onResolution: @MainActor (Int, Int) -> Void
+        private var appliedInitialDisplaySize = false
+        private var appliedFullscreen = false
 
-        private let model: SessionModel
-        private var cancellables = Set<AnyCancellable>()
-        private weak var observedWindow: NSWindow?
-        private var windowObservers: [NSObjectProtocol] = []
-        private var stopped = false
-
-        init(model: SessionModel) {
-            self.model = model
-            super.init()
-            displayView.onWindowChanged = { [weak self] window in
-                self?.attachWindow(window)
-            }
-            wireClient()
+        init(
+            displaySize: CGSize?,
+            prefersFullscreen: Bool,
+            onReleaseInput: @escaping @MainActor () -> Void,
+            onResolution: @escaping @MainActor (Int, Int) -> Void
+        ) {
+            self.displaySize = displaySize
+            self.prefersFullscreen = prefersFullscreen
+            self.onReleaseInput = onReleaseInput
+            self.onResolution = onResolution
         }
 
-        private func wireClient() {
-            guard let client = model.client else { return }
-
-            client.onDisplayCreated = { [weak self] display in
-                MainActor.assumeIsolated { self?.attachDisplay(display) }
-            }
-            client.onDisplayDestroyed = { [weak self] _ in
-                MainActor.assumeIsolated { self?.displayView.detach() }
-            }
-            client.onInputAvailable = { [weak self] input in
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    self.displayView.router.input = input
-                    self.displayView.router.requestMouseMode(server: false)
-                    self.displayView.window?.makeFirstResponder(self.displayView)
-                    self.displayView.refreshCursorPresentation()
-                    self.model.setInputAvailable(true)
-                }
-            }
-            client.onInputUnavailable = { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    self.displayView.router.input = nil
-                    self.displayView.refreshCursorPresentation()
-                    self.model.setInputAvailable(false)
-                }
-            }
-
-            client.$agentConnected
-                .receive(on: RunLoop.main)
-                .sink { [weak self] connected in
-                    MainActor.assumeIsolated {
-                        if connected { self?.requestResolutionForCurrentSize() }
-                    }
-                }
-                .store(in: &cancellables)
+        func update(
+            displaySize: CGSize?,
+            prefersFullscreen: Bool,
+            onReleaseInput: @escaping @MainActor () -> Void,
+            onResolution: @escaping @MainActor (Int, Int) -> Void
+        ) {
+            self.displaySize = displaySize
+            self.prefersFullscreen = prefersFullscreen
+            self.onReleaseInput = onReleaseInput
+            self.onResolution = onResolution
+            applyInitialWindowPolicy()
         }
 
-        private func attachDisplay(_ display: CSDisplay) {
-            guard !stopped else { return }
-            displayView.attachDisplay(display)
-            resizeWindowToDisplay(display.displaySize)
-            displayView.window?.makeFirstResponder(displayView)
-            if model.prefersFullscreen,
-               displayView.window?.styleMask.contains(.fullScreen) == false {
-                displayView.window?.toggleFullScreen(nil)
+        func attach(to window: NSWindow?) {
+            guard self.window !== window else {
+                applyInitialWindowPolicy()
+                return
             }
-        }
-
-        func attachWindow(_ window: NSWindow?) {
-            guard !stopped, observedWindow !== window else { return }
-            removeWindowObservers()
-            observedWindow = window
+            removeObservers()
+            self.window = window
             guard let window else { return }
-
             window.acceptsMouseMovedEvents = true
-            window.initialFirstResponder = displayView
-
             let center = NotificationCenter.default
             let names: [Notification.Name] = [
-                NSWindow.didBecomeKeyNotification,
                 NSWindow.didResignKeyNotification,
                 NSWindow.didEndLiveResizeNotification,
                 NSWindow.didEnterFullScreenNotification,
                 NSWindow.didExitFullScreenNotification,
                 NSWindow.willCloseNotification,
             ]
-            windowObservers = names.map { name in
-                center.addObserver(forName: name, object: window, queue: .main) { [weak self] note in
-                    let eventName = note.name
-                    MainActor.assumeIsolated { self?.handleWindowNotification(eventName) }
+            observers = names.map { name in
+                center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.handle(name) }
                 }
             }
+            applyInitialWindowPolicy()
         }
 
-        private func handleWindowNotification(_ name: Notification.Name) {
+        func stop() {
+            onReleaseInput()
+            removeObservers()
+            window = nil
+        }
+
+        private func handle(_ name: Notification.Name) {
             switch name {
-            case NSWindow.didBecomeKeyNotification:
-                displayView.window?.makeFirstResponder(displayView)
-                displayView.refreshCursorPresentation()
-                model.refreshUSBDevices()
-            case NSWindow.didResignKeyNotification:
-                displayView.router.releaseAll()
-                displayView.refreshCursorPresentation()
-                displayView.restoreSystemCursor()
+            case NSWindow.didResignKeyNotification, NSWindow.willCloseNotification:
+                onReleaseInput()
             case NSWindow.didEndLiveResizeNotification,
                  NSWindow.didEnterFullScreenNotification,
                  NSWindow.didExitFullScreenNotification:
-                requestResolutionForCurrentSize()
-            case NSWindow.willCloseNotification:
-                stop()
+                requestCurrentResolution()
             default:
                 break
             }
         }
 
-        private func resizeWindowToDisplay(_ size: CGSize) {
-            guard size.width > 1, size.height > 1,
-                  let window = displayView.window,
-                  !window.styleMask.contains(.fullScreen) else { return }
-            let visible = (window.screen ?? NSScreen.main)?.visibleFrame.size ?? size
-            let scale = min(1, min(visible.width / size.width, visible.height / size.height))
-            window.setContentSize(CGSize(
-                width: floor(size.width * scale),
-                height: floor(size.height * scale)))
-            window.center()
+        private func applyInitialWindowPolicy() {
+            guard let window else { return }
+            if !appliedInitialDisplaySize,
+               let displaySize,
+               displaySize.width > 1,
+               displaySize.height > 1,
+               !window.styleMask.contains(.fullScreen) {
+                let visible = (window.screen ?? NSScreen.main)?.visibleFrame.size ?? displaySize
+                let scale = min(1, min(visible.width / displaySize.width, visible.height / displaySize.height))
+                window.setContentSize(CGSize(
+                    width: floor(displaySize.width * scale),
+                    height: floor(displaySize.height * scale)
+                ))
+                window.center()
+                appliedInitialDisplaySize = true
+            }
+            if prefersFullscreen, !appliedFullscreen,
+               !window.styleMask.contains(.fullScreen) {
+                appliedFullscreen = true
+                window.toggleFullScreen(nil)
+            }
         }
 
-        private func requestResolutionForCurrentSize() {
-            guard model.client?.supportsDynamicResolution == true,
-                  let display = displayView.attachedDisplay else { return }
-            display.requestResolution(displayView.convertToBacking(displayView.bounds))
+        private func requestCurrentResolution() {
+            guard let contentView = window?.contentView else { return }
+            let size = contentView.convertToBacking(contentView.bounds).size
+            let width = Int(size.width.rounded(.down))
+            let height = Int(size.height.rounded(.down))
+            guard width > 0, height > 0 else { return }
+            onResolution(width, height)
         }
 
-        fileprivate func sendCtrlAltDelete() {
-            guard let input = displayView.router.input else { return }
-            let combo: [Int32] = [0x1D, 0x38, 0x153]
-            for code in combo { input.send(.press, code: code) }
-            for code in combo.reversed() { input.send(.release, code: code) }
-        }
-
-        fileprivate func releaseCursor() {
-            displayView.router.releaseAll()
-        }
-
-        func stop() {
-            guard !stopped else { return }
-            stopped = true
-            removeWindowObservers()
-            displayView.router.releaseAll()
-            displayView.restoreSystemCursor()
-            displayView.detach()
-            displayView.onWindowChanged = nil
-            model.client?.onDisplayCreated = nil
-            model.client?.onDisplayDestroyed = nil
-            model.client?.onInputAvailable = nil
-            model.client?.onInputUnavailable = nil
-            model.stop()
-        }
-
-        private func removeWindowObservers() {
+        private func removeObservers() {
             let center = NotificationCenter.default
-            for observer in windowObservers { center.removeObserver(observer) }
-            windowObservers.removeAll()
+            for observer in observers { center.removeObserver(observer) }
+            observers.removeAll()
         }
     }
 }
 
-extension SpiceDisplayRepresentable.Coordinator: SpiceDisplayActionHandling {}
+@MainActor
+private final class WindowProbeView: NSView {
+    var onWindowChanged: (@MainActor (NSWindow?) -> Void)?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        onWindowChanged?(window)
+    }
+}

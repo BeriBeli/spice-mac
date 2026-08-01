@@ -6,7 +6,6 @@ struct SessionView: View {
     let appDelegate: AppDelegate
 
     @State private var model: SessionModel
-    @State private var displayActions = SpiceDisplayActionRouter()
     @AppStorage(Preferences.shareClipboardKey) private var shareClipboard = true
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
@@ -20,8 +19,8 @@ struct SessionView: View {
 
     var body: some View {
         ZStack {
-            if model.client != nil {
-                SpiceDisplayRepresentable(model: model, actionRouter: displayActions)
+            if let client = model.client {
+                SwiftSpiceDesktop(client: client, model: model)
             } else {
                 Color.clear
             }
@@ -63,11 +62,6 @@ struct SessionView: View {
                 dismissWindow(id: "launcher")
             }
         }
-        .alert("USB Redirection", isPresented: usbErrorIsPresented) {
-            Button("OK") { model.usbError = nil }
-        } message: {
-            Text(model.usbError ?? "Unknown USB error")
-        }
     }
 
     private var focusedActions: FocusedSessionActions {
@@ -75,15 +69,7 @@ struct SessionView: View {
             availability: SessionCommandAvailability(
                 hasActiveSession: model.client != nil,
                 hasInput: model.isInputAvailable),
-            sendCtrlAltDelete: displayActions.sendCtrlAltDelete,
-            releaseCursor: displayActions.releaseCursor,
-            usbDevices: model.usbDevices,
-            toggleUSBDevice: model.toggleUSBDevice(id:))
-    }
-
-    private var usbErrorIsPresented: Binding<Bool> {
-        Binding(
-            get: { model.usbError != nil },
-            set: { if !$0 { model.usbError = nil } })
+            sendCtrlAltDelete: model.sendCtrlAltDelete,
+            releaseCursor: model.releaseAllInput)
     }
 }

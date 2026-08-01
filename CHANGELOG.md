@@ -6,6 +6,30 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced the active CocoaSpice, spice-gtk, and staged-sysroot backend with the
+  exact SwiftSpice 0.1.2 release and its IOSurface/Metal desktop view.
+- Narrowed the supported transport to direct standard-QEMU and Ravada TCP/TLS.
+  Proxy and Proxmox/PVE connection files now fail explicitly; direct TLS accepts
+  system trust, a per-file CA, or a CA plus complete `host-subject` policy.
+- Moved audio playback, clipboard synchronization, guest display resizing, and
+  input delivery onto SwiftSpice. Ordered input preserves key/button edges,
+  coalesces adjacent pointer motion, and releases held input during teardown.
+
+### Removed
+
+- Removed the inactive vendored CocoaSpice tree, Proxmox patch, old native
+  Frameworks/sysroot workflow, root USB launcher, and OpenSSL upgrade tooling.
+- Removed excluded CocoaSpice bridges/tests and standalone input, clipboard, and
+  cursor helpers that were no longer referenced by the active application.
+
+### Security
+
+- Pinned SwiftSpice in `Package.resolved`, bundled its exact native-license
+  notices, and added pre/post-assembly Mach-O checks that reject Homebrew,
+  build-host dependency paths, and absolute runtime search paths.
+
 ## [0.2.1] — 2026-07-27
 
 ### Highlights

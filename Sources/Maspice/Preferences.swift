@@ -13,7 +13,7 @@ enum Preferences {
     }
 
     static var trashConnectionFileAfterUse: Bool {
-        get { (UserDefaults.standard.object(forKey: trashConnectionFileAfterUseKey) as? Bool) ?? true }
+        get { (UserDefaults.standard.object(forKey: trashConnectionFileAfterUseKey) as? Bool) ?? false }
         set { UserDefaults.standard.set(newValue, forKey: trashConnectionFileAfterUseKey) }
     }
 

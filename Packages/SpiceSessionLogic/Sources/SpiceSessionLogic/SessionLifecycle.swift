@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 /// One-shot session lifetime decisions kept independent of AppKit, SwiftUI, and
-/// CocoaSpice so cleanup and disconnect navigation can be tested deterministically.
+/// the transport backend so cleanup and navigation can be tested deterministically.
 public struct SessionLifecycle: Equatable, Sendable {
     public private(set) var didStart = false
     public private(set) var isActive = false
