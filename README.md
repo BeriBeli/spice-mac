@@ -8,10 +8,6 @@ Maspice is a native Apple-Silicon macOS 26+ SPICE client built with SwiftUI,
 WebKit, AppKit, Metal, and
 [SwiftSpice](https://github.com/BeriBeli/spice-swift).
 
-The active backend is the exact SwiftSpice `v0.1.2` release recorded in
-`Package.resolved`. Maspice has no vendored CocoaSpice, spice-gtk sysroot, or
-Homebrew runtime dependency.
-
 ## Download
 
 Published builds and their release notes are on
