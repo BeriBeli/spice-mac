@@ -33,6 +33,21 @@ enum Preferences {
         UserDefaults.standard.set(certificates, forKey: trustedPortalCertificatesKey)
     }
 
+    static func ravadaPortalURL(from value: String) -> URL? {
+        let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard var components = URLComponents(string: value),
+              let scheme = components.scheme?.lowercased(),
+              scheme == "https" || scheme == "http",
+              components.host != nil,
+              components.user == nil,
+              components.password == nil else { return nil }
+        components.scheme = "https"
+        if scheme == "http", components.port == 80 {
+            components.port = nil
+        }
+        return components.url
+    }
+
     private static var trustedPortalCertificates: [String: String] {
         UserDefaults.standard.dictionary(forKey: trustedPortalCertificatesKey) as? [String: String] ?? [:]
     }

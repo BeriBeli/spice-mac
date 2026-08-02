@@ -19,9 +19,6 @@ struct SwiftSpiceDesktop: View {
         )
         .background {
             SpiceWindowBridge(
-                displaySize: client.frame.map {
-                    CGSize(width: $0.width, height: $0.height)
-                },
                 prefersFullscreen: model.prefersFullscreen,
                 onReleaseInput: model.releaseAllInput,
                 onResolution: model.requestResolution(width:height:)
@@ -32,14 +29,12 @@ struct SwiftSpiceDesktop: View {
 }
 
 private struct SpiceWindowBridge: NSViewRepresentable {
-    let displaySize: CGSize?
     let prefersFullscreen: Bool
     let onReleaseInput: @MainActor () -> Void
     let onResolution: @MainActor (Int, Int) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
-            displaySize: displaySize,
             prefersFullscreen: prefersFullscreen,
             onReleaseInput: onReleaseInput,
             onResolution: onResolution
@@ -56,7 +51,6 @@ private struct SpiceWindowBridge: NSViewRepresentable {
 
     func updateNSView(_ nsView: WindowProbeView, context: Context) {
         context.coordinator.update(
-            displaySize: displaySize,
             prefersFullscreen: prefersFullscreen,
             onReleaseInput: onReleaseInput,
             onResolution: onResolution
@@ -73,41 +67,36 @@ private struct SpiceWindowBridge: NSViewRepresentable {
     final class Coordinator {
         private weak var window: NSWindow?
         private var observers: [NSObjectProtocol] = []
-        private var displaySize: CGSize?
         private var prefersFullscreen: Bool
         private var onReleaseInput: @MainActor () -> Void
         private var onResolution: @MainActor (Int, Int) -> Void
-        private var appliedInitialDisplaySize = false
         private var appliedFullscreen = false
+        private var initialPolicyTask: Task<Void, Never>?
 
         init(
-            displaySize: CGSize?,
             prefersFullscreen: Bool,
             onReleaseInput: @escaping @MainActor () -> Void,
             onResolution: @escaping @MainActor (Int, Int) -> Void
         ) {
-            self.displaySize = displaySize
             self.prefersFullscreen = prefersFullscreen
             self.onReleaseInput = onReleaseInput
             self.onResolution = onResolution
         }
 
         func update(
-            displaySize: CGSize?,
             prefersFullscreen: Bool,
             onReleaseInput: @escaping @MainActor () -> Void,
             onResolution: @escaping @MainActor (Int, Int) -> Void
         ) {
-            self.displaySize = displaySize
             self.prefersFullscreen = prefersFullscreen
             self.onReleaseInput = onReleaseInput
             self.onResolution = onResolution
-            applyInitialWindowPolicy()
+            scheduleInitialWindowPolicy()
         }
 
         func attach(to window: NSWindow?) {
             guard self.window !== window else {
-                applyInitialWindowPolicy()
+                scheduleInitialWindowPolicy()
                 return
             }
             removeObservers()
@@ -116,6 +105,7 @@ private struct SpiceWindowBridge: NSViewRepresentable {
             window.acceptsMouseMovedEvents = true
             let center = NotificationCenter.default
             let names: [Notification.Name] = [
+                NSWindow.didBecomeKeyNotification,
                 NSWindow.didResignKeyNotification,
                 NSWindow.didEndLiveResizeNotification,
                 NSWindow.didEnterFullScreenNotification,
@@ -127,22 +117,27 @@ private struct SpiceWindowBridge: NSViewRepresentable {
                     MainActor.assumeIsolated { self?.handle(name) }
                 }
             }
-            applyInitialWindowPolicy()
+            scheduleInitialWindowPolicy()
         }
 
         func stop() {
             onReleaseInput()
+            initialPolicyTask?.cancel()
+            initialPolicyTask = nil
             removeObservers()
             window = nil
         }
 
         private func handle(_ name: Notification.Name) {
             switch name {
+            case NSWindow.didBecomeKeyNotification:
+                scheduleInitialWindowPolicy()
             case NSWindow.didResignKeyNotification, NSWindow.willCloseNotification:
                 onReleaseInput()
             case NSWindow.didEndLiveResizeNotification,
                  NSWindow.didEnterFullScreenNotification,
                  NSWindow.didExitFullScreenNotification:
+                scheduleInitialWindowPolicy()
                 requestCurrentResolution()
             default:
                 break
@@ -150,25 +145,21 @@ private struct SpiceWindowBridge: NSViewRepresentable {
         }
 
         private func applyInitialWindowPolicy() {
-            guard let window else { return }
-            if !appliedInitialDisplaySize,
-               let displaySize,
-               displaySize.width > 1,
-               displaySize.height > 1,
-               !window.styleMask.contains(.fullScreen) {
-                let visible = (window.screen ?? NSScreen.main)?.visibleFrame.size ?? displaySize
-                let scale = min(1, min(visible.width / displaySize.width, visible.height / displaySize.height))
-                window.setContentSize(CGSize(
-                    width: floor(displaySize.width * scale),
-                    height: floor(displaySize.height * scale)
-                ))
-                window.center()
-                appliedInitialDisplaySize = true
-            }
+            guard let window, window.isVisible else { return }
             if prefersFullscreen, !appliedFullscreen,
                !window.styleMask.contains(.fullScreen) {
                 appliedFullscreen = true
                 window.toggleFullScreen(nil)
+            }
+        }
+
+        private func scheduleInitialWindowPolicy() {
+            guard initialPolicyTask == nil, prefersFullscreen, !appliedFullscreen else { return }
+            initialPolicyTask = Task { @MainActor [weak self] in
+                await Task.yield()
+                guard let self, !Task.isCancelled else { return }
+                initialPolicyTask = nil
+                applyInitialWindowPolicy()
             }
         }
 

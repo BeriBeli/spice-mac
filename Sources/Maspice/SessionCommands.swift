@@ -21,6 +21,8 @@ extension FocusedValues {
 }
 
 struct SpiceCommands: Commands {
+    let applicationModel: ApplicationModel
+
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
     @FocusedValue(\.sessionActions) private var sessionActions
@@ -30,7 +32,9 @@ struct SpiceCommands: Commands {
         CommandGroup(replacing: .newItem) {
             Button("Open…") {
                 if let url = ConnectionFilePicker.chooseFile() {
-                    openWindow(value: SessionRequest(url: url))
+                    let request = SessionRequest(url: url)
+                    applicationModel.authorizeSessionPresentation(request)
+                    openWindow(value: request)
                     dismissWindow(id: "launcher")
                 }
             }

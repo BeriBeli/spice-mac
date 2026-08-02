@@ -89,7 +89,7 @@ final class SessionModel {
         case .connecting: "Connecting…"
         case .connected: nil
         case .disconnected: "Disconnected.\nReopen the .vv file to connect again."
-        case let .failed(message): "Connection failed.\n\(message)"
+        case let .failed(message): SessionFailureMessage.status(from: message)
         }
     }
 
@@ -133,7 +133,7 @@ final class SessionModel {
             failureMessage = nil
             needsDisconnect = false
         case let .failed(message):
-            failureMessage = "Connection failed.\n\(message)"
+            failureMessage = message
             needsDisconnect = true
         case .idle, .connecting, .connected:
             return

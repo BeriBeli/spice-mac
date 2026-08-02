@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import Foundation
 
 /// One-shot session lifetime decisions kept independent of AppKit, SwiftUI, and
 /// the transport backend so cleanup and navigation can be tested deterministically.
@@ -42,4 +43,35 @@ public struct SessionCommandAvailability: Equatable, Sendable {
 
     public var canSendCtrlAltDelete: Bool { hasActiveSession && hasInput }
     public var canReleaseCursor: Bool { hasActiveSession && hasInput }
+}
+
+/// Produces the detail text shown below a "Connection Failed" heading.
+/// Backend errors may already include that heading, so remove it at this UI boundary.
+public enum SessionFailureMessage {
+    public static func status(from message: String) -> String {
+        "Connection failed.\n\(detail(from: message))"
+    }
+
+    public static func detail(from message: String) -> String {
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        let prefixes = ["connection failed:", "connection failed."]
+
+        let reason = prefixes.lazy.compactMap { prefix -> String? in
+            guard let range = trimmed.range(
+                of: prefix,
+                options: [.anchored, .caseInsensitive]
+            ) else { return nil }
+            return String(trimmed[range.upperBound...])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }.first ?? trimmed
+
+        switch reason {
+        case "connectionClosed":
+            return "The remote server closed the connection."
+        case "":
+            return "The connection could not be opened."
+        default:
+            return reason
+        }
+    }
 }

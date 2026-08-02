@@ -46,3 +46,22 @@ import Testing
     #expect(interactive.canSendCtrlAltDelete)
     #expect(interactive.canReleaseCursor)
 }
+
+@Test func connectionFailureDetailDoesNotRepeatAlertHeading() {
+    #expect(
+        SessionFailureMessage.detail(from: "connection failed: connectionClosed")
+            == "The remote server closed the connection."
+    )
+    #expect(
+        SessionFailureMessage.detail(from: "Connection failed.\nTLS handshake timed out")
+            == "TLS handshake timed out"
+    )
+    #expect(
+        SessionFailureMessage.detail(from: "Could not download the connection file.")
+            == "Could not download the connection file."
+    )
+    #expect(
+        SessionFailureMessage.status(from: "connection failed: connectionClosed")
+            == "Connection failed.\nThe remote server closed the connection."
+    )
+}

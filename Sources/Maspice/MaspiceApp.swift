@@ -12,6 +12,16 @@ struct MaspiceApp: App {
                 .environment(applicationModel)
         }
         .defaultSize(width: 520, height: 300)
+        .restorationBehavior(.disabled)
+
+        Window("Ravada Portal", id: "portal") {
+            RavadaPortalWindow()
+                .environment(applicationModel)
+        }
+        .defaultSize(width: 1024, height: 768)
+        .windowIdealSize(.maximum)
+        .restorationBehavior(.disabled)
+        .defaultLaunchBehavior(.suppressed)
 
         WindowGroup("SPICE Console", for: SessionRequest.self) { request in
             if let request = request.wrappedValue {
@@ -25,9 +35,10 @@ struct MaspiceApp: App {
             }
         }
         .defaultSize(width: 1024, height: 768)
+        .windowIdealSize(.maximum)
         .restorationBehavior(.disabled)
         .commands {
-            SpiceCommands()
+            SpiceCommands(applicationModel: applicationModel)
         }
 
         Settings {

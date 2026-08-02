@@ -4,8 +4,10 @@ import SpiceSessionLogic
 
 struct SessionView: View {
     let appDelegate: AppDelegate
+    let requestID: UUID
 
     @State private var model: SessionModel
+    @State private var isReturningToLauncher = false
     @AppStorage(Preferences.shareClipboardKey) private var shareClipboard = true
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
@@ -14,6 +16,7 @@ struct SessionView: View {
 
     init(request: SessionRequest, appDelegate: AppDelegate) {
         self.appDelegate = appDelegate
+        requestID = request.id
         _model = State(initialValue: SessionModel(request: request))
     }
 
@@ -36,28 +39,39 @@ struct SessionView: View {
             }
         }
         .frame(minWidth: 640, minHeight: 480)
+        .background {
+            InitialWindowZoomBridge()
+                .frame(width: 0, height: 0)
+        }
         .navigationTitle(model.windowTitle)
         .focusedSceneValue(\.sessionActions, focusedActions)
         .onAppear {
+            guard applicationModel.activateSessionPresentation(for: requestID) else {
+                openWindow(id: "launcher")
+                dismiss()
+                return
+            }
             model.setClipboardSharing(shareClipboard)
             model.start()
+            if model.shouldReturnToLauncher {
+                returnToLauncher()
+            }
         }
         .onDisappear {
+            applicationModel.deactivateSessionPresentation(for: requestID)
             model.stop()
         }
         .onChange(of: shareClipboard) {
             model.setClipboardSharing(shareClipboard)
         }
         .onChange(of: model.shouldReturnToLauncher, initial: true) {
-            guard model.shouldReturnToLauncher else { return }
-            if let message = model.terminalFailureMessage {
-                applicationModel.presentSessionFailure(message)
-            }
-            openWindow(id: "launcher")
-            dismiss()
+            guard applicationModel.isSessionPresentationActive(for: requestID),
+                  model.shouldReturnToLauncher else { return }
+            returnToLauncher()
         }
         .onChange(of: appDelegate.pendingRequests, initial: true) {
             for request in appDelegate.drainPendingRequests() {
+                applicationModel.authorizeSessionPresentation(request)
                 openWindow(value: request)
                 dismissWindow(id: "launcher")
             }
@@ -71,5 +85,15 @@ struct SessionView: View {
                 hasInput: model.isInputAvailable),
             sendCtrlAltDelete: model.sendCtrlAltDelete,
             releaseCursor: model.releaseAllInput)
+    }
+
+    private func returnToLauncher() {
+        guard !isReturningToLauncher else { return }
+        isReturningToLauncher = true
+        if let message = model.terminalFailureMessage {
+            applicationModel.presentSessionFailure(message)
+        }
+        openWindow(id: "launcher")
+        dismiss()
     }
 }

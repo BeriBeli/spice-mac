@@ -136,6 +136,7 @@ private final class RavadaNavigationDecider: WebPage.NavigationDeciding {
     private let onConnectionFile: @MainActor (URL) -> Void
     private let onError: @MainActor (String) -> Void
     private var downloadInFlight = false
+    private var connectionWasDelivered = false
     private var downloadTask: Task<Void, Never>?
 
     init(
@@ -157,11 +158,15 @@ private final class RavadaNavigationDecider: WebPage.NavigationDeciding {
         preferences: inout WebPage.NavigationPreferences
     ) async -> WKNavigationActionPolicy {
         guard Self.isConnectionFile(action.request.url) else { return .allow }
-        guard Self.isUserInitiated(action.navigationType),
-              isAllowedConnectionURL(action.request.url) else {
-            onError("The portal tried to open an untrusted connection file. No connection was made.")
+        guard isAllowedConnectionURL(action.request.url) else {
+            onError("The portal tried to open a connection file from an untrusted address. No connection was made.")
             return .cancel
         }
+        guard isUserInitiated(action) else {
+            onError("The portal tried to open a connection file without a verified user action. No connection was made.")
+            return .cancel
+        }
+        guard !connectionWasDelivered else { return .cancel }
         guard !downloadInFlight else { return .cancel }
         downloadInFlight = true
         let request = action.request
@@ -205,7 +210,7 @@ private final class RavadaNavigationDecider: WebPage.NavigationDeciding {
         }
         // Direct .vv requests are intercepted in the action policy. Replaying a
         // response here would lose POST bodies and action-specific headers.
-        if !downloadInFlight {
+        if !downloadInFlight && !connectionWasDelivered {
             onError("The portal returned a connection file from an unsupported download URL.")
         }
         return .cancel
@@ -278,10 +283,12 @@ private final class RavadaNavigationDecider: WebPage.NavigationDeciding {
                 try? FileManager.default.removeItem(at: destination)
                 throw error
             }
+            connectionWasDelivered = true
             onConnectionFile(destination)
         } catch is CancellationError {
             return
         } catch {
+            guard !connectionWasDelivered else { return }
             onError("Could not download the connection file.\n\(error.localizedDescription)")
         }
     }
@@ -310,8 +317,23 @@ private final class RavadaNavigationDecider: WebPage.NavigationDeciding {
         return true
     }
 
-    private static func isUserInitiated(_ type: WKNavigationType) -> Bool {
-        type == .linkActivated || type == .formSubmitted || type == .formResubmitted
+    private func isUserInitiated(_ action: WebPage.NavigationAction) -> Bool {
+        guard action.source.isMainFrame,
+              action.source.securityOrigin.host.caseInsensitiveCompare(portalHost) == .orderedSame else {
+            return false
+        }
+        switch action.navigationType {
+        case .linkActivated, .formSubmitted, .formResubmitted:
+            return true
+        case .other:
+            // Ravada's generated .vv download link is reported as `.other` by
+            // native WebPage. A primary-button event still proves a real click.
+            return action.buttonNumber == 0
+        case .backForward, .reload:
+            return false
+        @unknown default:
+            return false
+        }
     }
 
     private static func cookie(_ cookie: HTTPCookie, appliesTo url: URL) -> Bool {

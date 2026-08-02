@@ -5,19 +5,12 @@ struct LauncherView: View {
     let appDelegate: AppDelegate
 
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(\.dismiss) private var dismiss
     @Environment(ApplicationModel.self) private var applicationModel
     @AppStorage(Preferences.ravadaPortalURLKey) private var ravadaPortalURL = ""
-    @State private var showsPortal = false
 
     var body: some View {
-        Group {
-            if showsPortal, let portalURL {
-                portalContent(url: portalURL)
-            } else {
-                launcherContent
-            }
-        }
+        launcherContent
         .onChange(of: appDelegate.pendingRequests, initial: true) {
             routePendingRequests()
         }
@@ -48,7 +41,9 @@ struct LauncherView: View {
 
             VStack(spacing: 12) {
                 Button {
-                    showsPortal = true
+                    applicationModel.authorizePortalPresentation()
+                    openWindow(id: "portal")
+                    dismiss()
                 } label: {
                     Text("Open Ravada Portal")
                         .frame(maxWidth: .infinity)
@@ -78,28 +73,6 @@ struct LauncherView: View {
         }
     }
 
-    private func portalContent(url: URL) -> some View {
-        VStack(spacing: 0) {
-            HStack {
-                Button("Back to Launcher", systemImage: "chevron.left") {
-                    showsPortal = false
-                }
-                Spacer()
-                Text(url.host() ?? url.absoluteString)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(10)
-
-            Divider()
-
-            RavadaPortalView(
-                url: url,
-                onConnectionFile: openDownloadedConnection,
-                onError: applicationModel.presentSessionFailure)
-        }
-        .frame(minWidth: 900, minHeight: 650)
-    }
-
     private func routePendingRequests() {
         let requests = appDelegate.drainPendingRequests()
         for request in requests {
@@ -113,29 +86,14 @@ struct LauncherView: View {
         }
     }
 
-    private func openDownloadedConnection(_ url: URL) {
-        showsPortal = false
-        openSession(SessionRequest(url: url, removesFileAfterStart: true))
-    }
-
     private func openSession(_ request: SessionRequest) {
+        applicationModel.authorizeSessionPresentation(request)
         openWindow(value: request)
-        dismissWindow(id: "launcher")
+        dismiss()
     }
 
     private var portalURL: URL? {
-        let value = ravadaPortalURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard var components = URLComponents(string: value),
-              let scheme = components.scheme?.lowercased(),
-              scheme == "https" || scheme == "http",
-              components.host != nil,
-              components.user == nil,
-              components.password == nil else { return nil }
-        components.scheme = "https"
-        if scheme == "http", components.port == 80 {
-            components.port = nil
-        }
-        return components.url
+        Preferences.ravadaPortalURL(from: ravadaPortalURL)
     }
 
     private var sessionFailureIsPresented: Binding<Bool> {
