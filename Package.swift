@@ -16,7 +16,7 @@ let package = Package(
         .package(path: "Packages/SpiceSessionLogic"),
         .package(
             url: "https://github.com/BeriBeli/spice-swift.git",
-            exact: "0.1.2"
+            exact: "0.1.3"
         ),
     ],
     targets: [

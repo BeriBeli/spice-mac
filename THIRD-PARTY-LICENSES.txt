@@ -7,10 +7,10 @@ Active source dependency
 ------------------------
 
 SwiftSpice (https://github.com/BeriBeli/spice-swift)
-  Version:   v0.1.2 (exact SwiftPM release dependency)
+  Version:   v0.1.3 (exact SwiftPM release dependency)
   License:   MIT
   Copyright: Copyright (c) 2026 BeriBeli
-  Text:      https://github.com/BeriBeli/spice-swift/blob/v0.1.2/LICENSE
+  Text:      https://github.com/BeriBeli/spice-swift/blob/v0.1.3/LICENSE
 
 Native dependency closure
 -------------------------
@@ -24,7 +24,7 @@ checksum-verified sources:
   libusb 1.0.30 .............. LGPL-2.1-or-later
 
 Source URLs, checksums, and the reproducible build recipe are in
-the v0.1.2 `Scripts/build-native-dependencies.sh`. The precise
+the v0.1.3 `Scripts/build-native-dependencies.sh`. The precise
 upstream license texts are embedded in the XCFrameworks and copied into the app.
 Maspice independently verifies that the final Mach-O closure has no build-host
 absolute dynamic-library paths.
