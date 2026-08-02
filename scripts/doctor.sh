@@ -37,7 +37,23 @@ metal_path="$(xcrun -f metal 2>/dev/null || true)"
 if [ -x "$metal_path" ]; then pass "Metal toolchain ($metal_path)"
 else fail "Metal toolchain not found" "xcodebuild -downloadComponent MetalToolchain"; fi
 
-expected_version="$(sed -nE 's/.*exact:[[:space:]]*"([^"]+)".*/\1/p' "$ROOT/Package.swift" | head -1)"
+expected_version="$(
+    awk '
+        /url:[[:space:]]*"https:\/\/github.com\/BeriBeli\/spice-swift\.git"/ {
+            in_swiftspice = 1
+        }
+        in_swiftspice && /exact:[[:space:]]*"[^"]+"/ {
+            version = $0
+            sub(/^.*exact:[[:space:]]*"/, "", version)
+            sub(/".*$/, "", version)
+            print version
+            exit
+        }
+        in_swiftspice && /\)/ {
+            in_swiftspice = 0
+        }
+    ' "$ROOT/Package.swift"
+)"
 resolved_version="$(sed -nE '/"identity"[[:space:]]*:[[:space:]]*"spice-swift"/,/}/{s/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p;}' "$ROOT/Package.resolved" 2>/dev/null | head -1)"
 if [ -z "$expected_version" ]; then
     fail "SwiftSpice exact version not found" "declare an exact SwiftSpice version in Package.swift"
