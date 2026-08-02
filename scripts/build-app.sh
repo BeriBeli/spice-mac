@@ -28,6 +28,10 @@ BINARY="$BIN_PATH/$EXECUTABLE_NAME"
 SWIFTSPICE_SOURCE="$ROOT/.build/checkouts/spice-swift"
 [ -f "$SWIFTSPICE_SOURCE/Package.swift" ] \
     || die "resolved SwiftSpice release checkout not found at $SWIFTSPICE_SOURCE"
+SPARKLE_ROOT="$ROOT/.build/artifacts/sparkle/Sparkle"
+SPARKLE_FRAMEWORK="$SPARKLE_ROOT/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+[ -d "$SPARKLE_FRAMEWORK" ] \
+    || die "resolved Sparkle framework not found at $SPARKLE_FRAMEWORK"
 
 # This gate intentionally runs before assembling or signing. Maspice never uses
 # install_name_tool to disguise Homebrew paths supplied by SwiftSpice.
@@ -36,9 +40,10 @@ log "auditing native dependency closure"
 
 log "assembling $APP"
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Frameworks" "$APP/Contents/Resources"
 cp "$PLIST" "$APP/Contents/Info.plist"
 cp "$BINARY" "$APP/Contents/MacOS/$EXECUTABLE_NAME"
+ditto "$SPARKLE_FRAMEWORK" "$APP/Contents/Frameworks/Sparkle.framework"
 
 METAL_BUNDLE="$BIN_PATH/SwiftSpice_SpiceMetalCompositor.bundle"
 [ -f "$METAL_BUNDLE/SpiceVideoCompositor.metallib" ] \
@@ -70,6 +75,8 @@ cp "$SWIFTSPICE_SOURCE/LICENSE" \
     "$APP/Contents/Resources/Licenses/SwiftSpice-MIT.txt"
 cp "$SWIFTSPICE_SOURCE/THIRD_PARTY_NOTICES.md" \
     "$APP/Contents/Resources/Licenses/SwiftSpice-THIRD_PARTY_NOTICES.md"
+cp "$SPARKLE_ROOT/LICENSE" \
+    "$APP/Contents/Resources/Licenses/Sparkle-MIT.txt"
 while IFS= read -r -d '' license; do
     cp "$license" "$APP/Contents/Resources/Licenses/"
 done < <(find "$SWIFTSPICE_SOURCE/Artifacts" -path '*/Licenses/*' -type f -print0)
@@ -83,6 +90,8 @@ if [ "$SIGN_IDENTITY" = "-" ]; then SIGN_ARGS+=(--timestamp=none); else SIGN_ARG
 if [ "${HARDENED:-0}" = "1" ]; then
     SIGN_ARGS+=(--options runtime)
 fi
+log "signing embedded Sparkle framework"
+codesign "${SIGN_ARGS[@]}" --deep "$APP/Contents/Frameworks/Sparkle.framework"
 log "signing app (identity: $SIGN_IDENTITY)"
 codesign "${SIGN_ARGS[@]}" "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"

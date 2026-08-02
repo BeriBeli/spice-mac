@@ -3,14 +3,20 @@ Maspice — Third-Party Licenses and Attribution
 
 Maspice itself is licensed under the MIT License (see LICENSE).
 
-Active source dependency
-------------------------
+Active dependencies
+-------------------
 
 SwiftSpice (https://github.com/BeriBeli/spice-swift)
   Version:   v0.1.3 (exact SwiftPM release dependency)
   License:   MIT
   Copyright: Copyright (c) 2026 BeriBeli
   Text:      https://github.com/BeriBeli/spice-swift/blob/v0.1.3/LICENSE
+
+Sparkle (https://github.com/sparkle-project/Sparkle)
+  Version:   2.9.4 (exact SwiftPM binary release dependency)
+  License:   MIT
+  Copyright: Copyright (c) 2006-2026 Andy Matuschak and contributors
+  Text:      https://github.com/sparkle-project/Sparkle/blob/2.9.4/LICENSE
 
 Native dependency closure
 -------------------------

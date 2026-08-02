@@ -6,6 +6,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added Sparkle-powered automatic updates with EdDSA-signed archives, a manual
+  **Check for Updates…** application-menu command, and update preferences.
+- Added **What's New** and **Report an Issue…** links to the Help menu.
+
+### Changed
+
+- Simplified the top-level menu bar and reorganized Settings into focused
+  General and Portal panes.
+
 ## [0.3.0] — 2026-08-02
 
 ### Changed

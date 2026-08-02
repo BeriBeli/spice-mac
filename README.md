@@ -55,6 +55,9 @@ explicitly instead of falling back to a different transport or trust policy.
   default; Settings can move them to Trash after connecting.
 - Clipboard sharing is enabled by default and can be disabled in Settings for
   an untrusted guest.
+- Maspice checks for signed updates automatically. Use **Maspice ▸ Check for
+  Updates…** for a manual check, or configure automatic checks and downloads in
+  **Settings ▸ Updates**.
 
 ## Build from source
 
@@ -75,9 +78,10 @@ make build
 ```
 
 `make test` exercises `.vv` validation, session policy, the ordered SwiftSpice
-input pump, and SwiftUI command registration. `make build` creates an ad-hoc
-signed `build/Maspice.app`, zip, and checksum. Use `make run` to open the staged
-app and `make distclean` to remove generated app and SwiftPM state.
+input pump, and SwiftUI command registration. `make build` embeds Sparkle and
+creates an ad-hoc signed `build/Maspice.app`, zip, and checksum. Use `make run`
+to open the staged app and `make distclean` to remove generated app and SwiftPM
+state.
 
 SwiftSpice changes belong in its upstream repository. Update Maspice only after
 publishing and pinning a reviewed upstream release.
@@ -88,7 +92,9 @@ The release builder checks dependency install names and runtime search paths in
 every Mach-O file before and after app assembly. `/opt/homebrew`, `/usr/local`,
 build-tree paths, and other absolute host paths fail the build; Maspice never
 uses `install_name_tool` to disguise them. SwiftSpice supplies the arm64 static
-XCFrameworks and Metal resource bundle.
+XCFrameworks and Metal resource bundle. Sparkle is embedded as a signed,
+self-contained framework, and release ZIPs are authenticated with the public
+EdDSA key bundled in Maspice.
 
 A successful local build is not complete release evidence. Release acceptance
 also requires a clean macOS 26 machine without Homebrew and a live direct

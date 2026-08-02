@@ -17,12 +17,49 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
 
     func testApplicationRegistersSpiceCommandsExactlyOnce() throws {
         let appSource = try source("Sources/Maspice/MaspiceApp.swift")
+        let commandsSource = try source("Sources/Maspice/SessionCommands.swift")
+        let updateCommandsSource = try source("Sources/Maspice/UpdateCommands.swift")
 
         XCTAssertEqual(
-            appSource.components(separatedBy: "SpiceCommands(applicationModel: applicationModel)").count - 1,
+            appSource.components(separatedBy: "SpiceCommands(").count - 1,
             1,
             "Registering the same Commands value on multiple WindowGroups creates duplicate macOS menus."
         )
+        XCTAssertTrue(commandsSource.contains("Button(\"Open Connection File…\")"))
+        XCTAssertTrue(commandsSource.contains("CommandMenu(\"Session\")"))
+        XCTAssertFalse(commandsSource.contains("CommandGroup(before: .toolbar)"))
+        XCTAssertFalse(commandsSource.contains("CommandGroup(before: .windowSize)"))
+        XCTAssertTrue(commandsSource.contains("CommandGroup(after: .appInfo)"))
+        XCTAssertTrue(commandsSource.contains("CheckForUpdatesCommand(updater: updater)"))
+        XCTAssertTrue(commandsSource.contains("CommandGroup(replacing: .help)"))
+        XCTAssertTrue(commandsSource.contains("Link(\"What's New\", destination: latestReleaseURL)"))
+        XCTAssertTrue(commandsSource.contains("Link(\"Report an Issue…\", destination: newIssueURL)"))
+        XCTAssertTrue(commandsSource.contains("https://github.com/BeriBeli/spice-mac/releases/latest"))
+        XCTAssertTrue(commandsSource.contains("https://github.com/BeriBeli/spice-mac/issues/new/choose"))
+        XCTAssertTrue(updateCommandsSource.contains("Button(\"Check for Updates…\""))
+        XCTAssertTrue(updateCommandsSource.contains("\\.canCheckForUpdates"))
+        XCTAssertFalse(commandsSource.contains("Share Clipboard with VM"))
+        XCTAssertFalse(commandsSource.contains("@AppStorage"))
+
+        for placement in ["saveItem", "importExport", "printItem", "textFormatting", "toolbar", "sidebar"] {
+            XCTAssertTrue(
+                commandsSource.contains("CommandGroup(replacing: .\(placement)) {}"),
+                "The unsupported \(placement) command group should be removed."
+            )
+        }
+    }
+
+    func testSettingsUseFocusedNativeTabs() throws {
+        let settingsSource = try source("Sources/Maspice/SettingsView.swift")
+
+        XCTAssertTrue(settingsSource.contains("TabView"))
+        XCTAssertTrue(settingsSource.contains("Label(\"General\", systemImage: \"gearshape\")"))
+        XCTAssertTrue(settingsSource.contains("Label(\"Updates\", systemImage: \"arrow.triangle.2.circlepath\")"))
+        XCTAssertTrue(settingsSource.contains("Label(\"Portal\", systemImage: \"globe\")"))
+        XCTAssertTrue(settingsSource.contains("Automatically check for updates"))
+        XCTAssertTrue(settingsSource.contains("Download updates automatically"))
+        XCTAssertTrue(settingsSource.contains("No saved certificate for this portal."))
+        XCTAssertTrue(settingsSource.contains("Preferences.ravadaPortalURL(from: ravadaPortalURL)"))
     }
 
     func testLauncherIsSingletonAndDoesNotAutomaticallyOpenFilePicker() throws {
@@ -43,6 +80,8 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
         XCTAssertTrue(appSource.contains(".restorationBehavior(.disabled)"))
         XCTAssertTrue(appSource.contains(".defaultLaunchBehavior(.suppressed)"))
         XCTAssertFalse(appDelegateSource.contains("applicationDidBecomeActive"))
+        XCTAssertTrue(appDelegateSource.contains("NSMenu.didAddItemNotification"))
+        XCTAssertTrue(appDelegateSource.contains("removeEmptyTopLevelMenus()"))
         XCTAssertTrue(launcherSource.contains("authorizePortalPresentation()"))
         XCTAssertTrue(launcherSource.contains("authorizeSessionPresentation(request)"))
     }

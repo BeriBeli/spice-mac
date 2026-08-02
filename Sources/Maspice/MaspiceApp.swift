@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: MIT
+import Sparkle
 import SwiftUI
 
 @main
 struct MaspiceApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var applicationModel = ApplicationModel()
+    private let updaterController = SPUStandardUpdaterController(
+        startingUpdater: true,
+        updaterDelegate: nil,
+        userDriverDelegate: nil)
 
     var body: some Scene {
         Window("Maspice", id: "launcher") {
@@ -38,11 +43,13 @@ struct MaspiceApp: App {
         .windowIdealSize(.maximum)
         .restorationBehavior(.disabled)
         .commands {
-            SpiceCommands(applicationModel: applicationModel)
+            SpiceCommands(
+                applicationModel: applicationModel,
+                updater: updaterController.updater)
         }
 
         Settings {
-            SettingsView()
+            SettingsView(updater: updaterController.updater)
         }
     }
 }

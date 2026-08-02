@@ -22,7 +22,7 @@ audit_one() {
                 failures=$((failures + 1))
                 ;;
         esac
-    done < <(otool -L "$binary" | tail -n +2 | awk '{print $1}')
+    done < <(otool -L "$binary" | awk '/^\t/ { print $1 }')
 
     while IFS= read -r rpath; do
         case "$rpath" in

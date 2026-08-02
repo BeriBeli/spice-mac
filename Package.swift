@@ -15,6 +15,10 @@ let package = Package(
         .package(path: "Packages/VVConfig"),
         .package(path: "Packages/SpiceSessionLogic"),
         .package(
+            url: "https://github.com/sparkle-project/Sparkle",
+            exact: "2.9.4"
+        ),
+        .package(
             url: "https://github.com/BeriBeli/spice-swift.git",
             exact: "0.1.3"
         ),
@@ -36,9 +40,16 @@ let package = Package(
                 "SpiceController",
                 .product(name: "SpiceSessionLogic", package: "SpiceSessionLogic"),
                 .product(name: "VVConfig", package: "VVConfig"),
+                .product(name: "Sparkle", package: "Sparkle"),
                 .product(name: "SwiftSpice", package: "spice-swift"),
             ],
-            path: "Sources/Maspice"
+            path: "Sources/Maspice",
+            linkerSettings: [
+                .unsafeFlags([
+                    "-Xlinker", "-rpath",
+                    "-Xlinker", "@loader_path/../Frameworks",
+                ]),
+            ]
         ),
         .testTarget(
             name: "MaspiceTests",

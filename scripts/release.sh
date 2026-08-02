@@ -66,6 +66,23 @@ DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}" ./s
 DISPLAY_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$PLIST" 2>/dev/null || echo Maspice)"
 ZIP="build/$DISPLAY_NAME.app.zip"
 SHA="$(awk '{print $1}' "$ZIP.sha256" 2>/dev/null)"
+SPARKLE_TOOLS="$ROOT/.build/artifacts/sparkle/Sparkle/bin"
+GENERATE_APPCAST="$SPARKLE_TOOLS/generate_appcast"
+[ -x "$GENERATE_APPCAST" ] || die "Sparkle generate_appcast tool not found"
+APPCAST_WORK="$(mktemp -d)"
+trap 'rm -rf "$APPCAST_WORK"' EXIT
+cp "$ZIP" "$APPCAST_WORK/"
+log "generating signed Sparkle appcast"
+"$GENERATE_APPCAST" \
+    --account io.github.beribeli.Maspice \
+    --download-url-prefix "https://github.com/BeriBeli/spice-mac/releases/download/v$VER/" \
+    --full-release-notes-url "https://github.com/BeriBeli/spice-mac/releases/tag/v$VER" \
+    --link "https://github.com/BeriBeli/spice-mac/releases/latest" \
+    --maximum-versions 1 \
+    -o "$APPCAST_WORK/appcast.xml" \
+    "$APPCAST_WORK"
+APPCAST="build/appcast.xml"
+cp "$APPCAST_WORK/appcast.xml" "$APPCAST"
 
 # --- Review + confirm (publish is irreversible) ----------------------------
 echo; log "prepared. changes:"; git --no-pager diff --stat; echo
@@ -93,6 +110,7 @@ log "pushing"
 git push origin main
 git push origin "v$VER"
 log "creating GitHub release"
-gh release create "v$VER" "$ZIP" "$ZIP.sha256" --title "Maspice $VER" --verify-tag --notes-file "$notes"
+gh release create "v$VER" "$ZIP" "$ZIP.sha256" "$APPCAST" \
+    --title "Maspice $VER" --verify-tag --notes-file "$notes"
 rm -f "$notes"
 log "released v$VER ✓  https://github.com/BeriBeli/spice-mac/releases/tag/v$VER"
