@@ -11,7 +11,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Replaced the active CocoaSpice, spice-gtk, and staged-sysroot backend with the
-  exact SwiftSpice 0.1.2 release and its IOSurface/Metal desktop view.
+  exact SwiftSpice 0.1.3 release and its IOSurface/Metal desktop view.
 - Narrowed the supported transport to direct standard-QEMU and Ravada TCP/TLS.
   Proxy and Proxmox/PVE connection files now fail explicitly; direct TLS accepts
   system trust, a per-file CA, or a CA plus complete `host-subject` policy.
