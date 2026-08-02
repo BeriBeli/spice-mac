@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-08-02
+
 ### Added
 
 - Added Sparkle-powered automatic updates with EdDSA-signed archives, a manual
@@ -290,7 +292,8 @@ CocoaSpice.
   QEMU frameworks are no longer shipped (app size 443 MB → 23 MB).
 - See [SECURITY.md](SECURITY.md) for the threat model and residual risks.
 
-[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/BeriBeli/spice-mac/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/BeriBeli/spice-mac/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/BeriBeli/spice-mac/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/BeriBeli/spice-mac/compare/v0.1.7%2Bberibeli.4...v0.2.0
