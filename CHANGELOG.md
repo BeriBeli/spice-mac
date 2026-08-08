@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-08-08
+
 ### Added
 
 - Added an opt-in **Session Diagnostics** overlay for investigating intermittent
@@ -302,7 +304,8 @@ CocoaSpice.
   QEMU frameworks are no longer shipped (app size 443 MB → 23 MB).
 - See [SECURITY.md](SECURITY.md) for the threat model and residual risks.
 
-[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/BeriBeli/spice-mac/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/BeriBeli/spice-mac/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/BeriBeli/spice-mac/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/BeriBeli/spice-mac/compare/v0.2.0...v0.2.1
