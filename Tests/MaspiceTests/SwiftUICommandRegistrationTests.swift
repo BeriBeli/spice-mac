@@ -27,6 +27,9 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
         )
         XCTAssertTrue(commandsSource.contains("Button(\"Open Connection File…\")"))
         XCTAssertTrue(commandsSource.contains("CommandMenu(\"Session\")"))
+        XCTAssertTrue(commandsSource.contains("Toggle(\"Show Diagnostics\""))
+        XCTAssertTrue(commandsSource.contains("Button(\"Copy Diagnostics Summary\")"))
+        XCTAssertTrue(commandsSource.contains("sessionActions?.setDiagnosticsVisible($0)"))
         XCTAssertFalse(commandsSource.contains("CommandGroup(before: .toolbar)"))
         XCTAssertFalse(commandsSource.contains("CommandGroup(before: .windowSize)"))
         XCTAssertTrue(commandsSource.contains("CommandGroup(after: .appInfo)"))
@@ -47,6 +50,39 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
                 "The unsupported \(placement) command group should be removed."
             )
         }
+    }
+
+    func testSessionDiagnosticsAreWindowScopedAndExplicitlyEnabled() throws {
+        let sessionViewSource = try source("Sources/Maspice/SessionView.swift")
+        let diagnosticsViewSource = try source("Sources/Maspice/SessionDiagnosticsView.swift")
+        let launcherSource = try source("Sources/Maspice/LauncherView.swift")
+        let applicationModelSource = try source("Sources/Maspice/ApplicationModel.swift")
+
+        XCTAssertTrue(sessionViewSource.contains("@State private var showsDiagnostics = false"))
+        XCTAssertTrue(sessionViewSource.contains("client.diagnosticsMonitor"))
+        XCTAssertTrue(sessionViewSource.contains("model.client?.setDiagnosticsEnabled(true)"))
+        XCTAssertTrue(sessionViewSource.contains("model.client?.setDiagnosticsEnabled(false)"))
+        XCTAssertTrue(sessionViewSource.contains("setDiagnosticsVisible(false)"))
+        XCTAssertTrue(sessionViewSource.contains("retainSessionDiagnosticsSummary"))
+        XCTAssertTrue(diagnosticsViewSource.contains("NSPasteboard.general"))
+        XCTAssertTrue(launcherSource.contains("Copy Last Diagnostics"))
+        XCTAssertTrue(applicationModelSource.contains("lastSessionDiagnosticsSummary"))
+        XCTAssertTrue(diagnosticsViewSource.contains("Session Diagnostics"))
+        XCTAssertTrue(diagnosticsViewSource.contains("Copy Summary"))
+        XCTAssertTrue(diagnosticsViewSource.contains("Publisher submit / emit / client"))
+        XCTAssertTrue(diagnosticsViewSource.contains("Publisher stale / evicted / pending"))
+        XCTAssertTrue(diagnosticsViewSource.contains("Readbacks / pool exhausted / GPU errors"))
+        XCTAssertTrue(diagnosticsViewSource.contains("VDAgent"))
+        XCTAssertTrue(diagnosticsViewSource.contains("Monitor supported / requests / blocked"))
+        XCTAssertTrue(diagnosticsViewSource.contains("never clipboard text"))
+        XCTAssertTrue(diagnosticsViewSource.contains("Advanced video"))
+        XCTAssertTrue(diagnosticsViewSource.contains("MJPEG only"))
+        XCTAssertTrue(diagnosticsViewSource.contains("current >= baseline ? current - baseline : current"))
+        XCTAssertTrue(diagnosticsViewSource.contains("emitted frames are not presented frames"))
+        XCTAssertFalse(diagnosticsViewSource.contains("firstMetalGenerationDisableReason"))
+        XCTAssertFalse(diagnosticsViewSource.contains("FileHandle"))
+        XCTAssertFalse(diagnosticsViewSource.contains("Logger"))
+        XCTAssertFalse(diagnosticsViewSource.contains("write(to:"))
     }
 
     func testSettingsUseFocusedNativeTabs() throws {

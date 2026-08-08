@@ -4,6 +4,17 @@ import Foundation
 import SwiftSpice
 import VVConfig
 
+@MainActor
+public final class SpiceClientDiagnosticsMonitor: ObservableObject {
+    @Published public fileprivate(set) var snapshot: SpiceClientDiagnosticsSnapshot = .disabled
+
+    public init() {}
+
+    fileprivate func publish(_ snapshot: SpiceClientDiagnosticsSnapshot) {
+        self.snapshot = snapshot
+    }
+}
+
 /// Main-actor façade over the public SwiftSpice API used by Maspice.
 @MainActor
 public final class SpiceClient: ObservableObject {
@@ -22,11 +33,20 @@ public final class SpiceClient: ObservableObject {
     @Published public private(set) var agentConnected = false
     @Published public private(set) var supportsDynamicResolution = false
     @Published public private(set) var isInputAvailable = false
+    public let diagnosticsMonitor = SpiceClientDiagnosticsMonitor()
 
     public var shareClipboard = true {
         didSet {
-            guard oldValue != shareClipboard, let agentManager else { return }
+            guard oldValue != shareClipboard else { return }
             let enabled = shareClipboard
+            latestClipboardState = enabled
+                ? agentConnected ? .waitingForCapabilities : .unavailable
+                : .disabled
+            diagnosticsCollector.seedAgentState(
+                support: latestAgentSupport,
+                clipboardState: latestClipboardState
+            )
+            guard let agentManager else { return }
             Task { await agentManager.setPasteboardSynchronizationEnabled(enabled) }
         }
     }
@@ -42,6 +62,13 @@ public final class SpiceClient: ObservableObject {
     private var connectionTask: Task<Void, Never>?
     private var eventTask: Task<Void, Never>?
     private var supportTask: Task<Void, Never>?
+    private var clipboardTask: Task<Void, Never>?
+    private var displayConfigurationTask: Task<Void, Never>?
+    private var latestAgentSupport: SpiceDisplayConfigurationSupport?
+    private var latestClipboardState: SpiceClientClipboardDiagnosticsState = .unknown
+    private let diagnosticsCollector = SpiceClientDiagnosticsCollector()
+    private var diagnosticsTask: Task<Void, Never>?
+    private var diagnosticsGeneration: UInt64 = 0
     private var generation: UInt64 = 0
 
     public init(parameters: SpiceConnectionParameters) {
@@ -70,6 +97,7 @@ public final class SpiceClient: ObservableObject {
     }
 
     public func disconnect() {
+        setDiagnosticsEnabled(false)
         guard session != nil || connectionTask != nil else { return }
         generation &+= 1
         connectionTask?.cancel()
@@ -78,6 +106,10 @@ public final class SpiceClient: ObservableObject {
         eventTask = nil
         supportTask?.cancel()
         supportTask = nil
+        clipboardTask?.cancel()
+        clipboardTask = nil
+        displayConfigurationTask?.cancel()
+        displayConfigurationTask = nil
 
         let oldInputPump = inputPump
         inputPump = nil
@@ -110,8 +142,101 @@ public final class SpiceClient: ObservableObject {
         inputPump?.releaseAll()
     }
 
+    public func setDiagnosticsEnabled(_ enabled: Bool) {
+        guard diagnosticsCollector.isEnabled != enabled else { return }
+        diagnosticsGeneration &+= 1
+        diagnosticsTask?.cancel()
+        diagnosticsTask = nil
+        if enabled { diagnosticsCollector.reset() }
+        diagnosticsCollector.setEnabled(enabled)
+        if enabled {
+            diagnosticsCollector.seedAgentState(
+                support: latestAgentSupport,
+                clipboardState: latestClipboardState
+            )
+        }
+        diagnosticsMonitor.publish(diagnosticsCollector.snapshot())
+        guard enabled else { return }
+
+        let taskGeneration = diagnosticsGeneration
+        diagnosticsTask = Task { @MainActor [weak self] in
+            guard self?.isCurrentDiagnosticsTask(taskGeneration) == true else { return }
+
+            let clock = ContinuousClock()
+            let heartbeatInterval = Duration.milliseconds(100)
+            let sampleUpstreamDiagnostics: @MainActor () async -> Bool = { [weak self] in
+                guard self?.isCurrentDiagnosticsTask(taskGeneration) == true else {
+                    return false
+                }
+                let sampledSession = self?.session
+                let sampledAgentManager = self?.agentManager
+                let sampleStartedAt = ContinuousClock().now
+                async let sessionSnapshot = sampledSession?.diagnosticsSnapshot()
+                async let agentSnapshot = sampledAgentManager?.diagnosticsSnapshot()
+                let (sampledSessionDiagnostics, sampledAgentDiagnostics) = await (
+                    sessionSnapshot,
+                    agentSnapshot
+                )
+                guard self?.isCurrentDiagnosticsTask(taskGeneration) == true else {
+                    return false
+                }
+                if let sampledSessionDiagnostics {
+                    self?.diagnosticsCollector.recordSwiftSpiceDiagnostics(
+                        sampledSessionDiagnostics,
+                        sampledAt: sampleStartedAt
+                    )
+                }
+                if let sampledAgentDiagnostics {
+                    self?.diagnosticsCollector.recordAgentWireDiagnostics(
+                        sampledAgentDiagnostics
+                    )
+                }
+                return true
+            }
+
+            guard await sampleUpstreamDiagnostics(),
+            self?.isCurrentDiagnosticsTask(taskGeneration) == true else { return }
+
+            var deadline = clock.now.advanced(by: heartbeatInterval)
+            var ticksUntilPublication = 10
+
+            while !Task.isCancelled {
+                do {
+                    try await clock.sleep(until: deadline)
+                } catch {
+                    return
+                }
+                let now = clock.now
+                guard self?.isCurrentDiagnosticsTask(taskGeneration) == true else { return }
+
+                let schedulingDelay = deadline.duration(to: now)
+                if schedulingDelay > .zero {
+                    self?.diagnosticsCollector.recordMainActorSchedulingDelay(schedulingDelay)
+                }
+                ticksUntilPublication -= 1
+                if ticksUntilPublication == 0 {
+                    guard await sampleUpstreamDiagnostics(),
+                    self?.isCurrentDiagnosticsTask(taskGeneration) == true else { return }
+                    if let snapshot = self?.diagnosticsCollector.snapshot() {
+                        self?.diagnosticsMonitor.publish(snapshot)
+                    }
+                    ticksUntilPublication = 10
+                }
+                deadline = clock.now.advanced(by: heartbeatInterval)
+            }
+        }
+    }
+
+    private func isCurrentDiagnosticsTask(_ generation: UInt64) -> Bool {
+        !Task.isCancelled
+            && generation == diagnosticsGeneration
+            && diagnosticsCollector.isEnabled
+    }
+
     public func requestResolution(width: Int, height: Int) {
-        guard supportsDynamicResolution, let agentManager else { return }
+        let isBlocked = !supportsDynamicResolution || agentManager == nil
+        diagnosticsCollector.recordMonitorConfigurationRequest(blocked: isBlocked)
+        guard !isBlocked, let agentManager else { return }
         Task {
             do {
                 try await agentManager.requestResolution(width: width, height: height)
@@ -133,7 +258,10 @@ public final class SpiceClient: ObservableObject {
             pointerMode = SpicePointerMode(spiceMouseMode: info.currentMouseMode)
             isInputAvailable = info.channels.contains { $0.type == 3 && $0.id == 0 }
             if isInputAvailable {
-                inputPump = OrderedSpiceInputPump(session: session) { [weak self] error in
+                inputPump = OrderedSpiceInputPump(
+                    session: session,
+                    diagnostics: diagnosticsCollector
+                ) { [weak self] error in
                     self?.fail(error.description, generation: generation)
                 }
             }
@@ -155,18 +283,43 @@ public final class SpiceClient: ObservableObject {
             )
             agentManager = manager
             agentConnected = info.agentConnected
+            let initialSupport = SpiceDisplayConfigurationSupport(
+                agentConnected: info.agentConnected,
+                hasExplicitPeerCapabilities: false,
+                supportsMonitorConfiguration: info.agentConnected,
+                supportsSparseMonitors: false,
+                supportsMonitorPositions: false
+            )
+            latestAgentSupport = initialSupport
+            latestClipboardState = shareClipboard
+                ? info.agentConnected ? .waitingForCapabilities : .unavailable
+                : .disabled
+            diagnosticsCollector.seedAgentState(
+                support: initialSupport,
+                clipboardState: latestClipboardState
+            )
             supportTask = Task { [weak self] in
                 for await support in manager.displayConfigurationSupportEvents {
                     guard !Task.isCancelled else { return }
-                    guard generation == self?.generation else { return }
-                    self?.agentConnected = support.agentConnected
-                    self?.supportsDynamicResolution = support.agentConnected
-                        && support.supportsMonitorConfiguration
+                    self?.consumeAgentSupport(support, generation: generation)
+                }
+            }
+            clipboardTask = Task { [weak self] in
+                for await event in manager.events {
+                    guard !Task.isCancelled else { return }
+                    self?.consumeClipboardEvent(event, generation: generation)
+                }
+            }
+            displayConfigurationTask = Task { [weak self] in
+                for await event in manager.displayConfigurationEvents {
+                    guard !Task.isCancelled else { return }
+                    self?.consumeDisplayConfigurationEvent(event, generation: generation)
                 }
             }
             do {
                 try await manager.start(session: session)
             } catch {
+                diagnosticsCollector.recordAgentManagerStartFailure()
                 NSLog("Maspice: guest-agent services unavailable: \(String(describing: error))")
             }
 
@@ -182,10 +335,54 @@ public final class SpiceClient: ObservableObject {
         }
     }
 
+    private func consumeAgentSupport(
+        _ support: SpiceDisplayConfigurationSupport,
+        generation: UInt64
+    ) {
+        guard generation == self.generation else { return }
+        latestAgentSupport = support
+        agentConnected = support.agentConnected
+        supportsDynamicResolution = support.agentConnected
+            && support.supportsMonitorConfiguration
+        if !support.agentConnected, latestClipboardState != .disabled {
+            latestClipboardState = .unavailable
+        } else if support.agentConnected, latestClipboardState == .unknown {
+            latestClipboardState = .waitingForCapabilities
+        }
+        diagnosticsCollector.recordAgentSupport(support)
+    }
+
+    private func consumeClipboardEvent(
+        _ event: SpiceClipboardEvent,
+        generation: UInt64
+    ) {
+        guard generation == self.generation else { return }
+        switch event {
+        case .ready:
+            latestClipboardState = .ready
+        case .unavailable:
+            latestClipboardState = .unavailable
+        case .failed:
+            latestClipboardState = .failed
+        case .guestText, .localTextOffered, .oversizedLocalText:
+            break
+        }
+        diagnosticsCollector.recordClipboardEvent(event)
+    }
+
+    private func consumeDisplayConfigurationEvent(
+        _ event: SpiceDisplayConfigurationEvent,
+        generation: UInt64
+    ) {
+        guard generation == self.generation else { return }
+        diagnosticsCollector.recordDisplayConfigurationEvent(event)
+    }
+
     private func consume(_ event: SpiceSessionEvent, generation: UInt64) {
         guard generation == self.generation else { return }
         switch event {
         case let .frame(frame):
+            diagnosticsCollector.recordClientFrameEvent()
             self.frame = frame
         case let .surfaceDestroyed(surfaceID):
             if frame?.surfaceID == surfaceID { frame = nil }
@@ -196,9 +393,12 @@ public final class SpiceClient: ObservableObject {
         case let .failed(error):
             fail(error.description, generation: generation)
         case .disconnected:
+            setDiagnosticsEnabled(false)
             resetRuntimeState()
             status = .disconnected
-        case .displayConfiguration, .keyboardModifiers, .mouseMotionAcknowledged, .migration:
+        case .mouseMotionAcknowledged:
+            diagnosticsCollector.recordMouseMotionAcknowledged()
+        case .displayConfiguration, .keyboardModifiers, .migration:
             break
         }
     }
@@ -234,6 +434,7 @@ public final class SpiceClient: ObservableObject {
 
     private func fail(_ message: String, generation: UInt64) {
         guard generation == self.generation else { return }
+        setDiagnosticsEnabled(false)
         connectionTask = nil
         resetRuntimeState()
         status = .failed(message)
@@ -247,5 +448,7 @@ public final class SpiceClient: ObservableObject {
         isInputAvailable = false
         agentConnected = false
         supportsDynamicResolution = false
+        latestAgentSupport = nil
+        latestClipboardState = shareClipboard ? .unknown : .disabled
     }
 }

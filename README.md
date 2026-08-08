@@ -55,9 +55,37 @@ explicitly instead of falling back to a different transport or trust policy.
   default; Settings can move them to Trash after connecting.
 - Clipboard sharing is enabled by default and can be disabled in Settings for
   an untrusted guest.
+- For intermittent input or display lag, use **Session ▸ Show Diagnostics**
+  while the session is active. Diagnostics are off by default, keep bounded
+  aggregate counters and latency distributions in memory, and include
+  content-free VDAgent connection, capability, clipboard, and monitor-request
+  state. VDAgent counters cover the current Agent manager lifetime, normally
+  the current connection. They do not record endpoint details, credentials,
+  key contents, clipboard text, or display pixels. **Copy Summary** writes the
+  current aggregate snapshot to the macOS pasteboard only when requested; **Copy Last
+  Diagnostics** remains available in the launcher after the session closes.
 - Maspice checks for signed updates automatically. Use **Maspice ▸ Check for
   Updates…** for a manual check, or configure automatic checks and downloads in
   **Settings ▸ Updates**.
+
+### Session diagnostics scope
+
+Session Diagnostics is a support aid rather than an end-to-end profiler. Input
+send duration ends when the local SwiftSpice send path completes and is not a
+server round-trip time. Motion acknowledgements are aggregate signals rather
+than per-event RTT samples. Display frame events are observed before final
+presentation, and the current snapshot does not measure transport, server,
+event-mailbox, or presentation latency. Advanced-video counters cover the
+opt-in H.264/H.265 path, not the default MJPEG path.
+
+Intermittent remote-session stalls may not reproduce during release testing.
+Release acceptance therefore verifies that Diagnostics remains inactive when
+hidden, that enabling it does not cause an obvious input or display regression
+in an available live session, and that a stopped or disconnected session can
+export its last aggregate summary. When the original stall occurs in the field,
+capture that summary together with an approximate time and the observed action;
+use Instruments or an external process sample for a complete MainActor deadlock,
+because an in-process diagnostics view cannot update while the process is stuck.
 
 ## Build from source
 
@@ -98,9 +126,10 @@ EdDSA key bundled in Maspice.
 
 A successful local build is not complete release evidence. Release acceptance
 also requires a clean macOS 26 machine without Homebrew and a live direct
-Ravada/standard-QEMU test covering launch, display, audio, input, clipboard, and
-resize. Developer ID signing, hardened runtime, and notarization are separate
-distribution gates.
+Ravada/standard-QEMU test covering launch, display, audio, input, clipboard,
+resize, and the Session Diagnostics enable/copy/stop lifecycle. Reproducing an
+intermittent field stall is not a release prerequisite. Developer ID signing,
+hardened runtime, and notarization are separate distribution gates.
 
 ## Repository layout
 

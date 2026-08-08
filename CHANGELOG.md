@@ -6,6 +6,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added an opt-in **Session Diagnostics** overlay for investigating intermittent
+  remote input and display stalls. It keeps bounded aggregate latency and
+  pipeline counters in memory, exposes relevant SwiftSpice publisher, renderer,
+  and content-free VDAgent clipboard/display-configuration health signals, and
+  can copy the current or last stopped summary on explicit request without
+  recording endpoints, credentials, key contents, clipboard text, or display
+  pixels.
+
 ## [0.3.1] — 2026-08-02
 
 ### Added

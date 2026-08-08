@@ -8,6 +8,7 @@ import SpiceSessionLogic
 @Observable
 final class ApplicationModel {
     private var sessionFailures: [String] = []
+    private(set) var lastSessionDiagnosticsSummary: String?
     private var portalPresentationIsAuthorized = false
     private var portalPresentationIsActive = false
     private var authorizedSessionPresentations = Set<UUID>()
@@ -25,6 +26,10 @@ final class ApplicationModel {
         if !sessionFailures.isEmpty {
             sessionFailures.removeFirst()
         }
+    }
+
+    func retainSessionDiagnosticsSummary(_ summary: String) {
+        lastSessionDiagnosticsSummary = summary
     }
 
     func authorizePortalPresentation() {

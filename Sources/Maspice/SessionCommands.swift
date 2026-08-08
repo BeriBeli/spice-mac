@@ -6,8 +6,11 @@ import SpiceSessionLogic
 @MainActor
 struct FocusedSessionActions {
     let availability: SessionCommandAvailability
+    let showsDiagnostics: Bool
     let sendCtrlAltDelete: () -> Void
     let releaseCursor: () -> Void
+    let setDiagnosticsVisible: (Bool) -> Void
+    let copyDiagnosticsSummary: () -> Void
 }
 
 private struct FocusedSessionActionsKey: FocusedValueKey {
@@ -73,6 +76,23 @@ struct SpiceCommands: Commands {
             }
             .keyboardShortcut("r", modifiers: [.control, .option])
             .disabled(sessionActions?.availability.canReleaseCursor != true)
+
+            Divider()
+
+            Toggle("Show Diagnostics", isOn: Binding(
+                get: { sessionActions?.showsDiagnostics == true },
+                set: { sessionActions?.setDiagnosticsVisible($0) }
+            ))
+            .keyboardShortcut("d", modifiers: [.control, .option])
+            .disabled(sessionActions?.availability.hasActiveSession != true)
+
+            Button("Copy Diagnostics Summary") {
+                sessionActions?.copyDiagnosticsSummary()
+            }
+            .disabled(
+                sessionActions?.availability.hasActiveSession != true
+                    || sessionActions?.showsDiagnostics != true
+            )
         }
     }
 }
