@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import SpiceController
 import SwiftUI
 import SpiceSessionLogic
 
@@ -8,6 +9,7 @@ struct SessionView: View {
 
     @State private var model: SessionModel
     @State private var isReturningToLauncher = false
+    @State private var showsDiagnostics = false
     @AppStorage(Preferences.shareClipboardKey) private var shareClipboard = true
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
@@ -37,6 +39,19 @@ struct SessionView: View {
                 }
                 .padding(40)
             }
+
+            if showsDiagnostics, let client = model.client {
+                VStack {
+                    HStack {
+                        Spacer()
+                        SessionDiagnosticsOverlay(
+                            monitor: client.diagnosticsMonitor,
+                            onCopy: copyDiagnosticsSummary)
+                    }
+                    Spacer()
+                }
+                .padding(16)
+            }
         }
         .frame(minWidth: 640, minHeight: 480)
         .background {
@@ -58,6 +73,7 @@ struct SessionView: View {
             }
         }
         .onDisappear {
+            setDiagnosticsVisible(false)
             applicationModel.deactivateSessionPresentation(for: requestID)
             model.stop()
         }
@@ -83,8 +99,31 @@ struct SessionView: View {
             availability: SessionCommandAvailability(
                 hasActiveSession: model.client != nil,
                 hasInput: model.isInputAvailable),
+            showsDiagnostics: showsDiagnostics,
             sendCtrlAltDelete: model.sendCtrlAltDelete,
-            releaseCursor: model.releaseAllInput)
+            releaseCursor: model.releaseAllInput,
+            setDiagnosticsVisible: setDiagnosticsVisible,
+            copyDiagnosticsSummary: copyDiagnosticsSummary)
+    }
+
+    private func setDiagnosticsVisible(_ visible: Bool) {
+        guard showsDiagnostics != visible else { return }
+        if visible {
+            showsDiagnostics = true
+            model.client?.setDiagnosticsEnabled(true)
+        } else {
+            model.client?.setDiagnosticsEnabled(false)
+            if let snapshot = model.client?.diagnosticsMonitor.snapshot {
+                applicationModel.retainSessionDiagnosticsSummary(snapshot.diagnosticsSummary)
+            }
+            showsDiagnostics = false
+        }
+    }
+
+    private func copyDiagnosticsSummary() {
+        guard showsDiagnostics,
+              let snapshot = model.client?.diagnosticsMonitor.snapshot else { return }
+        SessionDiagnosticsClipboard.copy(snapshot.diagnosticsSummary)
     }
 
     private func returnToLauncher() {
@@ -95,5 +134,14 @@ struct SessionView: View {
         }
         openWindow(id: "launcher")
         dismiss()
+    }
+}
+
+private struct SessionDiagnosticsOverlay: View {
+    @ObservedObject var monitor: SpiceClientDiagnosticsMonitor
+    let onCopy: () -> Void
+
+    var body: some View {
+        SessionDiagnosticsView(snapshot: monitor.snapshot, onCopy: onCopy)
     }
 }

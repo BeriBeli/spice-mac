@@ -61,6 +61,17 @@ struct LauncherView: View {
             }
             .controlSize(.large)
             .frame(width: 240)
+
+            if let summary = applicationModel.lastSessionDiagnosticsSummary {
+                Button {
+                    SessionDiagnosticsClipboard.copy(summary)
+                } label: {
+                    Label("Copy Last Diagnostics", systemImage: "doc.on.doc")
+                }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+                .accessibilityHint("Copies only aggregate session counters and latency values.")
+            }
         }
         .padding(32)
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
