@@ -1,5 +1,5 @@
 {
-  "originHash" : "b9a17280efaafde7545e52ea02d9c367d02b52b5f958135f3ffac279011ac5a7",
+  "originHash" : "c2bbb16b345e32f79f5b290f4ee0f34b5ed9538c2088f1ae94260cba054872d4",
   "pins" : [
     {
       "identity" : "sparkle",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/BeriBeli/spice-swift.git",
       "state" : {
-        "revision" : "67f9c793967ed6003d4e4dbedc23e5fea49161da",
-        "version" : "0.1.5"
+        "revision" : "4977132b15248beb40d0f8809c83f091ad77d570",
+        "version" : "0.1.6"
       }
     }
   ],

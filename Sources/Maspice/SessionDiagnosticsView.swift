@@ -111,7 +111,8 @@ extension SpiceClientDiagnosticsSnapshot {
             "video_scope=advanced_h264_h265_not_mjpeg",
             "channel_state_scope=active_plus_retired_last_observation",
             "agent_scope=state_and_content_free_event_counts",
-            "agent_counter_epoch=current_agent_manager_lifetime",
+            "agent_snapshot_counter_epoch=current_agent_manager_lifetime",
+            "agent_event_counter_epoch=diagnostics_enable",
             "unmeasured=transport_server_mailbox_presentation_timing",
             "input_submitted=\(inputSubmitted)",
             "input_sent=\(inputSent)",
@@ -149,10 +150,18 @@ extension SpiceClientDiagnosticsSnapshot {
             "agent_inbound_unexpected_protocol_messages=\(agent.inboundUnexpectedProtocolMessages)",
             "agent_inbound_capability_announcements=\(agent.inboundCapabilityAnnouncements)",
             "agent_inbound_clipboard_messages=\(agent.inboundClipboardMessages)",
+            "agent_inbound_clipboard_data_messages=\(agent.inboundClipboardDataMessages)",
+            "agent_inbound_clipboard_grab_messages=\(agent.inboundClipboardGrabMessages)",
+            "agent_inbound_clipboard_request_messages=\(agent.inboundClipboardRequestMessages)",
+            "agent_inbound_clipboard_release_messages=\(agent.inboundClipboardReleaseMessages)",
             "agent_inbound_monitor_replies=\(agent.inboundMonitorReplies)",
             "agent_inbound_file_transfer_messages=\(agent.inboundFileTransferMessages)",
             "agent_inbound_other_messages=\(agent.inboundOtherMessages)",
             "agent_inbound_decode_failures=\(agent.inboundDecodeFailures)",
+            "agent_peer_legacy_clipboard_capability=\(Self.optionalBool(agent.peerLegacyClipboardCapability))",
+            "agent_peer_clipboard_by_demand_capability=\(Self.optionalBool(agent.peerClipboardByDemandCapability))",
+            "agent_manager_clipboard_failures=\(agent.managerClipboardFailures)",
+            "agent_last_manager_clipboard_failure_category=\(agent.lastManagerClipboardFailureCategory?.rawValue ?? "n/a")",
             "agent_last_inbound_protocol_id=\(Self.optionalUInt32(agent.lastInboundProtocolID))",
             "agent_last_inbound_message_type=\(Self.optionalUInt32(agent.lastInboundMessageType))",
             "agent_clipboard_ready_events=\(agent.clipboardReadyEvents)",
@@ -198,6 +207,10 @@ extension SpiceClientDiagnosticsSnapshot {
     }
 
     private static func optionalUInt32(_ value: UInt32?) -> String {
+        value.map(String.init) ?? "n/a"
+    }
+
+    private static func optionalBool(_ value: Bool?) -> String {
         value.map(String.init) ?? "n/a"
     }
 }
@@ -472,6 +485,23 @@ private struct SessionDiagnosticsAgentSection: View {
                     + "\(metrics.inboundUnexpectedProtocolMessages)"
             )
             SessionDiagnosticsMetricRow(
+                label: "Clipboard data / grab / request / release",
+                value: "\(metrics.inboundClipboardDataMessages) / "
+                    + "\(metrics.inboundClipboardGrabMessages) / "
+                    + "\(metrics.inboundClipboardRequestMessages) / "
+                    + "\(metrics.inboundClipboardReleaseMessages)"
+            )
+            SessionDiagnosticsMetricRow(
+                label: "Peer clipboard legacy / by-demand",
+                value: "\(diagnosticValue(metrics.peerLegacyClipboardCapability)) / "
+                    + "\(diagnosticValue(metrics.peerClipboardByDemandCapability))"
+            )
+            SessionDiagnosticsMetricRow(
+                label: "Manager clipboard failures / last category",
+                value: "\(metrics.managerClipboardFailures) / "
+                    + "\(metrics.lastManagerClipboardFailureCategory?.rawValue ?? "—")"
+            )
+            SessionDiagnosticsMetricRow(
                 label: "Clipboard / host offers / guest data",
                 value: "\(clipboardState) / "
                     + "\(metrics.clipboardLocalTextOfferEvents) / "
@@ -490,7 +520,7 @@ private struct SessionDiagnosticsAgentSection: View {
                     + "\(monitorErrorCount)"
             )
             SessionDiagnosticsMetricRow(
-                label: "Clipboard / Agent start errors",
+                label: "Clipboard event / Agent start errors",
                 value: "\(metrics.clipboardFailures) / "
                     + "\(metrics.agentManagerStartFailures)"
             )
@@ -657,6 +687,10 @@ private func diagnosticValue(_ value: UInt32?) -> String {
     value.map(String.init) ?? "—"
 }
 
+private func diagnosticValue(_ value: Bool?) -> String {
+    value.map { $0 ? "Yes" : "No" } ?? "—"
+}
+
 private struct SessionDiagnosticsLatencyRow: View {
     let label: LocalizedStringResource
     let latency: SpiceLatencySummary
@@ -705,7 +739,7 @@ private struct SessionDiagnosticsMetricRow: View {
 
 private struct SessionDiagnosticsNotice: View {
     var body: some View {
-        Text("VDAgent metrics contain only state and event counts, never clipboard text; counters cover the current Agent manager lifetime, normally this connection. Send completion is local only; Motion ACK is aggregate, not per-event RTT. Display counters rebase at the first best-effort SwiftSpice sample; sample age shows possible terminal staleness. Channel-state samples include the last observation from retired channels. SwiftSpice coalesces publisher work on a 16 ms interval; emitted frames are not presented frames. VideoToolbox counters cover advanced video, not MJPEG. Frame gap is measured after the publisher when Maspice consumes events. Transport, event-mailbox, and presentation timing are not measured. MainActor is 100 ms timer scheduling delay.")
+        Text("VDAgent metrics never contain clipboard text. Agent snapshot counters and fixed failure categories cover the current Agent manager lifetime; UI event counters begin when Diagnostics is enabled. Send completion is local only; Motion ACK is aggregate, not per-event RTT. Display counters rebase at the first best-effort SwiftSpice sample; sample age shows possible terminal staleness. Channel-state samples include the last observation from retired channels. SwiftSpice coalesces publisher work on a 16 ms interval; emitted frames are not presented frames. VideoToolbox counters cover advanced video, not MJPEG. Frame gap is measured after the publisher when Maspice consumes events. Transport, event-mailbox, and presentation timing are not measured. MainActor is 100 ms timer scheduling delay.")
             .font(.caption2)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
