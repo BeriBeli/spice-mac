@@ -6,6 +6,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Expanded Session Diagnostics with separate VDAgent clipboard data, grab,
+  request, and release counts; peer legacy/by-demand capability observations;
+  and fixed content-free clipboard failure categories. Agent-manager snapshot
+  counters and Diagnostics-enable event counters now declare separate epochs.
+
 ## [0.3.2] — 2026-08-08
 
 ### Added

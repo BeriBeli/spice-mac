@@ -59,11 +59,14 @@ explicitly instead of falling back to a different transport or trust policy.
   while the session is active. Diagnostics are off by default, keep bounded
   aggregate counters and latency distributions in memory, and include
   content-free VDAgent connection, capability, clipboard, and monitor-request
-  state. VDAgent counters cover the current Agent manager lifetime, normally
-  the current connection. They do not record endpoint details, credentials,
-  key contents, clipboard text, or display pixels. **Copy Summary** writes the
-  current aggregate snapshot to the macOS pasteboard only when requested; **Copy Last
-  Diagnostics** remains available in the launcher after the session closes.
+  state. Agent snapshot counters cover the current manager lifetime, normally
+  the current connection, while UI event counters begin when Diagnostics is
+  enabled. Clipboard observations distinguish data, grab, request, and release
+  messages, peer legacy/by-demand capability flags, and fixed failure categories.
+  They do not record endpoint details, credentials, key contents, clipboard text,
+  or display pixels. **Copy Summary** writes the current aggregate snapshot to
+  the macOS pasteboard only when requested; **Copy Last Diagnostics** remains
+  available in the launcher after the session closes.
 - Maspice checks for signed updates automatically. Use **Maspice ▸ Check for
   Updates…** for a manual check, or configure automatic checks and downloads in
   **Settings ▸ Updates**.

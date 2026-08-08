@@ -74,7 +74,15 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
         XCTAssertTrue(diagnosticsViewSource.contains("Readbacks / pool exhausted / GPU errors"))
         XCTAssertTrue(diagnosticsViewSource.contains("VDAgent"))
         XCTAssertTrue(diagnosticsViewSource.contains("Monitor supported / requests / blocked"))
-        XCTAssertTrue(diagnosticsViewSource.contains("never clipboard text"))
+        XCTAssertTrue(diagnosticsViewSource.contains("never contain clipboard text"))
+        XCTAssertTrue(diagnosticsViewSource.contains("agent_snapshot_counter_epoch"))
+        XCTAssertTrue(diagnosticsViewSource.contains("agent_event_counter_epoch"))
+        XCTAssertTrue(diagnosticsViewSource.contains(
+            "Clipboard data / grab / request / release"
+        ))
+        XCTAssertTrue(diagnosticsViewSource.contains(
+            "Manager clipboard failures / last category"
+        ))
         XCTAssertTrue(diagnosticsViewSource.contains("Advanced video"))
         XCTAssertTrue(diagnosticsViewSource.contains("MJPEG only"))
         XCTAssertTrue(diagnosticsViewSource.contains("current >= baseline ? current - baseline : current"))

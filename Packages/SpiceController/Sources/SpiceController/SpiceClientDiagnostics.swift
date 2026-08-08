@@ -67,10 +67,19 @@ public struct SpiceClientAgentDiagnostics: Sendable, Equatable {
     public internal(set) var inboundUnexpectedProtocolMessages: UInt64
     public internal(set) var inboundCapabilityAnnouncements: UInt64
     public internal(set) var inboundClipboardMessages: UInt64
+    public internal(set) var inboundClipboardDataMessages: UInt64
+    public internal(set) var inboundClipboardGrabMessages: UInt64
+    public internal(set) var inboundClipboardRequestMessages: UInt64
+    public internal(set) var inboundClipboardReleaseMessages: UInt64
     public internal(set) var inboundMonitorReplies: UInt64
     public internal(set) var inboundFileTransferMessages: UInt64
     public internal(set) var inboundOtherMessages: UInt64
     public internal(set) var inboundDecodeFailures: UInt64
+    public internal(set) var peerLegacyClipboardCapability: Bool?
+    public internal(set) var peerClipboardByDemandCapability: Bool?
+    public internal(set) var managerClipboardFailures: UInt64
+    public internal(set) var lastManagerClipboardFailureCategory:
+        SpiceClipboardFailureCategory?
     public internal(set) var lastInboundProtocolID: UInt32?
     public internal(set) var lastInboundMessageType: UInt32?
     public internal(set) var clipboardReadyEvents: UInt64
@@ -106,10 +115,18 @@ public struct SpiceClientAgentDiagnostics: Sendable, Equatable {
         inboundUnexpectedProtocolMessages: UInt64 = 0,
         inboundCapabilityAnnouncements: UInt64 = 0,
         inboundClipboardMessages: UInt64 = 0,
+        inboundClipboardDataMessages: UInt64 = 0,
+        inboundClipboardGrabMessages: UInt64 = 0,
+        inboundClipboardRequestMessages: UInt64 = 0,
+        inboundClipboardReleaseMessages: UInt64 = 0,
         inboundMonitorReplies: UInt64 = 0,
         inboundFileTransferMessages: UInt64 = 0,
         inboundOtherMessages: UInt64 = 0,
         inboundDecodeFailures: UInt64 = 0,
+        peerLegacyClipboardCapability: Bool? = nil,
+        peerClipboardByDemandCapability: Bool? = nil,
+        managerClipboardFailures: UInt64 = 0,
+        lastManagerClipboardFailureCategory: SpiceClipboardFailureCategory? = nil,
         lastInboundProtocolID: UInt32? = nil,
         lastInboundMessageType: UInt32? = nil,
         clipboardReadyEvents: UInt64 = 0,
@@ -144,10 +161,18 @@ public struct SpiceClientAgentDiagnostics: Sendable, Equatable {
         self.inboundUnexpectedProtocolMessages = inboundUnexpectedProtocolMessages
         self.inboundCapabilityAnnouncements = inboundCapabilityAnnouncements
         self.inboundClipboardMessages = inboundClipboardMessages
+        self.inboundClipboardDataMessages = inboundClipboardDataMessages
+        self.inboundClipboardGrabMessages = inboundClipboardGrabMessages
+        self.inboundClipboardRequestMessages = inboundClipboardRequestMessages
+        self.inboundClipboardReleaseMessages = inboundClipboardReleaseMessages
         self.inboundMonitorReplies = inboundMonitorReplies
         self.inboundFileTransferMessages = inboundFileTransferMessages
         self.inboundOtherMessages = inboundOtherMessages
         self.inboundDecodeFailures = inboundDecodeFailures
+        self.peerLegacyClipboardCapability = peerLegacyClipboardCapability
+        self.peerClipboardByDemandCapability = peerClipboardByDemandCapability
+        self.managerClipboardFailures = managerClipboardFailures
+        self.lastManagerClipboardFailureCategory = lastManagerClipboardFailureCategory
         self.lastInboundProtocolID = lastInboundProtocolID
         self.lastInboundMessageType = lastInboundMessageType
         self.clipboardReadyEvents = clipboardReadyEvents
@@ -469,10 +494,25 @@ final class SpiceClientDiagnosticsCollector {
         metrics.agent.inboundCapabilityAnnouncements =
             diagnostics.inboundCapabilityAnnouncements
         metrics.agent.inboundClipboardMessages = diagnostics.inboundClipboardMessages
+        metrics.agent.inboundClipboardDataMessages =
+            diagnostics.inboundClipboardDataMessages
+        metrics.agent.inboundClipboardGrabMessages =
+            diagnostics.inboundClipboardGrabMessages
+        metrics.agent.inboundClipboardRequestMessages =
+            diagnostics.inboundClipboardRequestMessages
+        metrics.agent.inboundClipboardReleaseMessages =
+            diagnostics.inboundClipboardReleaseMessages
         metrics.agent.inboundMonitorReplies = diagnostics.inboundMonitorReplies
         metrics.agent.inboundFileTransferMessages = diagnostics.inboundFileTransferMessages
         metrics.agent.inboundOtherMessages = diagnostics.inboundOtherMessages
         metrics.agent.inboundDecodeFailures = diagnostics.inboundDecodeFailures
+        metrics.agent.peerLegacyClipboardCapability =
+            diagnostics.peerLegacyClipboardCapability
+        metrics.agent.peerClipboardByDemandCapability =
+            diagnostics.peerClipboardByDemandCapability
+        metrics.agent.managerClipboardFailures = diagnostics.clipboardFailures
+        metrics.agent.lastManagerClipboardFailureCategory =
+            diagnostics.lastClipboardFailureCategory
         metrics.agent.lastInboundProtocolID = diagnostics.lastInboundProtocolID
         metrics.agent.lastInboundMessageType = diagnostics.lastInboundMessageType
     }
