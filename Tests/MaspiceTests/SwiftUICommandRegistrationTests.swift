@@ -30,6 +30,8 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
         XCTAssertTrue(commandsSource.contains("Toggle(\"Show Diagnostics\""))
         XCTAssertTrue(commandsSource.contains("Button(\"Copy Diagnostics Summary\")"))
         XCTAssertTrue(commandsSource.contains("sessionActions?.setDiagnosticsVisible($0)"))
+        XCTAssertTrue(commandsSource.contains("@Entry var sessionActions: FocusedSessionActions?"))
+        XCTAssertFalse(commandsSource.contains("FocusedSessionActionsKey"))
         XCTAssertFalse(commandsSource.contains("CommandGroup(before: .toolbar)"))
         XCTAssertFalse(commandsSource.contains("CommandGroup(before: .windowSize)"))
         XCTAssertTrue(commandsSource.contains("CommandGroup(after: .appInfo)"))
@@ -41,6 +43,9 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
         XCTAssertTrue(commandsSource.contains("https://github.com/BeriBeli/spice-mac/issues/new/choose"))
         XCTAssertTrue(updateCommandsSource.contains("Button(\"Check for Updates…\""))
         XCTAssertTrue(updateCommandsSource.contains("\\.canCheckForUpdates"))
+        XCTAssertTrue(updateCommandsSource.contains("@Observable"))
+        XCTAssertTrue(updateCommandsSource.contains("@State private var viewModel"))
+        XCTAssertFalse(updateCommandsSource.contains("ObservableObject"))
         XCTAssertFalse(commandsSource.contains("Share Clipboard with VM"))
         XCTAssertFalse(commandsSource.contains("@AppStorage"))
 
