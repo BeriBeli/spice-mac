@@ -64,6 +64,12 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
         let applicationModelSource = try source("Sources/Maspice/ApplicationModel.swift")
 
         XCTAssertTrue(sessionViewSource.contains("@State private var showsDiagnostics = false"))
+        XCTAssertTrue(sessionViewSource.contains(".inspector(isPresented: diagnosticsInspectorIsPresented)"))
+        XCTAssertTrue(sessionViewSource.contains(".inspectorColumnWidth(min: 310, ideal: 360, max: 440)"))
+        XCTAssertTrue(sessionViewSource.contains("private var diagnosticsInspectorIsPresented: Binding<Bool>"))
+        XCTAssertTrue(sessionViewSource.contains("private struct SessionDiagnosticsInspector: View"))
+        XCTAssertFalse(sessionViewSource.contains("SessionDiagnosticsOverlay"))
+        XCTAssertTrue(sessionViewSource.contains("systemImage: \"sidebar.trailing\""))
         XCTAssertTrue(sessionViewSource.contains("private struct SessionChangeObserver: View"))
         XCTAssertTrue(sessionViewSource.contains("@AppStorage(Preferences.shareClipboardKey)"))
         XCTAssertTrue(sessionViewSource.contains("client.diagnosticsMonitor"))
@@ -106,6 +112,9 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
         XCTAssertFalse(diagnosticsViewSource.contains("FileHandle"))
         XCTAssertFalse(diagnosticsViewSource.contains("Logger"))
         XCTAssertFalse(diagnosticsViewSource.contains("write(to:"))
+        XCTAssertFalse(diagnosticsViewSource.contains(".background(.regularMaterial"))
+        XCTAssertFalse(diagnosticsViewSource.contains(".shadow("))
+        XCTAssertFalse(diagnosticsViewSource.contains("maxHeight: 400"))
     }
 
     func testSettingsUseFocusedNativeTabs() throws {

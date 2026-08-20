@@ -37,19 +37,6 @@ struct SessionView: View {
                 }
                 .padding(40)
             }
-
-            if showsDiagnostics, let client = model.client {
-                VStack {
-                    HStack {
-                        Spacer()
-                        SessionDiagnosticsOverlay(
-                            monitor: client.diagnosticsMonitor,
-                            onCopy: copyDiagnosticsSummary)
-                    }
-                    Spacer()
-                }
-                .padding(16)
-            }
         }
         .frame(minWidth: 640, minHeight: 480)
         .background {
@@ -61,6 +48,26 @@ struct SessionView: View {
                 .frame(width: 0, height: 0)
         }
         .navigationTitle(model.windowTitle)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(
+                    showsDiagnostics ? "Hide Diagnostics" : "Show Diagnostics",
+                    systemImage: "sidebar.trailing"
+                ) {
+                    setDiagnosticsVisible(!showsDiagnostics)
+                }
+                .disabled(model.client == nil)
+                .help(showsDiagnostics ? "Hide session diagnostics" : "Show session diagnostics")
+            }
+        }
+        .inspector(isPresented: diagnosticsInspectorIsPresented) {
+            if let client = model.client {
+                SessionDiagnosticsInspector(
+                    monitor: client.diagnosticsMonitor,
+                    onCopy: copyDiagnosticsSummary)
+                    .inspectorColumnWidth(min: 310, ideal: 360, max: 440)
+            }
+        }
         .focusedSceneValue(\.sessionActions, focusedActions)
         .onAppear {
             guard applicationModel.activateSessionPresentation(for: requestID) else {
@@ -90,6 +97,12 @@ struct SessionView: View {
             releaseCursor: model.releaseAllInput,
             setDiagnosticsVisible: setDiagnosticsVisible,
             copyDiagnosticsSummary: copyDiagnosticsSummary)
+    }
+
+    private var diagnosticsInspectorIsPresented: Binding<Bool> {
+        Binding(
+            get: { showsDiagnostics },
+            set: { setDiagnosticsVisible($0) })
     }
 
     private func setDiagnosticsVisible(_ visible: Bool) {
@@ -154,7 +167,7 @@ private struct SessionChangeObserver: View {
     }
 }
 
-private struct SessionDiagnosticsOverlay: View {
+private struct SessionDiagnosticsInspector: View {
     @ObservedObject var monitor: SpiceClientDiagnosticsMonitor
     let onCopy: () -> Void
 
