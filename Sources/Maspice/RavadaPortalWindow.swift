@@ -24,6 +24,15 @@ struct RavadaPortalWindow: View {
             InitialWindowZoomBridge()
                 .frame(width: 0, height: 0)
         }
+        .navigationTitle("Ravada Portal")
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button("Back to Launcher", systemImage: "house") {
+                    returnToLauncher()
+                }
+                .help("Close the portal and return to the launcher")
+            }
+        }
         .onAppear {
             guard applicationModel.activatePortalPresentation() else {
                 openWindow(id: "launcher")
@@ -42,25 +51,15 @@ struct RavadaPortalWindow: View {
     }
 
     private func portalContent(url: URL) -> some View {
-        VStack(spacing: 0) {
-            HStack {
-                Button("Back to Launcher", systemImage: "chevron.left") {
-                    openWindow(id: "launcher")
-                    dismiss()
-                }
-                Spacer()
-                Text(url.host() ?? url.absoluteString)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(10)
+        RavadaPortalView(
+            url: url,
+            onConnectionFile: openDownloadedConnection,
+            onError: presentPortalError)
+    }
 
-            Divider()
-
-            RavadaPortalView(
-                url: url,
-                onConnectionFile: openDownloadedConnection,
-                onError: presentPortalError)
-        }
+    private func returnToLauncher() {
+        openWindow(id: "launcher")
+        dismiss()
     }
 
     private func openDownloadedConnection(_ url: URL) {

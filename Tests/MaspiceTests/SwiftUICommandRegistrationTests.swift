@@ -214,4 +214,27 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
         XCTAssertFalse(portalSource.contains("NSViewRepresentable"))
         XCTAssertFalse(portalSource.contains("WKWebView("))
     }
+
+    func testPortalUsesNativeWindowToolbarAndBrowserNavigation() throws {
+        let portalSource = try source("Sources/Maspice/RavadaPortalView.swift")
+        let portalWindowSource = try source("Sources/Maspice/RavadaPortalWindow.swift")
+
+        XCTAssertTrue(portalWindowSource.contains("ToolbarItem(placement: .navigation)"))
+        XCTAssertTrue(portalWindowSource.contains("Button(\"Back to Launcher\", systemImage: \"house\")"))
+        XCTAssertTrue(portalWindowSource.contains("private func returnToLauncher()"))
+        XCTAssertFalse(portalWindowSource.contains("VStack(spacing: 0)"))
+        XCTAssertFalse(portalWindowSource.contains("Divider()"))
+
+        XCTAssertTrue(portalSource.contains(".navigationTitle(model.pageTitle)"))
+        XCTAssertTrue(portalSource.contains(".navigationSubtitle(model.pageAddress)"))
+        XCTAssertTrue(portalSource.contains("ToolbarItemGroup(placement: .navigation)"))
+        XCTAssertTrue(portalSource.contains("Button(\"Go Back\", systemImage: \"chevron.backward\")"))
+        XCTAssertTrue(portalSource.contains("Button(\"Go Forward\", systemImage: \"chevron.forward\")"))
+        XCTAssertTrue(portalSource.contains("ProgressView(value: model.page.estimatedProgress)"))
+        XCTAssertTrue(portalSource.contains("page.load(item)"))
+        XCTAssertTrue(portalSource.contains("page.stopLoading()"))
+        XCTAssertTrue(portalSource.contains("page.reload()"))
+        XCTAssertFalse(portalSource.contains("VStack(spacing: 0)"))
+        XCTAssertFalse(portalSource.contains("Divider()"))
+    }
 }

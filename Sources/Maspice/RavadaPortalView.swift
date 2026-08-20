@@ -24,29 +24,42 @@ struct RavadaPortalView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Text(model.page.title.isEmpty ? "Ravada Portal" : model.page.title)
-                    .lineLimit(1)
+        WebView(model.page)
+            .navigationTitle(model.pageTitle)
+            .navigationSubtitle(model.pageAddress)
+            .toolbar {
+                ToolbarItemGroup(placement: .navigation) {
+                    Button("Go Back", systemImage: "chevron.backward") {
+                        model.goBack()
+                    }
+                    .disabled(!model.canGoBack)
+                    .help("Go to the previous portal page")
 
-                Spacer()
-
-                if model.page.isLoading {
-                    ProgressView(value: model.page.estimatedProgress)
-                        .frame(width: 120)
+                    Button("Go Forward", systemImage: "chevron.forward") {
+                        model.goForward()
+                    }
+                    .disabled(!model.canGoForward)
+                    .help("Go to the next portal page")
                 }
 
-                Button("Reload", systemImage: "arrow.clockwise") {
-                    model.reload()
+                ToolbarItem(placement: .status) {
+                    if model.page.isLoading {
+                        ProgressView(value: model.page.estimatedProgress)
+                            .frame(width: 100)
+                            .help("Loading portal")
+                    }
                 }
-                .labelStyle(.iconOnly)
+
+                ToolbarItem(placement: .primaryAction) {
+                    Button(
+                        model.page.isLoading ? "Stop Loading" : "Reload",
+                        systemImage: model.page.isLoading ? "xmark" : "arrow.clockwise"
+                    ) {
+                        model.reloadOrStop()
+                    }
+                    .help(model.page.isLoading ? "Stop loading this page" : "Reload this page")
+                }
             }
-            .padding(10)
-
-            Divider()
-
-            WebView(model.page)
-        }
         .task {
             model.loadInitialPage()
         }
@@ -110,8 +123,38 @@ private final class RavadaPortalModel {
         page.load(initialURL)
     }
 
-    func reload() {
-        page.reload()
+    var pageTitle: String {
+        page.title.isEmpty ? "Ravada Portal" : page.title
+    }
+
+    var pageAddress: String {
+        page.url?.host() ?? initialURL.host() ?? initialURL.absoluteString
+    }
+
+    var canGoBack: Bool {
+        !page.backForwardList.backList.isEmpty
+    }
+
+    var canGoForward: Bool {
+        !page.backForwardList.forwardList.isEmpty
+    }
+
+    func goBack() {
+        guard let item = page.backForwardList.backList.last else { return }
+        page.load(item)
+    }
+
+    func goForward() {
+        guard let item = page.backForwardList.forwardList.first else { return }
+        page.load(item)
+    }
+
+    func reloadOrStop() {
+        if page.isLoading {
+            page.stopLoading()
+        } else {
+            page.reload()
+        }
     }
 
     var challengedHost: String? {
