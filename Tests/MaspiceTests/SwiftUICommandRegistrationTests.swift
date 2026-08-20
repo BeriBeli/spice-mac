@@ -199,7 +199,11 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
     }
 
     func testPortalUsesNativeSwiftUIWebViewAndInterceptsConnectionFiles() throws {
-        let portalSource = try source("Sources/Maspice/RavadaPortalView.swift")
+        let portalViewSource = try source("Sources/Maspice/RavadaPortalView.swift")
+        let navigationSource = try source("Sources/Maspice/RavadaNavigationDecider.swift")
+        let trustSource = try source("Sources/Maspice/PortalTrustCoordinator.swift")
+        let portalSource = [portalViewSource, navigationSource, trustSource]
+            .joined(separator: "\n")
 
         XCTAssertTrue(portalSource.contains("WebView(model.page)"))
         XCTAssertTrue(portalSource.contains("WebPage("))
@@ -221,6 +225,10 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
         XCTAssertTrue(portalSource.contains("guard !connectionWasDelivered else { return .cancel }"))
         XCTAssertFalse(portalSource.contains("NSViewRepresentable"))
         XCTAssertFalse(portalSource.contains("WKWebView("))
+        XCTAssertTrue(navigationSource.contains("final class RavadaNavigationDecider"))
+        XCTAssertTrue(trustSource.contains("final class PortalTrustCoordinator"))
+        XCTAssertFalse(portalViewSource.contains("URLSession("))
+        XCTAssertFalse(portalViewSource.contains("SecTrust"))
     }
 
     func testPortalUsesNativeWindowToolbarAndBrowserNavigation() throws {
