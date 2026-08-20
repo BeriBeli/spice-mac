@@ -10,9 +10,7 @@ struct SessionView: View {
     @State private var model: SessionModel
     @State private var isReturningToLauncher = false
     @State private var showsDiagnostics = false
-    @AppStorage(Preferences.shareClipboardKey) private var shareClipboard = true
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.dismiss) private var dismiss
     @Environment(ApplicationModel.self) private var applicationModel
 
@@ -57,6 +55,12 @@ struct SessionView: View {
         .background {
             InitialWindowZoomBridge()
                 .frame(width: 0, height: 0)
+            SessionChangeObserver(
+                appDelegate: appDelegate,
+                requestID: requestID,
+                model: model,
+                onReturnToLauncher: returnToLauncher)
+                .frame(width: 0, height: 0)
         }
         .navigationTitle(model.windowTitle)
         .focusedSceneValue(\.sessionActions, focusedActions)
@@ -66,7 +70,6 @@ struct SessionView: View {
                 dismiss()
                 return
             }
-            model.setClipboardSharing(shareClipboard)
             model.start()
             if model.shouldReturnToLauncher {
                 returnToLauncher()
@@ -76,21 +79,6 @@ struct SessionView: View {
             setDiagnosticsVisible(false)
             applicationModel.deactivateSessionPresentation(for: requestID)
             model.stop()
-        }
-        .onChange(of: shareClipboard) {
-            model.setClipboardSharing(shareClipboard)
-        }
-        .onChange(of: model.shouldReturnToLauncher, initial: true) {
-            guard applicationModel.isSessionPresentationActive(for: requestID),
-                  model.shouldReturnToLauncher else { return }
-            returnToLauncher()
-        }
-        .onChange(of: appDelegate.pendingRequests, initial: true) {
-            for request in appDelegate.drainPendingRequests() {
-                applicationModel.authorizeSessionPresentation(request)
-                openWindow(value: request)
-                dismissWindow(id: "launcher")
-            }
         }
     }
 
@@ -134,6 +122,37 @@ struct SessionView: View {
         }
         openWindow(id: "launcher")
         dismiss()
+    }
+}
+
+private struct SessionChangeObserver: View {
+    let appDelegate: AppDelegate
+    let requestID: UUID
+    let model: SessionModel
+    let onReturnToLauncher: @MainActor () -> Void
+
+    @AppStorage(Preferences.shareClipboardKey) private var shareClipboard = true
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(ApplicationModel.self) private var applicationModel
+
+    var body: some View {
+        Color.clear
+            .onChange(of: shareClipboard, initial: true) {
+                model.setClipboardSharing(shareClipboard)
+            }
+            .onChange(of: model.shouldReturnToLauncher, initial: true) {
+                guard applicationModel.isSessionPresentationActive(for: requestID),
+                      model.shouldReturnToLauncher else { return }
+                onReturnToLauncher()
+            }
+            .onChange(of: appDelegate.pendingRequests, initial: true) {
+                for request in appDelegate.drainPendingRequests() {
+                    applicationModel.authorizeSessionPresentation(request)
+                    openWindow(value: request)
+                    dismissWindow(id: "launcher")
+                }
+            }
     }
 }
 
