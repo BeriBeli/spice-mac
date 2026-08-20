@@ -6,6 +6,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.4] — 2026-08-20
+
+### Fixed
+
+- Restored visible, responsive pointer movement after guest login and runtime
+  mouse-mode changes by renegotiating client mouse mode and balancing relative
+  pointer capture across focus, window, and session teardown.
+- Removed unintended IOSurface CPU readbacks during SwiftUI frame comparison
+  and avoided redundant Metal presentation work for unchanged frame storage.
+
+### Changed
+
+- Updated SwiftSpice to 0.1.7 and expanded Session Diagnostics with
+  IOSurface/CPU-only publisher counts plus Metal presentation and fixed CPU
+  fallback categories.
+
 ## [0.3.3] — 2026-08-08
 
 ### Changed
@@ -313,7 +329,8 @@ CocoaSpice.
   QEMU frameworks are no longer shipped (app size 443 MB → 23 MB).
 - See [SECURITY.md](SECURITY.md) for the threat model and residual risks.
 
-[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/BeriBeli/spice-mac/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/BeriBeli/spice-mac/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/BeriBeli/spice-mac/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/BeriBeli/spice-mac/compare/v0.3.0...v0.3.1

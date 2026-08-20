@@ -118,6 +118,11 @@ final class SessionModel {
     }
 
     func releaseAllInput() {
+        _ = NSApp.sendAction(
+            NSSelectorFromString("releaseSpicePointerCapture:"),
+            to: nil,
+            from: nil
+        )
         client?.releaseAllInput()
     }
 
