@@ -163,6 +163,15 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
         XCTAssertTrue(appDelegateSource.contains("removeEmptyTopLevelMenus()"))
         XCTAssertTrue(launcherSource.contains("authorizePortalPresentation()"))
         XCTAssertTrue(launcherSource.contains("authorizeSessionPresentation(request)"))
+        XCTAssertTrue(launcherSource.contains("@State private var isDropTargeted = false"))
+        XCTAssertTrue(launcherSource.contains(".dropDestination(for: URL.self)"))
+        XCTAssertTrue(launcherSource.contains("urls.first(where: \\.isFileURL)"))
+        XCTAssertTrue(launcherSource.contains("private struct LauncherContent: View"))
+        XCTAssertTrue(launcherSource.contains("private struct LauncherHeader: View"))
+        XCTAssertTrue(launcherSource.contains("private struct LauncherActions: View"))
+        XCTAssertFalse(launcherSource.contains(".onDrop("))
+        XCTAssertFalse(launcherSource.contains("loadDataRepresentation"))
+        XCTAssertFalse(launcherSource.contains("public.file-url"))
     }
 
     func testPortalAndSessionWindowsUseNativeMaximumPlacement() throws {
