@@ -8,7 +8,7 @@ APP_NAME := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleName' Resources/I
 
 .DEFAULT_GOAL := help
 
-.PHONY: help doctor build run test test-session all icon debug release check-version clean distclean
+.PHONY: help doctor build run test test-session qa all icon debug release check-version clean distclean
 
 help: ## Show this help
 	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-14s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
@@ -30,10 +30,13 @@ test: ## Run VV parsing, session logic, and SwiftSpice integration tests
 test-session: ## Run focused session cleanup and command-state tests
 	@swift test --disable-sandbox --package-path Packages/SpiceSessionLogic
 
-all: ## Verify the environment, test, and assemble the app
+qa: ## Run environment, version, test, and app-assembly gates
 	@$(MAKE) doctor
+	@$(MAKE) check-version
 	@$(MAKE) test
 	@$(MAKE) build
+
+all: qa ## Alias for the complete QA gate
 
 icon: ## Validate Resources/AppIcon.icon and refresh the README preview
 	@./scripts/make-icon.sh

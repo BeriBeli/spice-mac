@@ -18,9 +18,13 @@ else fail "unsupported macOS ${macos_version:-unknown}" "Maspice requires macOS 
 if [ "$(uname -m)" = "arm64" ]; then pass "Apple Silicon (arm64)"
 else fail "unsupported architecture $(uname -m)" "SwiftSpice now supports Apple Silicon only."; fi
 
-xc="$(xcode-select -p 2>/dev/null || true)"
-if printf '%s' "$xc" | grep -q 'Xcode.app'; then pass "full Xcode selected ($xc)"
-else fail "full Xcode not selected" "sudo xcode-select -s /Applications/Xcode.app"; fi
+if [ -x "$DEVELOPER_DIR/usr/bin/xcodebuild" ] \
+    && [ -d "$DEVELOPER_DIR/Platforms/MacOSX.platform" ]; then
+    pass "full Xcode selected ($DEVELOPER_DIR)"
+else
+    fail "full Xcode not selected" \
+        "set DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer"
+fi
 
 swift_line="$(swift --version 2>/dev/null | head -1 || true)"
 swift_version="$(printf '%s\n' "$swift_line" | sed -nE 's/.*Swift version ([0-9]+\.[0-9]+).*/\1/p')"
