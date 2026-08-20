@@ -18,20 +18,7 @@ struct SessionDiagnosticsView: View {
             .scrollIndicators(.visible)
         }
         .padding(10)
-        .frame(
-            minWidth: 310,
-            idealWidth: 340,
-            maxWidth: 380,
-            maxHeight: 400,
-            alignment: .topLeading
-        )
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(.quaternary, lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
-        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
     private var diagnosticsContent: some View {
