@@ -103,16 +103,15 @@ xcodebuild -downloadComponent MetalToolchain
 git clone https://github.com/BeriBeli/spice-mac.git
 cd spice-mac
 swift package resolve
-make doctor
-make test
-make build
+make qa
 ```
 
-`make test` exercises `.vv` validation, session policy, the ordered SwiftSpice
-input pump, and SwiftUI command registration. `make build` embeds Sparkle and
-creates an ad-hoc signed `build/Maspice.app`, zip, and checksum. Use `make run`
-to open the staged app and `make distclean` to remove generated app and SwiftPM
-state.
+`make qa` verifies the development environment and version metadata, runs the
+complete test suite, then assembles the distributable app. `make test` exercises
+`.vv` validation, session policy, the ordered SwiftSpice input pump, and SwiftUI
+command registration. `make build` embeds Sparkle and creates an ad-hoc signed
+`build/Maspice.app`, zip, and checksum. Use `make run` to open the staged app and
+`make distclean` to remove generated app and SwiftPM state.
 
 SwiftSpice changes belong in its upstream repository. Update Maspice only after
 publishing and pinning a reviewed upstream release.

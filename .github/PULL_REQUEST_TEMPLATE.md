@@ -12,7 +12,7 @@
 
 - [ ] `make test` passes
 - [ ] `make check-version` passes
-- [ ] For app/native changes: `make build` passes, including link and signature checks
+- [ ] For app/native changes: `make qa` passes, including link and signature checks
 - [ ] For protocol/UI changes: recorded the relevant live Ravada/QEMU guest evidence
 
 ## Checklist
