@@ -13,15 +13,8 @@ struct FocusedSessionActions {
     let copyDiagnosticsSummary: () -> Void
 }
 
-private struct FocusedSessionActionsKey: FocusedValueKey {
-    typealias Value = FocusedSessionActions
-}
-
 extension FocusedValues {
-    var sessionActions: FocusedSessionActions? {
-        get { self[FocusedSessionActionsKey.self] }
-        set { self[FocusedSessionActionsKey.self] = newValue }
-    }
+    @Entry var sessionActions: FocusedSessionActions?
 }
 
 struct SpiceCommands: Commands {

@@ -1,25 +1,33 @@
 // SPDX-License-Identifier: MIT
 import Combine
+import Observation
 import Sparkle
 import SwiftUI
 
 @MainActor
-private final class CheckForUpdatesViewModel: ObservableObject {
-    @Published private(set) var canCheckForUpdates = false
+@Observable
+private final class CheckForUpdatesViewModel {
+    private(set) var canCheckForUpdates = false
+    @ObservationIgnored private var cancellable: AnyCancellable?
 
     init(updater: SPUUpdater) {
-        updater.publisher(for: \.canCheckForUpdates)
-            .assign(to: &$canCheckForUpdates)
+        cancellable = updater.publisher(for: \.canCheckForUpdates)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] canCheckForUpdates in
+                MainActor.assumeIsolated {
+                    self?.canCheckForUpdates = canCheckForUpdates
+                }
+            }
     }
 }
 
 struct CheckForUpdatesCommand: View {
-    @ObservedObject private var viewModel: CheckForUpdatesViewModel
+    @State private var viewModel: CheckForUpdatesViewModel
     private let updater: SPUUpdater
 
     init(updater: SPUUpdater) {
         self.updater = updater
-        viewModel = CheckForUpdatesViewModel(updater: updater)
+        _viewModel = State(initialValue: CheckForUpdatesViewModel(updater: updater))
     }
 
     var body: some View {
