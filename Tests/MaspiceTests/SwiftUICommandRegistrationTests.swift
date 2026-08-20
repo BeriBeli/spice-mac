@@ -59,7 +59,16 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
 
     func testSessionDiagnosticsAreWindowScopedAndExplicitlyEnabled() throws {
         let sessionViewSource = try source("Sources/Maspice/SessionView.swift")
-        let diagnosticsViewSource = try source("Sources/Maspice/SessionDiagnosticsView.swift")
+        let diagnosticsRootSource = try source("Sources/Maspice/SessionDiagnosticsView.swift")
+        let diagnosticsSummarySource = try source("Sources/Maspice/SessionDiagnosticsSummary.swift")
+        let diagnosticsMetricsSource = try source("Sources/Maspice/SessionDiagnosticsMetrics.swift")
+        let diagnosticsSectionsSource = try source("Sources/Maspice/SessionDiagnosticsSections.swift")
+        let diagnosticsViewSource = [
+            diagnosticsRootSource,
+            diagnosticsSummarySource,
+            diagnosticsMetricsSource,
+            diagnosticsSectionsSource,
+        ].joined(separator: "\n")
         let launcherSource = try source("Sources/Maspice/LauncherView.swift")
         let applicationModelSource = try source("Sources/Maspice/ApplicationModel.swift")
 
@@ -77,6 +86,13 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
         XCTAssertTrue(sessionViewSource.contains("model.client?.setDiagnosticsEnabled(false)"))
         XCTAssertTrue(sessionViewSource.contains("setDiagnosticsVisible(false)"))
         XCTAssertTrue(sessionViewSource.contains("retainSessionDiagnosticsSummary"))
+        XCTAssertTrue(diagnosticsRootSource.contains("private struct SessionDiagnosticsContent: View"))
+        XCTAssertFalse(diagnosticsRootSource.contains("private var diagnosticsContent"))
+        XCTAssertTrue(diagnosticsSummarySource.contains("extension SpiceClientDiagnosticsSnapshot"))
+        XCTAssertFalse(diagnosticsSummarySource.contains("struct SessionDiagnosticsSwiftSpiceMetrics"))
+        XCTAssertTrue(diagnosticsMetricsSource.contains("struct SessionDiagnosticsSwiftSpiceMetrics"))
+        XCTAssertTrue(diagnosticsSectionsSource.contains("struct SessionDiagnosticsInputSection: View"))
+        XCTAssertTrue(diagnosticsSectionsSource.contains("struct SessionDiagnosticsRendererSection: View"))
         XCTAssertTrue(diagnosticsViewSource.contains("NSPasteboard.general"))
         XCTAssertTrue(launcherSource.contains("Copy Last Diagnostics"))
         XCTAssertTrue(applicationModelSource.contains("lastSessionDiagnosticsSummary"))
