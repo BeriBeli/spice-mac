@@ -23,7 +23,9 @@ struct MaspiceApp: App {
             RavadaPortalWindow()
                 .environment(applicationModel)
         }
-        .defaultSize(width: 1024, height: 768)
+        .defaultWindowPlacement { _, context in
+            WindowPlacement(size: context.defaultDisplay.visibleRect.size)
+        }
         .windowIdealSize(.maximum)
         .restorationBehavior(.disabled)
         .defaultLaunchBehavior(.suppressed)
@@ -39,7 +41,9 @@ struct MaspiceApp: App {
                     description: Text("Open a direct SPICE .vv file."))
             }
         }
-        .defaultSize(width: 1024, height: 768)
+        .defaultWindowPlacement { _, context in
+            WindowPlacement(size: context.defaultDisplay.visibleRect.size)
+        }
         .windowIdealSize(.maximum)
         .restorationBehavior(.disabled)
         .commands {

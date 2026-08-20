@@ -156,19 +156,30 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
         XCTAssertTrue(launcherSource.contains("authorizeSessionPresentation(request)"))
     }
 
-    func testPortalAndSessionWindowsStartZoomed() throws {
+    func testPortalAndSessionWindowsUseNativeMaximumPlacement() throws {
         let appSource = try source("Sources/Maspice/MaspiceApp.swift")
         let portalWindowSource = try source("Sources/Maspice/RavadaPortalWindow.swift")
-        let zoomBridgeSource = try source("Sources/Maspice/InitialWindowZoomBridge.swift")
         let sessionViewSource = try source("Sources/Maspice/SessionView.swift")
         let sessionBridgeSource = try source("Sources/Maspice/SpiceDisplayRepresentable.swift")
+        let zoomBridgeURL = repositoryRoot
+            .appendingPathComponent("Sources/Maspice/InitialWindowZoomBridge.swift")
 
         XCTAssertTrue(appSource.contains("Window(\"Ravada Portal\", id: \"portal\")"))
         XCTAssertEqual(
             appSource.components(separatedBy: ".windowIdealSize(.maximum)").count - 1,
             2
         )
-        XCTAssertTrue(portalWindowSource.contains("InitialWindowZoomBridge()"))
+        XCTAssertEqual(
+            appSource.components(separatedBy: ".defaultWindowPlacement").count - 1,
+            2
+        )
+        XCTAssertEqual(
+            appSource.components(separatedBy: "context.defaultDisplay.visibleRect.size").count - 1,
+            2
+        )
+        XCTAssertFalse(appSource.contains(".defaultSize(width: 1024, height: 768)"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: zoomBridgeURL.path))
+        XCTAssertFalse(portalWindowSource.contains("InitialWindowZoomBridge()"))
         XCTAssertTrue(portalWindowSource.contains("RavadaPortalView("))
         XCTAssertTrue(portalWindowSource.contains("@Environment(\\.dismiss)"))
         XCTAssertTrue(portalWindowSource.contains("dismiss()"))
@@ -178,10 +189,7 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
         XCTAssertTrue(portalWindowSource.contains("guard !isHandingOffConnection else { return }"))
         XCTAssertTrue(portalWindowSource.contains("onError: presentPortalError"))
         XCTAssertFalse(portalWindowSource.contains("@State private var presentationWasAuthorized"))
-        XCTAssertTrue(zoomBridgeSource.contains("NSWindow.didBecomeKeyNotification"))
-        XCTAssertTrue(zoomBridgeSource.contains("window.zoom(nil)"))
-        XCTAssertTrue(zoomBridgeSource.contains("window.isKeyWindow"))
-        XCTAssertTrue(sessionViewSource.contains("InitialWindowZoomBridge()"))
+        XCTAssertFalse(sessionViewSource.contains("InitialWindowZoomBridge()"))
         XCTAssertTrue(sessionViewSource.contains("activateSessionPresentation(for: requestID)"))
         XCTAssertTrue(sessionViewSource.contains("deactivateSessionPresentation(for: requestID)"))
         XCTAssertFalse(sessionViewSource.contains("@State private var presentationWasAuthorized"))
