@@ -64,6 +64,8 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
         let applicationModelSource = try source("Sources/Maspice/ApplicationModel.swift")
 
         XCTAssertTrue(sessionViewSource.contains("@State private var showsDiagnostics = false"))
+        XCTAssertTrue(sessionViewSource.contains("private struct SessionChangeObserver: View"))
+        XCTAssertTrue(sessionViewSource.contains("@AppStorage(Preferences.shareClipboardKey)"))
         XCTAssertTrue(sessionViewSource.contains("client.diagnosticsMonitor"))
         XCTAssertTrue(sessionViewSource.contains("model.client?.setDiagnosticsEnabled(true)"))
         XCTAssertTrue(sessionViewSource.contains("model.client?.setDiagnosticsEnabled(false)"))
