@@ -6,6 +6,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Restored the compact native title bar for SPICE session windows and moved
+  Session Diagnostics into a separate per-session window, with summary copying
+  kept inside the diagnostics window.
+
 ## [0.3.6] — 2026-08-20
 
 ### Changed

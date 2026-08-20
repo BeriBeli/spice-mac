@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 import Foundation
 import Observation
+import SpiceController
 import SpiceSessionLogic
 
 /// SwiftUI-owned application state shared across launcher and session scenes.
@@ -13,6 +14,7 @@ final class ApplicationModel {
     private var portalPresentationIsActive = false
     private var authorizedSessionPresentations = Set<UUID>()
     private var activeSessionPresentations = Set<UUID>()
+    private var sessionDiagnosticsPresentations: [UUID: SessionDiagnosticsPresentation] = [:]
 
     var sessionFailureMessage: String? {
         sessionFailures.first
@@ -30,6 +32,45 @@ final class ApplicationModel {
 
     func retainSessionDiagnosticsSummary(_ summary: String) {
         lastSessionDiagnosticsSummary = summary
+    }
+
+    func presentSessionDiagnostics(
+        for id: UUID,
+        title: String,
+        client: SpiceClient
+    ) {
+        client.setDiagnosticsEnabled(true)
+        sessionDiagnosticsPresentations[id] = SessionDiagnosticsPresentation(
+            title: title,
+            client: client
+        )
+    }
+
+    func dismissSessionDiagnostics(for id: UUID) {
+        guard let presentation = sessionDiagnosticsPresentations.removeValue(forKey: id) else {
+            return
+        }
+        presentation.client.setDiagnosticsEnabled(false)
+        retainSessionDiagnosticsSummary(
+            presentation.client.diagnosticsMonitor.snapshot.diagnosticsSummary
+        )
+    }
+
+    func sessionDiagnosticsPresentation(
+        for id: UUID
+    ) -> SessionDiagnosticsPresentation? {
+        sessionDiagnosticsPresentations[id]
+    }
+
+    func isSessionDiagnosticsPresented(for id: UUID) -> Bool {
+        sessionDiagnosticsPresentations[id] != nil
+    }
+
+    func copySessionDiagnosticsSummary(for id: UUID) {
+        guard let presentation = sessionDiagnosticsPresentations[id] else { return }
+        SessionDiagnosticsClipboard.copy(
+            presentation.client.diagnosticsMonitor.snapshot.diagnosticsSummary
+        )
     }
 
     func authorizePortalPresentation() {
@@ -66,4 +107,9 @@ final class ApplicationModel {
     func deactivateSessionPresentation(for id: UUID) {
         activeSessionPresentations.remove(id)
     }
+}
+
+struct SessionDiagnosticsPresentation {
+    let title: String
+    let client: SpiceClient
 }

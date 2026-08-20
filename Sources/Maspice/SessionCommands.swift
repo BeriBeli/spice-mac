@@ -10,7 +10,6 @@ struct FocusedSessionActions {
     let sendCtrlAltDelete: () -> Void
     let releaseCursor: () -> Void
     let setDiagnosticsVisible: (Bool) -> Void
-    let copyDiagnosticsSummary: () -> Void
 }
 
 extension FocusedValues {
@@ -78,14 +77,6 @@ struct SpiceCommands: Commands {
             ))
             .keyboardShortcut("d", modifiers: [.control, .option])
             .disabled(sessionActions?.availability.hasActiveSession != true)
-
-            Button("Copy Diagnostics Summary") {
-                sessionActions?.copyDiagnosticsSummary()
-            }
-            .disabled(
-                sessionActions?.availability.hasActiveSession != true
-                    || sessionActions?.showsDiagnostics != true
-            )
         }
     }
 }

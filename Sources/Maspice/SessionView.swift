@@ -9,9 +9,9 @@ struct SessionView: View {
 
     @State private var model: SessionModel
     @State private var isReturningToLauncher = false
-    @State private var showsDiagnostics = false
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismissWindow) private var dismissWindow
     @Environment(ApplicationModel.self) private var applicationModel
 
     init(request: SessionRequest, appDelegate: AppDelegate) {
@@ -48,26 +48,6 @@ struct SessionView: View {
                 .frame(width: 0, height: 0)
         }
         .navigationTitle(model.windowTitle)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button(
-                    showsDiagnostics ? "Hide Diagnostics" : "Show Diagnostics",
-                    systemImage: "sidebar.trailing"
-                ) {
-                    setDiagnosticsVisible(!showsDiagnostics)
-                }
-                .disabled(model.client == nil)
-                .help(showsDiagnostics ? "Hide session diagnostics" : "Show session diagnostics")
-            }
-        }
-        .inspector(isPresented: diagnosticsInspectorIsPresented) {
-            if let client = model.client {
-                SessionDiagnosticsInspector(
-                    monitor: client.diagnosticsMonitor,
-                    onCopy: copyDiagnosticsSummary)
-                    .inspectorColumnWidth(min: 310, ideal: 360, max: 440)
-            }
-        }
         .focusedSceneValue(\.sessionActions, focusedActions)
         .onAppear {
             guard applicationModel.activateSessionPresentation(for: requestID) else {
@@ -95,34 +75,31 @@ struct SessionView: View {
             showsDiagnostics: showsDiagnostics,
             sendCtrlAltDelete: model.sendCtrlAltDelete,
             releaseCursor: model.releaseAllInput,
-            setDiagnosticsVisible: setDiagnosticsVisible,
-            copyDiagnosticsSummary: copyDiagnosticsSummary)
+            setDiagnosticsVisible: setDiagnosticsVisible)
     }
 
-    private var diagnosticsInspectorIsPresented: Binding<Bool> {
-        Binding(
-            get: { showsDiagnostics },
-            set: { setDiagnosticsVisible($0) })
+    private var showsDiagnostics: Bool {
+        applicationModel.isSessionDiagnosticsPresented(for: requestID)
+    }
+
+    private var diagnosticsRequest: SessionDiagnosticsRequest {
+        SessionDiagnosticsRequest(sessionID: requestID)
     }
 
     private func setDiagnosticsVisible(_ visible: Bool) {
         guard showsDiagnostics != visible else { return }
         if visible {
-            showsDiagnostics = true
-            model.client?.setDiagnosticsEnabled(true)
+            guard let client = model.client else { return }
+            applicationModel.presentSessionDiagnostics(
+                for: requestID,
+                title: model.baseTitle,
+                client: client
+            )
+            openWindow(value: diagnosticsRequest)
         } else {
-            model.client?.setDiagnosticsEnabled(false)
-            if let snapshot = model.client?.diagnosticsMonitor.snapshot {
-                applicationModel.retainSessionDiagnosticsSummary(snapshot.diagnosticsSummary)
-            }
-            showsDiagnostics = false
+            dismissWindow(value: diagnosticsRequest)
+            applicationModel.dismissSessionDiagnostics(for: requestID)
         }
-    }
-
-    private func copyDiagnosticsSummary() {
-        guard showsDiagnostics,
-              let snapshot = model.client?.diagnosticsMonitor.snapshot else { return }
-        SessionDiagnosticsClipboard.copy(snapshot.diagnosticsSummary)
     }
 
     private func returnToLauncher() {
@@ -164,14 +141,5 @@ private struct SessionChangeObserver: View {
                     dismissWindow(id: "launcher")
                 }
             }
-    }
-}
-
-private struct SessionDiagnosticsInspector: View {
-    @ObservedObject var monitor: SpiceClientDiagnosticsMonitor
-    let onCopy: () -> Void
-
-    var body: some View {
-        SessionDiagnosticsView(snapshot: monitor.snapshot, onCopy: onCopy)
     }
 }
