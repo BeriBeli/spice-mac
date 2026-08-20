@@ -28,6 +28,7 @@ public final class SpiceClient: ObservableObject {
 
     @Published public private(set) var status: Status = .idle
     @Published public private(set) var frame: SpiceFrame?
+    @Published public private(set) var frameSequence: UInt64 = 0
     @Published public private(set) var cursor: SpiceCursorState?
     @Published public private(set) var pointerMode: SpicePointerMode = .absolute
     @Published public private(set) var agentConnected = false
@@ -53,6 +54,9 @@ public final class SpiceClient: ObservableObject {
 
     public var title: String? { parameters.title }
     public var prefersFullscreen: Bool { parameters.fullscreen }
+    public var presentationDiagnostics: SpicePresentationDiagnostics? {
+        session?.presentationDiagnostics
+    }
 
     private let parameters: SpiceConnectionParameters
     private var session: SpiceSession?
@@ -83,6 +87,7 @@ public final class SpiceClient: ObservableObject {
         self.session = session
         status = .connecting
         frame = nil
+        frameSequence = 0
         cursor = nil
 
         eventTask = Task { [weak self] in
@@ -382,8 +387,12 @@ public final class SpiceClient: ObservableObject {
         guard generation == self.generation else { return }
         switch event {
         case let .frame(frame):
-            diagnosticsCollector.recordClientFrameEvent()
+            let sequence = frameSequence &+ 1
+            diagnosticsCollector.recordClientFrameEvent(
+                sequence: sequence
+            )
             self.frame = frame
+            frameSequence = sequence
         case let .surfaceDestroyed(surfaceID):
             if frame?.surfaceID == surfaceID { frame = nil }
         case let .cursor(cursor):
@@ -401,6 +410,10 @@ public final class SpiceClient: ObservableObject {
         case .displayConfiguration, .keyboardModifiers, .migration:
             break
         }
+    }
+
+    public func recordDesktopViewUpdate(sequence: UInt64) {
+        diagnosticsCollector.recordDesktopViewUpdate(sequence: sequence)
     }
 
     private func makeEndpoint() throws -> SpiceEndpoint {

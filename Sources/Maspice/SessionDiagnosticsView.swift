@@ -63,11 +63,21 @@ struct SessionDiagnosticsView: View {
                 publisherStaleSnapshots: swiftSpiceMetrics?.publisherStaleSnapshots,
                 publisherPendingEvictions: swiftSpiceMetrics?.publisherPendingEvictions,
                 publisherPendingSurfaces: swiftSpiceMetrics?.publisherPendingSurfaces,
-                swiftSpiceSampleAgeMilliseconds:
-                    swiftSpiceMetrics?.latestSampleAgeMilliseconds,
+                publisherFramedReceiveBatchStartGap:
+                    swiftSpiceMetrics?.publisherFramedReceiveBatchStartGap,
+                publisherMessageReceiveToSurfaceReady:
+                    swiftSpiceMetrics?.publisherMessageReceiveToSurfaceReady,
+                publisherSurfaceReadyToSubmit:
+                    swiftSpiceMetrics?.publisherSurfaceReadyToSubmit,
+                mailboxFramesSent: swiftSpiceMetrics?.mailboxFramesSent,
+                mailboxFramesDelivered: swiftSpiceMetrics?.mailboxFramesDelivered,
+                mailboxFramesCoalesced: swiftSpiceMetrics?.mailboxFramesCoalesced,
+                mailboxFramesEvicted: swiftSpiceMetrics?.mailboxFramesEvicted,
                 clientFrameEvents: "\(snapshot.clientFrameEvents)",
                 clientFrameEventGap: snapshot.clientFrameEventGap,
-                mainActorSchedulingDelay: snapshot.mainActorSchedulingDelay
+                desktopViewUpdates: "\(snapshot.desktopViewUpdates)",
+                clientFramesSupersededBeforeDesktopView:
+                    "\(snapshot.clientFramesSupersededBeforeDesktopView)"
             )
             Divider()
             SessionDiagnosticsRendererSection(metrics: swiftSpiceMetrics)
@@ -105,15 +115,19 @@ extension SpiceClientDiagnosticsSnapshot {
             "enabled=\(isEnabled)",
             "scope=best_effort_aggregate_in_memory",
             "display_epoch=first_swiftspice_sample",
+            "display_timing_epoch=current_swiftspice_session",
             "input_send_scope=local_completion_not_rtt",
             "motion_ack_scope=aggregate_not_per_event_rtt",
-            "publisher_emit_scope=before_mailbox_client_and_presentation",
+            "publisher_emit_scope=through_session_mailbox_send_not_client_consumption",
+            "display_receive_scope=channel_connection_framed_message_completion",
+            "display_decode_scope=receive_completion_through_surface_apply_before_ack",
+            "publisher_submit_scope=display_actor_to_publisher_actor_entry",
             "video_scope=advanced_h264_h265_not_mjpeg",
             "channel_state_scope=active_plus_retired_last_observation",
             "agent_scope=state_and_content_free_event_counts",
             "agent_snapshot_counter_epoch=current_agent_manager_lifetime",
             "agent_event_counter_epoch=diagnostics_enable",
-            "unmeasured=transport_server_mailbox_presentation_timing",
+            "unmeasured=server_to_framed_receive_async_stream_resume_to_client_and_display_vsync_timing",
             "input_submitted=\(inputSubmitted)",
             "input_sent=\(inputSent)",
             "input_coalesced=\(inputCoalesced)",
@@ -132,6 +146,12 @@ extension SpiceClientDiagnosticsSnapshot {
             Self.latencySummary(
                 name: "main_actor_scheduling_delay",
                 value: mainActorSchedulingDelay
+            ),
+            "desktop_view_updates=\(desktopViewUpdates)",
+            "client_frames_superseded_before_desktop_view=\(clientFramesSupersededBeforeDesktopView)",
+            Self.latencySummary(
+                name: "client_to_desktop_view_update",
+                value: clientToDesktopViewUpdate
             ),
             "send_failures=\(sendFailures)",
             "agent_support_observed=\(agent.supportObserved)",
@@ -253,6 +273,54 @@ private struct SessionDiagnosticsSwiftSpiceMetrics {
     }
 
     var publisherPendingSurfaces: Int { latest.publisherPendingSurfaces }
+    var publisherFlushes: UInt64 {
+        counterDelta(latest.publisherFlushes, from: baseline.publisherFlushes)
+    }
+    var publisherFlushesWithoutEmission: UInt64 {
+        counterDelta(
+            latest.publisherFlushesWithoutEmission,
+            from: baseline.publisherFlushesWithoutEmission
+        )
+    }
+    var mailboxFramesSent: UInt64 {
+        counterDelta(latest.mailboxFramesSent, from: baseline.mailboxFramesSent)
+    }
+    var mailboxFramesDelivered: UInt64 {
+        counterDelta(latest.mailboxFramesDelivered, from: baseline.mailboxFramesDelivered)
+    }
+    var mailboxFramesCoalesced: UInt64 {
+        counterDelta(latest.mailboxFramesCoalesced, from: baseline.mailboxFramesCoalesced)
+    }
+    var mailboxFramesEvicted: UInt64 {
+        counterDelta(latest.mailboxFramesEvicted, from: baseline.mailboxFramesEvicted)
+    }
+    var publisherBatchStartGap: SpiceLatencySummary {
+        Self.clientSummary(latest.publisherBatchStartGap)
+    }
+    var publisherFramedReceiveBatchStartGap: SpiceLatencySummary {
+        Self.clientSummary(latest.publisherFramedReceiveBatchStartGap)
+    }
+    var publisherMessageReceiveToSurfaceReady: SpiceLatencySummary {
+        Self.clientSummary(latest.publisherMessageReceiveToSurfaceReady)
+    }
+    var publisherSurfaceReadyToSubmit: SpiceLatencySummary {
+        Self.clientSummary(latest.publisherSurfaceReadyToSubmit)
+    }
+    var publisherFlushStartGap: SpiceLatencySummary {
+        Self.clientSummary(latest.publisherFlushStartGap)
+    }
+    var publisherFlushSchedulingDelay: SpiceLatencySummary {
+        Self.clientSummary(latest.publisherFlushSchedulingDelay)
+    }
+    var publisherSnapshotDuration: SpiceLatencySummary {
+        Self.clientSummary(latest.publisherSnapshotDuration)
+    }
+    var publisherEmitDuration: SpiceLatencySummary {
+        Self.clientSummary(latest.publisherEmitDuration)
+    }
+    var mailboxFrameQueueDelay: SpiceLatencySummary {
+        Self.clientSummary(latest.mailboxFrameQueueDelay)
+    }
     var revisionedBackingEnabled: Bool { latest.revisionedBackingEnabled }
 
     var cpuMaterializations: UInt64 {
@@ -272,6 +340,34 @@ private struct SessionDiagnosticsSwiftSpiceMetrics {
 
     var gpuErrors: UInt64 {
         counterDelta(latest.gpuErrors, from: baseline.gpuErrors)
+    }
+
+    var metalPresentedFrames: UInt64 {
+        counterDelta(latest.metalPresentedFrames, from: baseline.metalPresentedFrames)
+    }
+    var metalPresentationErrors: UInt64 {
+        counterDelta(latest.metalPresentationErrors, from: baseline.metalPresentationErrors)
+    }
+    var metalFramesSupersededBeforeDraw: UInt64 {
+        counterDelta(
+            latest.metalFramesSupersededBeforeDraw,
+            from: baseline.metalFramesSupersededBeforeDraw
+        )
+    }
+    var metalDrawableMisses: UInt64 {
+        counterDelta(latest.metalDrawableMisses, from: baseline.metalDrawableMisses)
+    }
+    var metalCommandCreationFailures: UInt64 {
+        counterDelta(
+            latest.metalCommandCreationFailures,
+            from: baseline.metalCommandCreationFailures
+        )
+    }
+    var viewUpdateToMetalCommit: SpiceLatencySummary {
+        Self.clientSummary(latest.viewUpdateToMetalCommit)
+    }
+    var metalCommitToCompletion: SpiceLatencySummary {
+        Self.clientSummary(latest.metalCommitToCompletion)
     }
 
     var nativeVideoFrames: UInt64 {
@@ -357,12 +453,34 @@ private struct SessionDiagnosticsSwiftSpiceMetrics {
             "swiftspice_publisher_stale_snapshots_delta=\(publisherStaleSnapshots)",
             "swiftspice_publisher_pending_evictions_delta=\(publisherPendingEvictions)",
             "swiftspice_publisher_pending_surfaces_sample=\(publisherPendingSurfaces)",
+            "swiftspice_publisher_flushes_delta=\(publisherFlushes)",
+            "swiftspice_publisher_flushes_without_emission_delta=\(publisherFlushesWithoutEmission)",
+            latencySummary(name: "swiftspice_publisher_batch_start_gap", value: publisherBatchStartGap),
+            latencySummary(name: "swiftspice_framed_receive_batch_start_gap", value: publisherFramedReceiveBatchStartGap),
+            latencySummary(name: "swiftspice_message_receive_to_surface_ready", value: publisherMessageReceiveToSurfaceReady),
+            latencySummary(name: "swiftspice_surface_ready_to_publisher_submit", value: publisherSurfaceReadyToSubmit),
+            latencySummary(name: "swiftspice_publisher_flush_start_gap", value: publisherFlushStartGap),
+            latencySummary(name: "swiftspice_publisher_flush_scheduling_delay", value: publisherFlushSchedulingDelay),
+            latencySummary(name: "swiftspice_publisher_snapshot_duration", value: publisherSnapshotDuration),
+            latencySummary(name: "swiftspice_publisher_emit_duration", value: publisherEmitDuration),
+            "swiftspice_mailbox_frames_sent_delta=\(mailboxFramesSent)",
+            "swiftspice_mailbox_frames_delivered_delta=\(mailboxFramesDelivered)",
+            "swiftspice_mailbox_frames_coalesced_delta=\(mailboxFramesCoalesced)",
+            "swiftspice_mailbox_frames_evicted_delta=\(mailboxFramesEvicted)",
+            latencySummary(name: "swiftspice_mailbox_frame_queue_delay", value: mailboxFrameQueueDelay),
             "swiftspice_revisioned_backing_observed=\(revisionedBackingEnabled)",
             "swiftspice_cpu_materializations_delta=\(cpuMaterializations)",
             "swiftspice_cpu_materialization_bytes_delta=\(cpuMaterializationBytes)",
             "swiftspice_pool_exhaustions_delta=\(poolExhaustions)",
             "swiftspice_in_flight_leases_observed_max=\(latest.inFlightLeases)",
             "swiftspice_gpu_errors_delta=\(gpuErrors)",
+            "swiftspice_metal_presented_frames_delta=\(metalPresentedFrames)",
+            "swiftspice_metal_presentation_errors_delta=\(metalPresentationErrors)",
+            "swiftspice_metal_frames_superseded_before_draw_delta=\(metalFramesSupersededBeforeDraw)",
+            "swiftspice_metal_drawable_misses_delta=\(metalDrawableMisses)",
+            "swiftspice_metal_command_creation_failures_delta=\(metalCommandCreationFailures)",
+            latencySummary(name: "swiftspice_view_update_to_metal_commit", value: viewUpdateToMetalCommit),
+            latencySummary(name: "swiftspice_metal_commit_to_completion", value: metalCommitToCompletion),
             "swiftspice_surface_allocated_bytes_gauge=\(latest.surfaceAllocatedBytes)",
             "swiftspice_surface_budget_bytes_limit=\(latest.maximumSurfaceBytes)",
         ]
@@ -392,6 +510,27 @@ private struct SessionDiagnosticsSwiftSpiceMetrics {
             locale: Locale(identifier: "en_US_POSIX"),
             latestSampleAgeMilliseconds
         )
+    }
+
+    private static func clientSummary(_ value: SpiceTimingSummary) -> SpiceLatencySummary {
+        return SpiceLatencySummary(
+            sampleCount: value.sampleCount,
+            p95Milliseconds: value.p95Milliseconds,
+            maximumMilliseconds: value.maximumMilliseconds
+        )
+    }
+
+    private func latencySummary(name: String, value: SpiceLatencySummary) -> String {
+        [
+            "\(name)_samples=\(value.sampleCount)",
+            "\(name)_p95_ms=\(stableMilliseconds(value.p95Milliseconds))",
+            "\(name)_max_ms=\(stableMilliseconds(value.maximumMilliseconds))",
+        ].joined(separator: "\n")
+    }
+
+    private func stableMilliseconds(_ value: Double?) -> String {
+        guard let value else { return "n/a" }
+        return String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), value)
     }
 }
 
@@ -568,11 +707,17 @@ private struct SessionDiagnosticsDisplaySection: View {
     let publisherStaleSnapshots: UInt64?
     let publisherPendingEvictions: UInt64?
     let publisherPendingSurfaces: Int?
-    let swiftSpiceSampleAgeMilliseconds: Double?
+    let publisherFramedReceiveBatchStartGap: SpiceLatencySummary?
+    let publisherMessageReceiveToSurfaceReady: SpiceLatencySummary?
+    let publisherSurfaceReadyToSubmit: SpiceLatencySummary?
+    let mailboxFramesSent: UInt64?
+    let mailboxFramesDelivered: UInt64?
+    let mailboxFramesCoalesced: UInt64?
+    let mailboxFramesEvicted: UInt64?
     let clientFrameEvents: String
     let clientFrameEventGap: SpiceLatencySummary
-    let mainActorSchedulingDelay: SpiceLatencySummary
-    @Environment(\.locale) private var locale
+    let desktopViewUpdates: String
+    let clientFramesSupersededBeforeDesktopView: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -588,26 +733,38 @@ private struct SessionDiagnosticsDisplaySection: View {
                     + "\(diagnosticValue(publisherPendingEvictions)) / "
                     + "\(diagnosticValue(publisherPendingSurfaces))"
             )
+            if let publisherFramedReceiveBatchStartGap,
+               let publisherMessageReceiveToSurfaceReady,
+               let publisherSurfaceReadyToSubmit {
+                SessionDiagnosticsLatencyRow(
+                    label: "Framed-receive batch gap p95 / max",
+                    latency: publisherFramedReceiveBatchStartGap
+                )
+                SessionDiagnosticsLatencyRow(
+                    label: "Receive → surface ready p95 / max",
+                    latency: publisherMessageReceiveToSurfaceReady
+                )
+                SessionDiagnosticsLatencyRow(
+                    label: "Surface ready → publisher p95 / max",
+                    latency: publisherSurfaceReadyToSubmit
+                )
+            }
             SessionDiagnosticsMetricRow(
-                label: "SwiftSpice sample age",
-                value: formattedSampleAge
+                label: "Mailbox sent / delivered / coalesced / evicted",
+                value: "\(diagnosticValue(mailboxFramesSent)) / "
+                    + "\(diagnosticValue(mailboxFramesDelivered)) / "
+                    + "\(diagnosticValue(mailboxFramesCoalesced)) / "
+                    + "\(diagnosticValue(mailboxFramesEvicted))"
             )
             SessionDiagnosticsLatencyRow(
                 label: "Client frame-event gap p95 / max",
                 latency: clientFrameEventGap
             )
-            SessionDiagnosticsLatencyRow(
-                label: "MainActor scheduling delay p95 / max",
-                latency: mainActorSchedulingDelay
+            SessionDiagnosticsMetricRow(
+                label: "Desktop updates / superseded client frames",
+                value: "\(desktopViewUpdates) / \(clientFramesSupersededBeforeDesktopView)"
             )
         }
-    }
-
-    private var formattedSampleAge: String {
-        guard let swiftSpiceSampleAgeMilliseconds else { return "—" }
-        return swiftSpiceSampleAgeMilliseconds.formatted(
-            .number.precision(.fractionLength(0...1)).locale(locale)
-        ) + " ms"
     }
 }
 
@@ -627,6 +784,27 @@ private struct SessionDiagnosticsRendererSection: View {
                     + "\(diagnosticValue(metrics?.poolExhaustions)) / "
                     + "\(diagnosticValue(metrics?.gpuErrors))"
             )
+            SessionDiagnosticsMetricRow(
+                label: "Metal presented / superseded / errors",
+                value: "\(diagnosticValue(metrics?.metalPresentedFrames)) / "
+                    + "\(diagnosticValue(metrics?.metalFramesSupersededBeforeDraw)) / "
+                    + "\(diagnosticValue(metrics?.metalPresentationErrors))"
+            )
+            SessionDiagnosticsMetricRow(
+                label: "Drawable misses / command failures",
+                value: "\(diagnosticValue(metrics?.metalDrawableMisses)) / "
+                    + "\(diagnosticValue(metrics?.metalCommandCreationFailures))"
+            )
+            if let metrics {
+                SessionDiagnosticsLatencyRow(
+                    label: "View update → Metal commit p95 / max",
+                    latency: metrics.viewUpdateToMetalCommit
+                )
+                SessionDiagnosticsLatencyRow(
+                    label: "Metal commit → completion p95 / max",
+                    latency: metrics.metalCommitToCompletion
+                )
+            }
         }
     }
 
@@ -739,7 +917,7 @@ private struct SessionDiagnosticsMetricRow: View {
 
 private struct SessionDiagnosticsNotice: View {
     var body: some View {
-        Text("VDAgent metrics never contain clipboard text. Agent snapshot counters and fixed failure categories cover the current Agent manager lifetime; UI event counters begin when Diagnostics is enabled. Send completion is local only; Motion ACK is aggregate, not per-event RTT. Display counters rebase at the first best-effort SwiftSpice sample; sample age shows possible terminal staleness. Channel-state samples include the last observation from retired channels. SwiftSpice coalesces publisher work on a 16 ms interval; emitted frames are not presented frames. VideoToolbox counters cover advanced video, not MJPEG. Frame gap is measured after the publisher when Maspice consumes events. Transport, event-mailbox, and presentation timing are not measured. MainActor is 100 ms timer scheduling delay.")
+        Text("VDAgent metrics never contain clipboard text. Agent snapshot counters and fixed failure categories cover the current Agent manager lifetime; UI event counters begin when Diagnostics is enabled. Send completion is local only; Motion ACK is aggregate, not per-event RTT. Display counters rebase at the first best-effort SwiftSpice sample; timing summaries cover the current SwiftSpice session. Sample age shows possible terminal staleness. Channel-state samples include the last observation from retired channels. SwiftSpice coalesces publisher work on a 16 ms interval; receive timing begins only after ChannelConnection returns a complete framed message. Mailbox and Metal counters expose later-stage coalescing and presentation. VideoToolbox counters cover advanced video, not MJPEG. Server-to-framed-receive timing, AsyncStream resume-to-client scheduling, and display-vsync completion remain unmeasured. MainActor is 100 ms timer scheduling delay.")
             .font(.caption2)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)

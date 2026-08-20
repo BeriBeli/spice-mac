@@ -6,6 +6,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Expanded bounded display diagnostics across framed receive, surface update,
+  publisher, mailbox, client, desktop-view, and Metal presentation boundaries,
+  while keeping the on-screen summary focused on the stages needed to locate
+  dropped frames.
+- Updated SwiftSpice to 0.1.10.
+
 ## [0.3.5] — 2026-08-20
 
 ### Fixed

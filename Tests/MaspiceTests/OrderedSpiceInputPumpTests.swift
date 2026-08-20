@@ -143,16 +143,39 @@ struct OrderedSpiceInputPumpTests {
         let diagnostics = SpiceClientDiagnosticsCollector(enabled: true)
         let firstFrame = ContinuousClock().now
 
-        diagnostics.recordClientFrameEvent(at: firstFrame)
-        diagnostics.recordClientFrameEvent(at: firstFrame.advanced(by: .milliseconds(20)))
+        diagnostics.recordClientFrameEvent(
+            sequence: 1,
+            at: firstFrame
+        )
+        diagnostics.recordDesktopViewUpdate(
+            sequence: 1,
+            at: firstFrame.advanced(by: .milliseconds(3))
+        )
+        diagnostics.recordClientFrameEvent(
+            sequence: 2,
+            at: firstFrame.advanced(by: .milliseconds(20))
+        )
+        diagnostics.recordClientFrameEvent(
+            sequence: 3,
+            at: firstFrame.advanced(by: .milliseconds(22))
+        )
+        diagnostics.recordDesktopViewUpdate(
+            sequence: 3,
+            at: firstFrame.advanced(by: .milliseconds(26))
+        )
         diagnostics.recordMouseMotionAcknowledged()
         diagnostics.recordMainActorSchedulingDelay(.milliseconds(75))
 
         let snapshot = diagnostics.snapshot()
-        #expect(snapshot.clientFrameEvents == 2)
-        #expect(snapshot.clientFrameEventGap.sampleCount == 1)
+        #expect(snapshot.clientFrameEvents == 3)
+        #expect(snapshot.clientFrameEventGap.sampleCount == 2)
         #expect(snapshot.clientFrameEventGap.p95Milliseconds == 20)
         #expect(snapshot.clientFrameEventGap.maximumMilliseconds == 20)
+        #expect(snapshot.desktopViewUpdates == 2)
+        #expect(snapshot.clientFramesSupersededBeforeDesktopView == 1)
+        #expect(snapshot.clientToDesktopViewUpdate.sampleCount == 2)
+        #expect(snapshot.clientToDesktopViewUpdate.p95Milliseconds == 4)
+        #expect(snapshot.clientToDesktopViewUpdate.maximumMilliseconds == 4)
         #expect(snapshot.mouseMotionAcknowledgements == 1)
         #expect(snapshot.mainActorSchedulingDelay.sampleCount == 1)
         #expect(snapshot.mainActorSchedulingDelay.p95Milliseconds == 75)
@@ -163,6 +186,9 @@ struct OrderedSpiceInputPumpTests {
         #expect(reset.isEnabled)
         #expect(reset.clientFrameEvents == 0)
         #expect(reset.clientFrameEventGap == .empty)
+        #expect(reset.desktopViewUpdates == 0)
+        #expect(reset.clientFramesSupersededBeforeDesktopView == 0)
+        #expect(reset.clientToDesktopViewUpdate == .empty)
         #expect(reset.mouseMotionAcknowledgements == 0)
         #expect(reset.mainActorSchedulingDelay == .empty)
     }

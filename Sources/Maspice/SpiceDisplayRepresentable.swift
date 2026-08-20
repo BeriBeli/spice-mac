@@ -15,6 +15,10 @@ struct SwiftSpiceDesktop: View {
             frame: client.frame,
             cursor: client.cursor,
             pointerMode: client.pointerMode,
+            presentationDiagnostics: client.presentationDiagnostics,
+            onFrameUpdate: {
+                client.recordDesktopViewUpdate(sequence: client.frameSequence)
+            },
             onInput: client.submit(_:)
         )
         .background {

@@ -70,6 +70,9 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
         XCTAssertTrue(diagnosticsViewSource.contains("Session Diagnostics"))
         XCTAssertTrue(diagnosticsViewSource.contains("Copy Summary"))
         XCTAssertTrue(diagnosticsViewSource.contains("Publisher submit / emit / client"))
+        XCTAssertTrue(diagnosticsViewSource.contains("Framed-receive batch gap p95 / max"))
+        XCTAssertTrue(diagnosticsViewSource.contains("Receive → surface ready p95 / max"))
+        XCTAssertTrue(diagnosticsViewSource.contains("Surface ready → publisher p95 / max"))
         XCTAssertTrue(diagnosticsViewSource.contains("Publisher stale / evicted / pending"))
         XCTAssertTrue(diagnosticsViewSource.contains("Readbacks / pool exhausted / GPU errors"))
         XCTAssertTrue(diagnosticsViewSource.contains("VDAgent"))
@@ -86,7 +89,12 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
         XCTAssertTrue(diagnosticsViewSource.contains("Advanced video"))
         XCTAssertTrue(diagnosticsViewSource.contains("MJPEG only"))
         XCTAssertTrue(diagnosticsViewSource.contains("current >= baseline ? current - baseline : current"))
-        XCTAssertTrue(diagnosticsViewSource.contains("emitted frames are not presented frames"))
+        XCTAssertTrue(diagnosticsViewSource.contains(
+            "Mailbox and Metal counters expose later-stage coalescing and presentation"
+        ))
+        XCTAssertTrue(diagnosticsViewSource.contains(
+            "receive timing begins only after ChannelConnection returns"
+        ))
         XCTAssertFalse(diagnosticsViewSource.contains("firstMetalGenerationDisableReason"))
         XCTAssertFalse(diagnosticsViewSource.contains("FileHandle"))
         XCTAssertFalse(diagnosticsViewSource.contains("Logger"))
