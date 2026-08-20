@@ -20,10 +20,6 @@ struct RavadaPortalWindow: View {
             }
         }
         .frame(minWidth: 900, minHeight: 650)
-        .background {
-            InitialWindowZoomBridge()
-                .frame(width: 0, height: 0)
-        }
         .navigationTitle("Ravada Portal")
         .toolbar {
             ToolbarItem(placement: .navigation) {

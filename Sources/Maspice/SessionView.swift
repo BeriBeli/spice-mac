@@ -53,8 +53,6 @@ struct SessionView: View {
         }
         .frame(minWidth: 640, minHeight: 480)
         .background {
-            InitialWindowZoomBridge()
-                .frame(width: 0, height: 0)
             SessionChangeObserver(
                 appDelegate: appDelegate,
                 requestID: requestID,
