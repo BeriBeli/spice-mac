@@ -6,7 +6,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 CONFIG="${CONFIG:-release}"
-SWIFTPM_BUILD_SYSTEM="${SWIFTPM_BUILD_SYSTEM:-}"
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 PLIST="$ROOT/Resources/Info.plist"
 APP_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$PLIST")"
@@ -21,14 +20,9 @@ die() { printf '\033[1;31m[build-app] error:\033[0m %s\n' "$*" >&2; exit 1; }
 
 xcode-select -p >/dev/null 2>&1 || die "Xcode command-line tools are unavailable"
 
-BUILD_SYSTEM_ARGS=()
-if [ -n "$SWIFTPM_BUILD_SYSTEM" ]; then
-    BUILD_SYSTEM_ARGS=(--build-system "$SWIFTPM_BUILD_SYSTEM")
-fi
-log "swift build -c $CONFIG${SWIFTPM_BUILD_SYSTEM:+ ($SWIFTPM_BUILD_SYSTEM build system)}"
-swift build --disable-sandbox -c "$CONFIG" "${BUILD_SYSTEM_ARGS[@]}"
-BIN_PATH="$(swift build --disable-sandbox -c "$CONFIG" \
-    "${BUILD_SYSTEM_ARGS[@]}" --show-bin-path)"
+log "swift build -c $CONFIG"
+swift build --disable-sandbox -c "$CONFIG"
+BIN_PATH="$(swift build --disable-sandbox -c "$CONFIG" --show-bin-path)"
 BINARY="$BIN_PATH/$EXECUTABLE_NAME"
 [ -x "$BINARY" ] || die "built executable not found at $BINARY"
 SWIFTSPICE_SOURCE="$ROOT/.build/checkouts/spice-swift"
@@ -52,8 +46,10 @@ cp "$BINARY" "$APP/Contents/MacOS/$EXECUTABLE_NAME"
 ditto "$SPARKLE_FRAMEWORK" "$APP/Contents/Frameworks/Sparkle.framework"
 
 METAL_BUNDLE="$BIN_PATH/SwiftSpice_SpiceMetalCompositor.bundle"
-[ -f "$METAL_BUNDLE/SpiceVideoCompositor.metallib" ] \
-    || die "SwiftSpice Metal resource bundle is missing from the SwiftPM build"
+if [ ! -f "$METAL_BUNDLE/SpiceVideoCompositor.metallib" ] \
+    && [ ! -f "$METAL_BUNDLE/Contents/Resources/SpiceVideoCompositor.metallib" ]; then
+    die "SwiftSpice Metal resource bundle is missing from the SwiftPM build"
+fi
 cp -R "$METAL_BUNDLE" "$APP/Contents/Resources/"
 
 ICON_SOURCE="$ROOT/Resources/AppIcon.icon"

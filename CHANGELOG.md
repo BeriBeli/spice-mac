@@ -6,6 +6,21 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.5] — 2026-08-20
+
+### Fixed
+
+- Restored compatibility with SwiftPM's default Swift Build by consuming
+  SwiftSpice's isolated static-framework XCFrameworks instead of overlapping
+  binary-target header and module-map outputs.
+- Accepted both flat and standard macOS layouts for the SwiftSpice Metal
+  compositor resource bundle during application assembly.
+
+### Changed
+
+- Updated SwiftSpice to 0.1.8 and removed the legacy native build-system
+  override from the release build path.
+
 ## [0.3.4] — 2026-08-20
 
 ### Fixed
@@ -329,7 +344,8 @@ CocoaSpice.
   QEMU frameworks are no longer shipped (app size 443 MB → 23 MB).
 - See [SECURITY.md](SECURITY.md) for the threat model and residual risks.
 
-[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.3.5...HEAD
+[0.3.5]: https://github.com/BeriBeli/spice-mac/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/BeriBeli/spice-mac/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/BeriBeli/spice-mac/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/BeriBeli/spice-mac/compare/v0.3.1...v0.3.2
