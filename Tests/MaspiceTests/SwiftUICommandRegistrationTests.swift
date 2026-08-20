@@ -107,12 +107,23 @@ final class SwiftUICommandRegistrationTests: XCTestCase {
     }
 
     func testSettingsUseFocusedNativeTabs() throws {
-        let settingsSource = try source("Sources/Maspice/SettingsView.swift")
+        let settingsSource = try [
+            "Sources/Maspice/SettingsView.swift",
+            "Sources/Maspice/GeneralSettingsView.swift",
+            "Sources/Maspice/UpdateSettingsView.swift",
+            "Sources/Maspice/PortalSettingsView.swift",
+        ]
+        .map(source)
+        .joined(separator: "\n")
 
         XCTAssertTrue(settingsSource.contains("TabView"))
         XCTAssertTrue(settingsSource.contains("Label(\"General\", systemImage: \"gearshape\")"))
         XCTAssertTrue(settingsSource.contains("Label(\"Updates\", systemImage: \"arrow.triangle.2.circlepath\")"))
         XCTAssertTrue(settingsSource.contains("Label(\"Portal\", systemImage: \"globe\")"))
+        XCTAssertTrue(settingsSource.contains("struct GeneralSettingsView: View"))
+        XCTAssertTrue(settingsSource.contains("struct UpdateSettingsView: View"))
+        XCTAssertTrue(settingsSource.contains("struct PortalSettingsView: View"))
+        XCTAssertTrue(settingsSource.contains("let title: LocalizedStringResource"))
         XCTAssertTrue(settingsSource.contains("Automatically check for updates"))
         XCTAssertTrue(settingsSource.contains("Download updates automatically"))
         XCTAssertTrue(settingsSource.contains("No saved certificate for this portal."))
