@@ -9,6 +9,12 @@ import Observation
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var pendingRequests: [SessionRequest] = []
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // These windows have unrelated lifecycles. Automatic tab groups make a
+        // session's full-screen transition carry the other windows with it.
+        NSWindow.allowsAutomaticWindowTabbing = false
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)

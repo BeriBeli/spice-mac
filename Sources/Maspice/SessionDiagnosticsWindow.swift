@@ -34,6 +34,7 @@ struct SessionDiagnosticsWindow: View {
             }
         }
         .frame(minWidth: 360, minHeight: 480)
+        .windowFullScreenBehavior(.disabled)
         .onDisappear {
             applicationModel.dismissSessionDiagnostics(for: request.sessionID)
         }

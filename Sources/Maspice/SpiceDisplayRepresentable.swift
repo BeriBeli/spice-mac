@@ -109,7 +109,6 @@ private struct SpiceWindowBridge: NSViewRepresentable {
             window.acceptsMouseMovedEvents = true
             let center = NotificationCenter.default
             let names: [Notification.Name] = [
-                NSWindow.didBecomeKeyNotification,
                 NSWindow.didResignKeyNotification,
                 NSWindow.didEndLiveResizeNotification,
                 NSWindow.didEnterFullScreenNotification,
@@ -121,11 +120,20 @@ private struct SpiceWindowBridge: NSViewRepresentable {
                     MainActor.assumeIsolated { self?.handle(name) }
                 }
             }
+            observers.append(center.addObserver(
+                forName: NSWindow.didBecomeKeyNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.handleKeyWindowChange(NSApp.keyWindow)
+                }
+            })
             scheduleInitialWindowPolicy()
         }
 
         func stop() {
-            onReleaseInput()
+            releaseWindowInput()
             initialPolicyTask?.cancel()
             initialPolicyTask = nil
             removeObservers()
@@ -134,10 +142,8 @@ private struct SpiceWindowBridge: NSViewRepresentable {
 
         private func handle(_ name: Notification.Name) {
             switch name {
-            case NSWindow.didBecomeKeyNotification:
-                scheduleInitialWindowPolicy()
             case NSWindow.didResignKeyNotification, NSWindow.willCloseNotification:
-                onReleaseInput()
+                releaseWindowInput()
             case NSWindow.didEndLiveResizeNotification,
                  NSWindow.didEnterFullScreenNotification,
                  NSWindow.didExitFullScreenNotification:
@@ -145,6 +151,40 @@ private struct SpiceWindowBridge: NSViewRepresentable {
                 requestCurrentResolution()
             default:
                 break
+            }
+        }
+
+        private func handleKeyWindowChange(_ keyWindow: NSWindow?) {
+            guard let keyWindow else { return }
+            if keyWindow === window {
+                scheduleInitialWindowPolicy()
+            } else {
+                releaseWindowInput()
+            }
+        }
+
+        private func releaseWindowInput() {
+            if let window {
+                Self.releasePointerCapture(in: window)
+            }
+            onReleaseInput()
+        }
+
+        private static func releasePointerCapture(in window: NSWindow) {
+            let action = NSSelectorFromString("releaseSpicePointerCapture:")
+            if let firstResponder = window.firstResponder,
+               firstResponder.responds(to: action),
+               NSApp.sendAction(action, to: firstResponder, from: nil) {
+                return
+            }
+            guard let contentView = window.contentView else { return }
+            var pendingViews = [contentView]
+            while let view = pendingViews.popLast() {
+                if view.responds(to: action),
+                   NSApp.sendAction(action, to: view, from: nil) {
+                    return
+                }
+                pendingViews.append(contentsOf: view.subviews)
             }
         }
 

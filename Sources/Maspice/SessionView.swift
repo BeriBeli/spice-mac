@@ -51,7 +51,8 @@ struct SessionView: View {
         .focusedSceneValue(\.sessionActions, focusedActions)
         .onAppear {
             guard applicationModel.activateSessionPresentation(for: requestID) else {
-                openWindow(id: "launcher")
+                applicationModel.showLauncher()
+                openWindow(id: "main", value: MainWindowID.primary)
                 dismiss()
                 return
             }
@@ -108,7 +109,8 @@ struct SessionView: View {
         if let message = model.terminalFailureMessage {
             applicationModel.presentSessionFailure(message)
         }
-        openWindow(id: "launcher")
+        applicationModel.showLauncher()
+        openWindow(id: "main", value: MainWindowID.primary)
         dismiss()
     }
 }
@@ -138,7 +140,7 @@ private struct SessionChangeObserver: View {
                 for request in appDelegate.drainPendingRequests() {
                     applicationModel.authorizeSessionPresentation(request)
                     openWindow(value: request)
-                    dismissWindow(id: "launcher")
+                    dismissWindow(id: "main")
                 }
             }
     }

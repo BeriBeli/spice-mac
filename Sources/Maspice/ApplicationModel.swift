@@ -5,13 +5,17 @@ import SpiceController
 import SpiceSessionLogic
 
 /// SwiftUI-owned application state shared across launcher and session scenes.
+enum MainDestination: Equatable {
+    case launcher
+    case portal
+}
+
 @MainActor
 @Observable
 final class ApplicationModel {
+    private(set) var mainDestination: MainDestination = .launcher
     private var sessionFailures: [String] = []
     private(set) var lastSessionDiagnosticsSummary: String?
-    private var portalPresentationIsAuthorized = false
-    private var portalPresentationIsActive = false
     private var authorizedSessionPresentations = Set<UUID>()
     private var activeSessionPresentations = Set<UUID>()
     private var sessionDiagnosticsPresentations: [UUID: SessionDiagnosticsPresentation] = [:]
@@ -73,20 +77,12 @@ final class ApplicationModel {
         )
     }
 
-    func authorizePortalPresentation() {
-        portalPresentationIsAuthorized = true
+    func showLauncher() {
+        mainDestination = .launcher
     }
 
-    func activatePortalPresentation() -> Bool {
-        if portalPresentationIsActive { return true }
-        guard portalPresentationIsAuthorized else { return false }
-        portalPresentationIsAuthorized = false
-        portalPresentationIsActive = true
-        return true
-    }
-
-    func deactivatePortalPresentation() {
-        portalPresentationIsActive = false
+    func showPortal() {
+        mainDestination = .portal
     }
 
     func authorizeSessionPresentation(_ request: SessionRequest) {

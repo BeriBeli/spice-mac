@@ -40,7 +40,7 @@ struct SpiceCommands: Commands {
                     let request = SessionRequest(url: url)
                     applicationModel.authorizeSessionPresentation(request)
                     openWindow(value: request)
-                    dismissWindow(id: "launcher")
+                    dismissWindow(id: "main")
                 }
             }
             .keyboardShortcut("o", modifiers: .command)

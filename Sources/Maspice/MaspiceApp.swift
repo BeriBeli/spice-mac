@@ -12,23 +12,15 @@ struct MaspiceApp: App {
         userDriverDelegate: nil)
 
     var body: some Scene {
-        Window("Maspice", id: "launcher") {
-            LauncherView(appDelegate: appDelegate)
+        WindowGroup("Maspice", id: "main", for: MainWindowID.self) { _ in
+            MainWindowRoot(appDelegate: appDelegate)
                 .environment(applicationModel)
+        } defaultValue: {
+            .primary
         }
         .defaultSize(width: 520, height: 300)
-        .restorationBehavior(.disabled)
-
-        Window("Ravada Portal", id: "portal") {
-            RavadaPortalWindow()
-                .environment(applicationModel)
-        }
-        .defaultWindowPlacement { _, context in
-            WindowPlacement(size: context.defaultDisplay.visibleRect.size)
-        }
         .windowIdealSize(.maximum)
         .restorationBehavior(.disabled)
-        .defaultLaunchBehavior(.suppressed)
 
         WindowGroup("SPICE Console", for: SessionRequest.self) { request in
             if let request = request.wrappedValue {
@@ -64,6 +56,7 @@ struct MaspiceApp: App {
             }
         }
         .defaultSize(width: 420, height: 720)
+        .windowManagerRole(.principal)
         .restorationBehavior(.disabled)
         .defaultLaunchBehavior(.suppressed)
 
