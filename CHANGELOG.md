@@ -16,6 +16,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   management without a custom window-list heuristic.
 - Close the main Launcher or Portal window after handing a connection to a new
   Session, then recreate a fresh Launcher only when the Session returns.
+- Keep quick Diagnostics close-and-reopen cycles from letting an older window
+  tear down the replacement window's presentation and diagnostic collection.
+- Prevent additional main-window instances while retaining native `WindowGroup`
+  management for Window/Dock menus, Spaces, and full-screen behavior.
 
 ## [0.3.7] — 2026-08-21
 

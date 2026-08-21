@@ -38,22 +38,35 @@ final class ApplicationModel {
         lastSessionDiagnosticsSummary = summary
     }
 
+    @discardableResult
     func presentSessionDiagnostics(
         for id: UUID,
         title: String,
         client: SpiceClient
-    ) {
+    ) -> SessionDiagnosticsRequest {
+        if let presentation = sessionDiagnosticsPresentations[id] {
+            return presentation.request
+        }
+
+        let request = SessionDiagnosticsRequest(
+            sessionID: id,
+            presentationID: UUID()
+        )
         client.setDiagnosticsEnabled(true)
         sessionDiagnosticsPresentations[id] = SessionDiagnosticsPresentation(
+            request: request,
             title: title,
             client: client
         )
+        return request
     }
 
-    func dismissSessionDiagnostics(for id: UUID) {
-        guard let presentation = sessionDiagnosticsPresentations.removeValue(forKey: id) else {
+    func dismissSessionDiagnostics(_ request: SessionDiagnosticsRequest) {
+        guard let presentation = sessionDiagnosticsPresentations[request.sessionID],
+              presentation.request == request else {
             return
         }
+        sessionDiagnosticsPresentations.removeValue(forKey: request.sessionID)
         presentation.client.setDiagnosticsEnabled(false)
         retainSessionDiagnosticsSummary(
             presentation.client.diagnosticsMonitor.snapshot.diagnosticsSummary
@@ -61,17 +74,27 @@ final class ApplicationModel {
     }
 
     func sessionDiagnosticsPresentation(
-        for id: UUID
+        for request: SessionDiagnosticsRequest
     ) -> SessionDiagnosticsPresentation? {
-        sessionDiagnosticsPresentations[id]
+        guard let presentation = sessionDiagnosticsPresentations[request.sessionID],
+              presentation.request == request else {
+            return nil
+        }
+        return presentation
+    }
+
+    func sessionDiagnosticsRequest(for id: UUID) -> SessionDiagnosticsRequest? {
+        sessionDiagnosticsPresentations[id]?.request
     }
 
     func isSessionDiagnosticsPresented(for id: UUID) -> Bool {
         sessionDiagnosticsPresentations[id] != nil
     }
 
-    func copySessionDiagnosticsSummary(for id: UUID) {
-        guard let presentation = sessionDiagnosticsPresentations[id] else { return }
+    func copySessionDiagnosticsSummary(for request: SessionDiagnosticsRequest) {
+        guard let presentation = sessionDiagnosticsPresentation(for: request) else {
+            return
+        }
         SessionDiagnosticsClipboard.copy(
             presentation.client.diagnosticsMonitor.snapshot.diagnosticsSummary
         )
@@ -106,6 +129,7 @@ final class ApplicationModel {
 }
 
 struct SessionDiagnosticsPresentation {
+    let request: SessionDiagnosticsRequest
     let title: String
     let client: SpiceClient
 }

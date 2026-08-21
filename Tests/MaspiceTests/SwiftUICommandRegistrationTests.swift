@@ -81,13 +81,16 @@ struct SwiftUICommandRegistrationTests {
         #expect(appSource.contains("WindowGroup(\"Session Diagnostics\", for: SessionDiagnosticsRequest.self)"))
         #expect(appSource.contains(".defaultSize(width: 420, height: 720)"))
         #expect(diagnosticsWindowSource.contains(".windowFullScreenBehavior(.disabled)"))
-        #expect(sessionViewSource.contains("openWindow(value: diagnosticsRequest)"))
-        #expect(sessionViewSource.contains("dismissWindow(value: diagnosticsRequest)"))
+        #expect(sessionViewSource.contains("openWindow(value: request)"))
+        #expect(sessionViewSource.contains("dismissWindow(value: request)"))
         #expect(!sessionViewSource.contains(".inspector("))
         #expect(diagnosticsWindowSource.contains("struct SessionDiagnosticsRequest: Codable, Hashable"))
+        #expect(diagnosticsWindowSource.contains("let presentationID: UUID"))
         #expect(diagnosticsWindowSource.contains("@ObservedObject var monitor"))
         #expect(diagnosticsWindowSource.contains(".frame(minWidth: 360, minHeight: 480)"))
-        #expect(diagnosticsWindowSource.contains("applicationModel.dismissSessionDiagnostics"))
+        #expect(diagnosticsWindowSource.contains(
+            "applicationModel.dismissSessionDiagnostics(request)"
+        ))
         #expect(!sessionViewSource.contains("SessionDiagnosticsOverlay"))
         #expect(
             !sessionViewSource.contains(".toolbar {"),
@@ -98,6 +101,13 @@ struct SwiftUICommandRegistrationTests {
         #expect(sessionViewSource.contains("setDiagnosticsVisible(false)"))
         #expect(applicationModelSource.contains("client.setDiagnosticsEnabled(true)"))
         #expect(applicationModelSource.contains("presentation.client.setDiagnosticsEnabled(false)"))
+        #expect(applicationModelSource.contains("presentation.request == request"))
+        #expect(applicationModelSource.contains("sessionDiagnosticsRequest(for id: UUID)"))
+        #expect(applicationModelSource.contains("let request: SessionDiagnosticsRequest"))
+        #expect(sessionViewSource.contains(
+            "let request = applicationModel.presentSessionDiagnostics"
+        ))
+        #expect(sessionViewSource.contains("applicationModel.dismissSessionDiagnostics(request)"))
         #expect(applicationModelSource.contains("retainSessionDiagnosticsSummary"))
         #expect(diagnosticsRootSource.contains("private struct SessionDiagnosticsContent: View"))
         #expect(!diagnosticsRootSource.contains("private var diagnosticsContent"))
@@ -186,6 +196,7 @@ struct SwiftUICommandRegistrationTests {
         #expect(appSource.contains("MainWindowRoot(appDelegate: appDelegate)"))
         #expect(appSource.contains("defaultValue:"))
         #expect(appSource.contains(".primary"))
+        #expect(appSource.contains(".commandsRemoved()"))
         #expect(!appSource.contains("Window(\"Maspice\""))
         #expect(!appSource.contains("Window(\"Ravada Portal\""))
         #expect(mainWindowSource.contains("enum MainWindowID: String, Codable, Hashable"))
@@ -206,15 +217,27 @@ struct SwiftUICommandRegistrationTests {
         #expect(!launcherSource.contains("dismiss()"))
         #expect(portalSource.contains("applicationModel.showLauncher()"))
         #expect(portalSource.contains(
-            "openWindow(value: request)\n        dismissWindow(id: \"main\")\n"
+            "openWindow(value: request)\n"
+                + "        dismissWindow(id: \"main\", value: MainWindowID.primary)\n"
                 + "        applicationModel.showLauncher()"
         ))
         #expect(!portalSource.contains("openWindow(id: \"launcher\")"))
         #expect(!portalSource.contains("@Environment(\\.dismiss)"))
         #expect(!portalSource.contains("dismiss()"))
-        #expect(launcherSource.contains("dismissWindow(id: \"main\")"))
-        #expect(sessionSource.contains("dismissWindow(id: \"main\")"))
-        #expect(commandsSource.contains("dismissWindow(id: \"main\")"))
+        let mainWindowRoutingSource = [launcherSource, portalSource, sessionSource, commandsSource]
+            .joined(separator: "\n")
+        #expect(!mainWindowRoutingSource.contains("openWindow(id: \"main\")"))
+        #expect(!mainWindowRoutingSource.contains("dismissWindow(id: \"main\")"))
+        #expect(
+            mainWindowRoutingSource.components(
+                separatedBy: "dismissWindow(id: \"main\", value: MainWindowID.primary)"
+            ).count - 1 == 4
+        )
+        #expect(
+            mainWindowRoutingSource.components(
+                separatedBy: "openWindow(id: \"main\", value: MainWindowID.primary)"
+            ).count - 1 == 2
+        )
         #expect(launcherSource.contains("private func openSession(_ request: SessionRequest)"))
         #expect(appSource.contains(".restorationBehavior(.disabled)"))
         #expect(!appDelegateSource.contains("applicationDidBecomeActive"))

@@ -53,7 +53,7 @@ struct RavadaPortalWindow: View {
         let request = SessionRequest(url: url, removesFileAfterStart: true)
         applicationModel.authorizeSessionPresentation(request)
         openWindow(value: request)
-        dismissWindow(id: "main")
+        dismissWindow(id: "main", value: MainWindowID.primary)
         applicationModel.showLauncher()
     }
 

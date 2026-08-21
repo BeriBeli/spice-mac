@@ -83,23 +83,24 @@ struct SessionView: View {
         applicationModel.isSessionDiagnosticsPresented(for: requestID)
     }
 
-    private var diagnosticsRequest: SessionDiagnosticsRequest {
-        SessionDiagnosticsRequest(sessionID: requestID)
+    private var diagnosticsRequest: SessionDiagnosticsRequest? {
+        applicationModel.sessionDiagnosticsRequest(for: requestID)
     }
 
     private func setDiagnosticsVisible(_ visible: Bool) {
         guard showsDiagnostics != visible else { return }
         if visible {
             guard let client = model.client else { return }
-            applicationModel.presentSessionDiagnostics(
+            let request = applicationModel.presentSessionDiagnostics(
                 for: requestID,
                 title: model.baseTitle,
                 client: client
             )
-            openWindow(value: diagnosticsRequest)
+            openWindow(value: request)
         } else {
-            dismissWindow(value: diagnosticsRequest)
-            applicationModel.dismissSessionDiagnostics(for: requestID)
+            guard let request = diagnosticsRequest else { return }
+            dismissWindow(value: request)
+            applicationModel.dismissSessionDiagnostics(request)
         }
     }
 
@@ -140,7 +141,7 @@ private struct SessionChangeObserver: View {
                 for request in appDelegate.drainPendingRequests() {
                     applicationModel.authorizeSessionPresentation(request)
                     openWindow(value: request)
-                    dismissWindow(id: "main")
+                    dismissWindow(id: "main", value: MainWindowID.primary)
                 }
             }
     }
