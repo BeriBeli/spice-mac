@@ -5,6 +5,7 @@ import SwiftUI
 
 struct SessionDiagnosticsRequest: Codable, Hashable {
     let sessionID: UUID
+    let presentationID: UUID
 }
 
 struct SessionDiagnosticsWindow: View {
@@ -15,14 +16,12 @@ struct SessionDiagnosticsWindow: View {
     var body: some View {
         Group {
             if let presentation = applicationModel.sessionDiagnosticsPresentation(
-                for: request.sessionID
+                for: request
             ) {
                 SessionDiagnosticsMonitorView(
                     monitor: presentation.client.diagnosticsMonitor,
                     onCopy: {
-                        applicationModel.copySessionDiagnosticsSummary(
-                            for: request.sessionID
-                        )
+                        applicationModel.copySessionDiagnosticsSummary(for: request)
                     }
                 )
                 .navigationTitle(Text("Session Diagnostics — \(presentation.title)"))
@@ -36,7 +35,7 @@ struct SessionDiagnosticsWindow: View {
         .frame(minWidth: 360, minHeight: 480)
         .windowFullScreenBehavior(.disabled)
         .onDisappear {
-            applicationModel.dismissSessionDiagnostics(for: request.sessionID)
+            applicationModel.dismissSessionDiagnostics(request)
         }
     }
 }

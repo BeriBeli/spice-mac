@@ -56,7 +56,7 @@ struct LauncherView: View {
     private func openSession(_ request: SessionRequest) {
         applicationModel.authorizeSessionPresentation(request)
         openWindow(value: request)
-        dismissWindow(id: "main")
+        dismissWindow(id: "main", value: MainWindowID.primary)
     }
 
     private var portalURL: URL? {

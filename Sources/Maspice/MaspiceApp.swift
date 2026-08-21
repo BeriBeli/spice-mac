@@ -21,6 +21,7 @@ struct MaspiceApp: App {
         .defaultSize(width: 520, height: 300)
         .windowIdealSize(.maximum)
         .restorationBehavior(.disabled)
+        .commandsRemoved()
 
         WindowGroup("SPICE Console", for: SessionRequest.self) { request in
             if let request = request.wrappedValue {
