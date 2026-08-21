@@ -80,6 +80,7 @@ struct SwiftUICommandRegistrationTests {
 
         #expect(appSource.contains("WindowGroup(\"Session Diagnostics\", for: SessionDiagnosticsRequest.self)"))
         #expect(appSource.contains(".defaultSize(width: 420, height: 720)"))
+        #expect(diagnosticsWindowSource.contains(".windowFullScreenBehavior(.disabled)"))
         #expect(sessionViewSource.contains("openWindow(value: diagnosticsRequest)"))
         #expect(sessionViewSource.contains("dismissWindow(value: diagnosticsRequest)"))
         #expect(!sessionViewSource.contains(".inspector("))
@@ -169,27 +170,58 @@ struct SwiftUICommandRegistrationTests {
         #expect(settingsSource.contains("Preferences.ravadaPortalURL(from: ravadaPortalURL)"))
     }
 
-    @Test func `Launcher is singleton and does not automatically open file picker`() throws {
+    @Test func `Main window unifies launcher and portal without window routing`() throws {
         let appSource = try source("Sources/Maspice/MaspiceApp.swift")
         let appDelegateSource = try source("Sources/Maspice/AppDelegate.swift")
+        let mainWindowSource = try source("Sources/Maspice/MainWindow.swift")
         let launcherSource = try source("Sources/Maspice/LauncherView.swift")
+        let portalSource = try source("Sources/Maspice/RavadaPortalWindow.swift")
+        let sessionSource = try source("Sources/Maspice/SessionView.swift")
+        let commandsSource = try source("Sources/Maspice/SessionCommands.swift")
+        let applicationModelSource = try source("Sources/Maspice/ApplicationModel.swift")
 
-        #expect(appSource.contains("Window(\"Maspice\", id: \"launcher\")"))
-        #expect(!appSource.contains("WindowGroup(\"Maspice\", id: \"launcher\")"))
+        #expect(appSource.contains(
+            "WindowGroup(\"Maspice\", id: \"main\", for: MainWindowID.self)"
+        ))
+        #expect(appSource.contains("MainWindowRoot(appDelegate: appDelegate)"))
+        #expect(appSource.contains("defaultValue:"))
+        #expect(appSource.contains(".primary"))
+        #expect(!appSource.contains("Window(\"Maspice\""))
+        #expect(!appSource.contains("Window(\"Ravada Portal\""))
+        #expect(mainWindowSource.contains("enum MainWindowID: String, Codable, Hashable"))
+        #expect(mainWindowSource.contains("switch applicationModel.mainDestination"))
+        #expect(mainWindowSource.contains("LauncherView(appDelegate: appDelegate)"))
+        #expect(mainWindowSource.contains("RavadaPortalWindow()"))
+        #expect(applicationModelSource.contains("private(set) var mainDestination"))
+        #expect(applicationModelSource.contains("func showLauncher()"))
+        #expect(applicationModelSource.contains("func showPortal()"))
+        #expect(!applicationModelSource.contains("portalPresentationIsAuthorized"))
+        #expect(!applicationModelSource.contains("portalPresentationIsActive"))
         #expect(!launcherSource.contains("offerOpenPanelIfNeeded"))
         #expect(!launcherSource.contains("showsPortal"))
         #expect(!launcherSource.contains("RavadaPortalView("))
-        #expect(launcherSource.contains("openWindow(id: \"portal\")"))
-        #expect(launcherSource.contains("@Environment(\\.dismiss)"))
-        #expect(launcherSource.contains("dismiss()"))
-        #expect(!launcherSource.contains("dismissWindow(id: \"launcher\")"))
+        #expect(launcherSource.contains("applicationModel.showPortal()"))
+        #expect(!launcherSource.contains("openWindow(id: \"portal\")"))
+        #expect(!launcherSource.contains("@Environment(\\.dismiss)"))
+        #expect(!launcherSource.contains("dismiss()"))
+        #expect(portalSource.contains("applicationModel.showLauncher()"))
+        #expect(portalSource.contains(
+            "openWindow(value: request)\n        dismissWindow(id: \"main\")\n"
+                + "        applicationModel.showLauncher()"
+        ))
+        #expect(!portalSource.contains("openWindow(id: \"launcher\")"))
+        #expect(!portalSource.contains("@Environment(\\.dismiss)"))
+        #expect(!portalSource.contains("dismiss()"))
+        #expect(launcherSource.contains("dismissWindow(id: \"main\")"))
+        #expect(sessionSource.contains("dismissWindow(id: \"main\")"))
+        #expect(commandsSource.contains("dismissWindow(id: \"main\")"))
         #expect(launcherSource.contains("private func openSession(_ request: SessionRequest)"))
         #expect(appSource.contains(".restorationBehavior(.disabled)"))
-        #expect(appSource.contains(".defaultLaunchBehavior(.suppressed)"))
         #expect(!appDelegateSource.contains("applicationDidBecomeActive"))
+        #expect(appDelegateSource.contains("applicationWillFinishLaunching"))
+        #expect(appDelegateSource.contains("NSWindow.allowsAutomaticWindowTabbing = false"))
         #expect(appDelegateSource.contains("NSMenu.didAddItemNotification"))
         #expect(appDelegateSource.contains("removeEmptyTopLevelMenus()"))
-        #expect(launcherSource.contains("authorizePortalPresentation()"))
         #expect(launcherSource.contains("authorizeSessionPresentation(request)"))
         #expect(launcherSource.contains("@State private var isDropTargeted = false"))
         #expect(launcherSource.contains(".dropDestination(for: URL.self)"))
@@ -202,32 +234,60 @@ struct SwiftUICommandRegistrationTests {
         #expect(!launcherSource.contains("public.file-url"))
     }
 
-    @Test func `Portal and session windows use native maximum placement`() throws {
+    @Test func `Dock window list is entirely system managed`() throws {
+        let appDelegateSource = try source("Sources/Maspice/AppDelegate.swift")
+        let appSource = try source("Sources/Maspice/MaspiceApp.swift")
+
+        #expect(!appDelegateSource.contains("applicationDockMenu"))
+        #expect(!appDelegateSource.contains("NSMenuDelegate"))
+        #expect(!appDelegateSource.contains("NSApp.windows"))
+        #expect(!appDelegateSource.contains("application.windows"))
+        #expect(!appDelegateSource.contains("isOnActiveSpace"))
+        #expect(!appDelegateSource.contains("isExcludedFromWindowsMenu"))
+        #expect(!appDelegateSource.contains("DockWindowActionTarget"))
+        #expect(appSource.contains(
+            "WindowGroup(\"Maspice\", id: \"main\", for: MainWindowID.self)"
+        ))
+    }
+
+    @Test func `Main destination drives one narrow native sizing bridge`() throws {
         let appSource = try source("Sources/Maspice/MaspiceApp.swift")
         let portalWindowSource = try source("Sources/Maspice/RavadaPortalWindow.swift")
         let sessionViewSource = try source("Sources/Maspice/SessionView.swift")
         let sessionBridgeSource = try source("Sources/Maspice/SpiceDisplayRepresentable.swift")
+        let mainBridgeSource = try source(
+            "Sources/Maspice/MainWindowPresentationBridge.swift"
+        )
         let zoomBridgeURL = repositoryRoot
             .appendingPathComponent("Sources/Maspice/InitialWindowZoomBridge.swift")
 
-        #expect(appSource.contains("Window(\"Ravada Portal\", id: \"portal\")"))
+        #expect(!appSource.contains("Window(\"Ravada Portal\", id: \"portal\")"))
         #expect(
             appSource.components(separatedBy: ".windowIdealSize(.maximum)").count - 1 == 2
         )
         #expect(
-            appSource.components(separatedBy: ".defaultWindowPlacement").count - 1 == 2
+            appSource.components(separatedBy: ".windowManagerRole(.principal)").count - 1 == 1
         )
         #expect(
-            appSource.components(separatedBy: "context.defaultDisplay.visibleRect.size").count - 1 == 2
+            appSource.components(separatedBy: ".defaultWindowPlacement").count - 1 == 1
+        )
+        #expect(
+            appSource.components(separatedBy: "context.defaultDisplay.visibleRect.size").count - 1 == 1
         )
         #expect(!appSource.contains(".defaultSize(width: 1024, height: 768)"))
         #expect(!FileManager.default.fileExists(atPath: zoomBridgeURL.path))
         #expect(!portalWindowSource.contains("InitialWindowZoomBridge()"))
+        #expect(mainBridgeSource.contains("struct MainWindowPresentationBridge: NSViewRepresentable"))
+        #expect(mainBridgeSource.contains("window.contentMinSize"))
+        #expect(mainBridgeSource.contains("window.isZoomed"))
+        #expect(mainBridgeSource.contains("window.zoom(nil)"))
+        #expect(mainBridgeSource.contains("window.setContentSize"))
+        #expect(mainBridgeSource.contains("NSWindow.didExitFullScreenNotification"))
         #expect(portalWindowSource.contains("RavadaPortalView("))
-        #expect(portalWindowSource.contains("@Environment(\\.dismiss)"))
-        #expect(portalWindowSource.contains("dismiss()"))
-        #expect(portalWindowSource.contains("activatePortalPresentation()"))
-        #expect(portalWindowSource.contains("deactivatePortalPresentation()"))
+        #expect(!portalWindowSource.contains("@Environment(\\.dismiss)"))
+        #expect(!portalWindowSource.contains("dismiss()"))
+        #expect(!portalWindowSource.contains("activatePortalPresentation()"))
+        #expect(!portalWindowSource.contains("deactivatePortalPresentation()"))
         #expect(portalWindowSource.contains("authorizeSessionPresentation(request)"))
         #expect(portalWindowSource.contains("guard !isHandingOffConnection else { return }"))
         #expect(portalWindowSource.contains("onError: presentPortalError"))
@@ -237,6 +297,14 @@ struct SwiftUICommandRegistrationTests {
         #expect(sessionViewSource.contains("deactivateSessionPresentation(for: requestID)"))
         #expect(!sessionViewSource.contains("@State private var presentationWasAuthorized"))
         #expect(sessionBridgeSource.contains("NSWindow.didBecomeKeyNotification"))
+        #expect(sessionBridgeSource.contains("NSWindow.didResignKeyNotification"))
+        #expect(sessionBridgeSource.contains("handleKeyWindowChange"))
+        #expect(sessionBridgeSource.contains("window.firstResponder"))
+        #expect(sessionBridgeSource.contains("releaseSpicePointerCapture:"))
+        #expect(sessionBridgeSource.contains(
+            "case NSWindow.didResignKeyNotification, NSWindow.willCloseNotification:"
+        ))
+        #expect(sessionBridgeSource.contains("onReleaseInput()"))
         #expect(!sessionBridgeSource.contains("window.zoom(nil)"))
         #expect(!sessionBridgeSource.contains("window.setContentSize"))
     }

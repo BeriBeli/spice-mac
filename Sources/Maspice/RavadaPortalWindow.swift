@@ -3,7 +3,7 @@ import SwiftUI
 
 struct RavadaPortalWindow: View {
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismissWindow) private var dismissWindow
     @Environment(ApplicationModel.self) private var applicationModel
     @AppStorage(Preferences.ravadaPortalURLKey) private var ravadaPortalURL = ""
     @State private var isHandingOffConnection = false
@@ -29,16 +29,6 @@ struct RavadaPortalWindow: View {
                 .help("Close the portal and return to the launcher")
             }
         }
-        .onAppear {
-            guard applicationModel.activatePortalPresentation() else {
-                openWindow(id: "launcher")
-                dismiss()
-                return
-            }
-        }
-        .onDisappear {
-            applicationModel.deactivatePortalPresentation()
-        }
         .alert("Connection Failed", isPresented: sessionFailureIsPresented) {
             Button("OK") { applicationModel.clearSessionFailure() }
         } message: {
@@ -54,8 +44,7 @@ struct RavadaPortalWindow: View {
     }
 
     private func returnToLauncher() {
-        openWindow(id: "launcher")
-        dismiss()
+        applicationModel.showLauncher()
     }
 
     private func openDownloadedConnection(_ url: URL) {
@@ -64,7 +53,8 @@ struct RavadaPortalWindow: View {
         let request = SessionRequest(url: url, removesFileAfterStart: true)
         applicationModel.authorizeSessionPresentation(request)
         openWindow(value: request)
-        dismiss()
+        dismissWindow(id: "main")
+        applicationModel.showLauncher()
     }
 
     private func presentPortalError(_ message: String) {

@@ -6,6 +6,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Prevented unrelated Maspice windows from being automatically tabbed together,
+  following a SPICE session into full screen, or bypassing captured-input release
+  when switching windows.
+- Unified the launcher and Ravada Portal as one system-managed main window so
+  Dock, Window menu, Space, and full-screen behavior follow native macOS window
+  management without a custom window-list heuristic.
+- Close the main Launcher or Portal window after handing a connection to a new
+  Session, then recreate a fresh Launcher only when the Session returns.
+
 ## [0.3.7] — 2026-08-21
 
 ### Changed

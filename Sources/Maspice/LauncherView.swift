@@ -5,7 +5,7 @@ struct LauncherView: View {
     let appDelegate: AppDelegate
 
     @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismissWindow) private var dismissWindow
     @Environment(ApplicationModel.self) private var applicationModel
     @AppStorage(Preferences.ravadaPortalURLKey) private var ravadaPortalURL = ""
     @State private var isDropTargeted = false
@@ -37,9 +37,7 @@ struct LauncherView: View {
     }
 
     private func openPortal() {
-        applicationModel.authorizePortalPresentation()
-        openWindow(id: "portal")
-        dismiss()
+        applicationModel.showPortal()
     }
 
     private func routePendingRequests() {
@@ -58,7 +56,7 @@ struct LauncherView: View {
     private func openSession(_ request: SessionRequest) {
         applicationModel.authorizeSessionPresentation(request)
         openWindow(value: request)
-        dismiss()
+        dismissWindow(id: "main")
     }
 
     private var portalURL: URL? {
