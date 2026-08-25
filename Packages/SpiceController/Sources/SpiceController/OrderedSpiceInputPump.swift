@@ -184,6 +184,7 @@ final class OrderedSpiceInputPump {
             executorPreference: sendExecutor,
             priority: .high
         ) { [weak self] in
+            guard !Task.isCancelled else { return }
             let sendStartedAt = ContinuousClock().now
             let result: Result<Void, SpiceError>
             do {
@@ -194,6 +195,7 @@ final class OrderedSpiceInputPump {
             } catch {
                 result = .failure(.protocolError(String(describing: error)))
             }
+            guard !Task.isCancelled else { return }
             await self?.finishSend(
                 pendingInput,
                 startedAt: sendStartedAt,
@@ -209,6 +211,7 @@ final class OrderedSpiceInputPump {
         completedAt: ContinuousClock.Instant,
         result: Result<Void, SpiceError>
     ) {
+        guard !stopped else { return }
         let measurementToken = pendingInput.measurementToken
         let measuresLatency = diagnostics?.isCurrentMeasurement(measurementToken) == true
         if measuresLatency, let enqueuedAt = pendingInput.enqueuedAt {
