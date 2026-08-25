@@ -86,7 +86,8 @@ struct SwiftUICommandRegistrationTests {
         #expect(!sessionViewSource.contains(".inspector("))
         #expect(diagnosticsWindowSource.contains("struct SessionDiagnosticsRequest: Codable, Hashable"))
         #expect(diagnosticsWindowSource.contains("let presentationID: UUID"))
-        #expect(diagnosticsWindowSource.contains("@ObservedObject var monitor"))
+        #expect(diagnosticsWindowSource.contains("let monitor: SpiceClientDiagnosticsMonitor"))
+        #expect(!diagnosticsWindowSource.contains("@ObservedObject"))
         #expect(diagnosticsWindowSource.contains(".frame(minWidth: 360, minHeight: 480)"))
         #expect(diagnosticsWindowSource.contains(
             "applicationModel.dismissSessionDiagnostics(request)"
@@ -121,12 +122,15 @@ struct SwiftUICommandRegistrationTests {
         #expect(applicationModelSource.contains("lastSessionDiagnosticsSummary"))
         #expect(diagnosticsViewSource.contains("Session Diagnostics"))
         #expect(diagnosticsViewSource.contains("Copy Summary"))
-        #expect(diagnosticsViewSource.contains("Publisher submit / emit / client"))
+        #expect(diagnosticsViewSource.contains("Mutation submit / snapshot / emit"))
         #expect(diagnosticsViewSource.contains("Framed-receive batch gap p95 / max"))
         #expect(diagnosticsViewSource.contains("Receive → surface ready p95 / max"))
         #expect(diagnosticsViewSource.contains("Surface ready → publisher p95 / max"))
-        #expect(diagnosticsViewSource.contains("Publisher stale / evicted / pending"))
+        #expect(diagnosticsViewSource.contains("Demand suppressed / pending / prepared coalesces"))
+        #expect(diagnosticsViewSource.contains("Desktop delivered / stream coalesced / handler"))
         #expect(diagnosticsViewSource.contains("Readbacks / pool exhausted / GPU errors"))
+        #expect(diagnosticsViewSource.contains("Display-link wake / tick / idle pause"))
+        #expect(diagnosticsViewSource.contains("Texture cache hit / miss / eviction"))
         #expect(diagnosticsViewSource.contains("VDAgent"))
         #expect(diagnosticsViewSource.contains("Monitor supported / requests / blocked"))
         #expect(diagnosticsViewSource.contains("never contain clipboard text"))
@@ -138,22 +142,73 @@ struct SwiftUICommandRegistrationTests {
         #expect(diagnosticsViewSource.contains(
             "Manager clipboard failures / last category"
         ))
-        #expect(diagnosticsViewSource.contains("Advanced video"))
-        #expect(diagnosticsViewSource.contains("MJPEG only"))
+        #expect(diagnosticsViewSource.contains("Video codecs"))
+        #expect(diagnosticsViewSource.contains("MJPEG decoded / IOSurface / Data fallback"))
+        #expect(diagnosticsViewSource.contains("Codec fallback reconnects"))
+        #expect(diagnosticsViewSource.contains("H.264 + MJPEG fallback"))
         #expect(diagnosticsViewSource.contains("current >= baseline ? current - baseline : current"))
         #expect(diagnosticsViewSource.contains(
-            "Mailbox and Metal counters expose later-stage coalescing and presentation"
+            "Source, display-link, Metal, VideoToolbox, and MJPEG counters expose"
         ))
         #expect(diagnosticsViewSource.contains(
-            "receive timing begins only after ChannelConnection returns"
+            "Receive timing begins only after ChannelConnection returns"
         ))
         #expect(!diagnosticsViewSource.contains("firstMetalGenerationDisableReason"))
+        #expect(!diagnosticsViewSource.contains("mailbox_frames"))
+        #expect(!diagnosticsViewSource.contains("client_frame_events"))
         #expect(!diagnosticsViewSource.contains("FileHandle"))
         #expect(!diagnosticsViewSource.contains("Logger"))
         #expect(!diagnosticsViewSource.contains("write(to:"))
         #expect(!diagnosticsViewSource.contains(".background(.regularMaterial"))
         #expect(!diagnosticsViewSource.contains(".shadow("))
         #expect(!diagnosticsViewSource.contains("maxHeight: 400"))
+    }
+
+    @Test func `Desktop traffic bypasses SwiftUI Observation`() throws {
+        let clientSource = try source(
+            "Packages/SpiceController/Sources/SpiceController/SpiceClient.swift"
+        )
+        let reconnectStart = try #require(
+            clientSource.range(of: "    private func reconnectUsingMJPEG")
+        )
+        let reconnectEnd = try #require(
+            clientSource.range(
+                of: "\n    private func makeEndpoint",
+                range: reconnectStart.upperBound..<clientSource.endIndex
+            )
+        )
+        let reconnectSource = String(
+            clientSource[reconnectStart.lowerBound..<reconnectEnd.lowerBound]
+        )
+        let desktopSource = try source("Sources/Maspice/SpiceDisplayRepresentable.swift")
+        let sessionSource = try source("Sources/Maspice/SessionView.swift")
+
+        #expect(clientSource.contains("@Observable\npublic final class SpiceClient"))
+        #expect(clientSource.contains("@ObservationIgnored public let desktop"))
+        #expect(!clientSource.contains("@Published"))
+        #expect(!clientSource.contains("var frame: SpiceFrame"))
+        #expect(!clientSource.contains("var frameSequence"))
+        #expect(!clientSource.contains("var cursor: SpiceCursorState"))
+        #expect(!clientSource.contains("var pointerMode: SpicePointerMode"))
+        #expect(!desktopSource.contains("@ObservedObject"))
+        #expect(desktopSource.contains("let desktop: SpiceDesktopSource"))
+        #expect(desktopSource.contains("SpiceDesktopView(\n            desktop: desktop"))
+        #expect(sessionSource.contains("desktop: client.desktop"))
+        #expect(!desktopSource.contains("onFrameUpdate"))
+        #expect(clientSource.contains("videoCodecPolicy: .h264AndMJPEG"))
+        #expect(clientSource.components(separatedBy: "for await event in session.events").count == 2)
+        #expect(clientSource.contains("self.agentManager === manager"))
+        #expect(reconnectSource.contains("await manager.waitForSessionReconnectBoundary()"))
+        let explicitDisconnect = try #require(
+            reconnectSource.range(of: "await retrySession.disconnect()")
+        )
+        let agentBoundary = try #require(
+            reconnectSource.range(of: "await manager.waitForSessionReconnectBoundary()")
+        )
+        #expect(explicitDisconnect.lowerBound < agentBoundary.lowerBound)
+        #expect(clientSource.contains("codecFallbackPolicy.consumeExpectedDisconnect"))
+        #expect(!reconnectSource.contains("await oldManager.stop()"))
+        #expect(!reconnectSource.contains("await oldSink.stop()"))
     }
 
     @Test func `Settings use focused native tabs`() throws {

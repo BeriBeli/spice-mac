@@ -23,7 +23,11 @@ struct SessionView: View {
     var body: some View {
         ZStack {
             if let client = model.client {
-                SwiftSpiceDesktop(client: client, model: model)
+                SwiftSpiceDesktop(
+                    desktop: client.desktop,
+                    onInput: client.submit(_:),
+                    model: model
+                )
             } else {
                 Color.clear
             }

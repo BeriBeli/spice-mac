@@ -1,12 +1,50 @@
 // SPDX-License-Identifier: MIT
-import Combine
 import Foundation
+import Observation
 import SwiftSpice
 import VVConfig
 
+struct SpiceVideoCodecFallbackPolicy {
+    private(set) var didReconnect = false
+    private var expectedDisconnectGeneration: UInt64?
+
+    mutating func reset() {
+        didReconnect = false
+        expectedDisconnectGeneration = nil
+    }
+
+    mutating func shouldReconnect(
+        after error: SpiceError,
+        hasPresentedAdvancedVideo: Bool
+    ) -> Bool {
+        guard !didReconnect,
+              !hasPresentedAdvancedVideo,
+              case .videoCodecUnavailable = error
+        else { return false }
+        didReconnect = true
+        return true
+    }
+
+    mutating func expectFailedAttemptDisconnect(generation: UInt64) {
+        guard expectedDisconnectGeneration == nil else { return }
+        expectedDisconnectGeneration = generation
+    }
+
+    mutating func cancelExpectedDisconnect() {
+        expectedDisconnectGeneration = nil
+    }
+
+    mutating func consumeExpectedDisconnect(generation: UInt64) -> Bool {
+        guard expectedDisconnectGeneration == generation else { return false }
+        expectedDisconnectGeneration = nil
+        return true
+    }
+}
+
 @MainActor
-public final class SpiceClientDiagnosticsMonitor: ObservableObject {
-    @Published public fileprivate(set) var snapshot: SpiceClientDiagnosticsSnapshot = .disabled
+@Observable
+public final class SpiceClientDiagnosticsMonitor {
+    public fileprivate(set) var snapshot: SpiceClientDiagnosticsSnapshot = .disabled
 
     public init() {}
 
@@ -17,7 +55,8 @@ public final class SpiceClientDiagnosticsMonitor: ObservableObject {
 
 /// Main-actor façade over the public SwiftSpice API used by Maspice.
 @MainActor
-public final class SpiceClient: ObservableObject {
+@Observable
+public final class SpiceClient {
     public enum Status: Equatable {
         case idle
         case connecting
@@ -26,15 +65,12 @@ public final class SpiceClient: ObservableObject {
         case failed(String)
     }
 
-    @Published public private(set) var status: Status = .idle
-    @Published public private(set) var frame: SpiceFrame?
-    @Published public private(set) var frameSequence: UInt64 = 0
-    @Published public private(set) var cursor: SpiceCursorState?
-    @Published public private(set) var pointerMode: SpicePointerMode = .absolute
-    @Published public private(set) var agentConnected = false
-    @Published public private(set) var supportsDynamicResolution = false
-    @Published public private(set) var isInputAvailable = false
+    public private(set) var status: Status = .idle
+    public private(set) var agentConnected = false
+    public private(set) var supportsDynamicResolution = false
+    public private(set) var isInputAvailable = false
     public let diagnosticsMonitor = SpiceClientDiagnosticsMonitor()
+    @ObservationIgnored public let desktop: SpiceDesktopSource
 
     public var shareClipboard = true {
         didSet {
@@ -54,57 +90,66 @@ public final class SpiceClient: ObservableObject {
 
     public var title: String? { parameters.title }
     public var prefersFullscreen: Bool { parameters.fullscreen }
-    public var presentationDiagnostics: SpicePresentationDiagnostics? {
-        session?.presentationDiagnostics
-    }
 
-    private let parameters: SpiceConnectionParameters
-    private var session: SpiceSession?
-    private var agentManager: SpiceAgentManager?
-    private var playbackSink: SpiceAudioPlaybackSink?
-    private var inputPump: OrderedSpiceInputPump?
-    private var connectionTask: Task<Void, Never>?
-    private var eventTask: Task<Void, Never>?
-    private var supportTask: Task<Void, Never>?
-    private var clipboardTask: Task<Void, Never>?
-    private var displayConfigurationTask: Task<Void, Never>?
-    private var latestAgentSupport: SpiceDisplayConfigurationSupport?
-    private var latestClipboardState: SpiceClientClipboardDiagnosticsState = .unknown
-    private let diagnosticsCollector = SpiceClientDiagnosticsCollector()
-    private var diagnosticsTask: Task<Void, Never>?
-    private var diagnosticsGeneration: UInt64 = 0
-    private var generation: UInt64 = 0
+    @ObservationIgnored private let parameters: SpiceConnectionParameters
+    @ObservationIgnored private let session: SpiceSession
+    @ObservationIgnored private var agentManager: SpiceAgentManager?
+    @ObservationIgnored private var playbackSink: SpiceAudioPlaybackSink?
+    @ObservationIgnored private var inputPump: OrderedSpiceInputPump?
+    @ObservationIgnored private var connectionTask: Task<Void, Never>?
+    @ObservationIgnored private var eventTask: Task<Void, Never>?
+    @ObservationIgnored private var supportTask: Task<Void, Never>?
+    @ObservationIgnored private var clipboardTask: Task<Void, Never>?
+    @ObservationIgnored private var displayConfigurationTask: Task<Void, Never>?
+    @ObservationIgnored private var latestAgentSupport: SpiceDisplayConfigurationSupport?
+    @ObservationIgnored private var latestClipboardState: SpiceClientClipboardDiagnosticsState = .unknown
+    @ObservationIgnored private let diagnosticsCollector = SpiceClientDiagnosticsCollector()
+    @ObservationIgnored private var diagnosticsTask: Task<Void, Never>?
+    @ObservationIgnored private var diagnosticsGeneration: UInt64 = 0
+    @ObservationIgnored private var generation: UInt64 = 0
+    @ObservationIgnored private var diagnosticsReadyGeneration: UInt64?
+    @ObservationIgnored private var codecFallbackPolicy = SpiceVideoCodecFallbackPolicy()
 
     public init(parameters: SpiceConnectionParameters) {
+        let session = SpiceSession()
         self.parameters = parameters
+        self.session = session
+        desktop = session.desktop
     }
 
     public func connect() {
-        guard connectionTask == nil, session == nil else { return }
+        guard Self.canStartConnection(
+            status: status,
+            hasConnectionTask: connectionTask != nil
+        ) else { return }
         generation &+= 1
         let currentGeneration = generation
-        let session = SpiceSession()
-        self.session = session
+        diagnosticsReadyGeneration = nil
+        codecFallbackPolicy.reset()
         status = .connecting
-        frame = nil
-        frameSequence = 0
-        cursor = nil
+        let session = self.session
 
         eventTask = Task { [weak self] in
             for await event in session.events {
                 guard !Task.isCancelled else { return }
-                self?.consume(event, generation: currentGeneration)
+                await self?.consume(event)
             }
         }
         connectionTask = Task { [weak self] in
-            await self?.establish(session, generation: currentGeneration)
+            await self?.establish(
+                session,
+                generation: currentGeneration,
+                videoCodecPolicy: .h264AndMJPEG
+            )
         }
     }
 
     public func disconnect() {
         setDiagnosticsEnabled(false)
-        guard session != nil || connectionTask != nil else { return }
+        guard status != .idle || connectionTask != nil else { return }
         generation &+= 1
+        codecFallbackPolicy.cancelExpectedDisconnect()
+        diagnosticsReadyGeneration = nil
         connectionTask?.cancel()
         connectionTask = nil
         eventTask?.cancel()
@@ -118,10 +163,8 @@ public final class SpiceClient: ObservableObject {
 
         let oldInputPump = inputPump
         inputPump = nil
-        let oldSession = session
         let oldManager = agentManager
         let oldSink = playbackSink
-        session = nil
         agentManager = nil
         playbackSink = nil
         resetRuntimeState(stoppingInput: false)
@@ -131,7 +174,7 @@ public final class SpiceClient: ObservableObject {
             if let oldInputPump { await oldInputPump.shutdown() }
             if let oldManager { await oldManager.stop() }
             if let oldSink { await oldSink.stop() }
-            if let oldSession { await oldSession.disconnect() }
+            await session.disconnect()
         }
     }
 
@@ -155,6 +198,9 @@ public final class SpiceClient: ObservableObject {
         if enabled { diagnosticsCollector.reset() }
         diagnosticsCollector.setEnabled(enabled)
         if enabled {
+            if codecFallbackPolicy.didReconnect {
+                diagnosticsCollector.recordVideoCodecFallbackReconnect()
+            }
             diagnosticsCollector.seedAgentState(
                 support: latestAgentSupport,
                 clipboardState: latestClipboardState
@@ -170,29 +216,47 @@ public final class SpiceClient: ObservableObject {
             let clock = ContinuousClock()
             let heartbeatInterval = Duration.milliseconds(100)
             let sampleUpstreamDiagnostics: @MainActor () async -> Bool = { [weak self] in
-                guard self?.isCurrentDiagnosticsTask(taskGeneration) == true else {
+                guard let self,
+                      self.isCurrentDiagnosticsTask(taskGeneration)
+                else {
                     return false
                 }
-                let sampledSession = self?.session
-                let sampledAgentManager = self?.agentManager
+                let sampledSession = self.session
+                let sampledAgentManager = self.agentManager
+                let sampledConnectionGeneration = self.generation
+                guard Self.canRecordUpstreamDiagnostics(
+                    sampledGeneration: sampledConnectionGeneration,
+                    currentGeneration: self.generation,
+                    readyGeneration: self.diagnosticsReadyGeneration
+                ) else {
+                    return true
+                }
                 let sampleStartedAt = ContinuousClock().now
-                async let sessionSnapshot = sampledSession?.diagnosticsSnapshot()
+                async let sessionSnapshot = sampledSession.diagnosticsSnapshot()
                 async let agentSnapshot = sampledAgentManager?.diagnosticsSnapshot()
                 let (sampledSessionDiagnostics, sampledAgentDiagnostics) = await (
                     sessionSnapshot,
                     agentSnapshot
                 )
-                guard self?.isCurrentDiagnosticsTask(taskGeneration) == true else {
+                guard self.isCurrentDiagnosticsTask(taskGeneration) else {
                     return false
                 }
-                if let sampledSessionDiagnostics {
-                    self?.diagnosticsCollector.recordSwiftSpiceDiagnostics(
-                        sampledSessionDiagnostics,
-                        sampledAt: sampleStartedAt
-                    )
+                guard Self.canRecordUpstreamDiagnostics(
+                    sampledGeneration: sampledConnectionGeneration,
+                    currentGeneration: self.generation,
+                    readyGeneration: self.diagnosticsReadyGeneration
+                ) else {
+                    // A reconnect started while the upstream actors were being
+                    // sampled, or its reset has not completed. Drop the old
+                    // epoch without stopping monitoring.
+                    return true
                 }
+                self.diagnosticsCollector.recordSwiftSpiceDiagnostics(
+                    sampledSessionDiagnostics,
+                    sampledAt: sampleStartedAt
+                )
                 if let sampledAgentDiagnostics {
-                    self?.diagnosticsCollector.recordAgentWireDiagnostics(
+                    self.diagnosticsCollector.recordAgentWireDiagnostics(
                         sampledAgentDiagnostics
                     )
                 }
@@ -251,16 +315,22 @@ public final class SpiceClient: ObservableObject {
         }
     }
 
-    private func establish(_ session: SpiceSession, generation: UInt64) async {
+    private func establish(
+        _ session: SpiceSession,
+        generation: UInt64,
+        videoCodecPolicy: SpiceVideoCodecPolicy
+    ) async {
         do {
-            let endpoint = try makeEndpoint()
+            let endpoint = try makeEndpoint(videoCodecPolicy: videoCodecPolicy)
             let info = try await session.connect(
                 endpoint: endpoint,
                 credentials: SpiceCredentials(password: parameters.password ?? "")
             )
-            guard generation == self.generation, self.session === session else { return }
+            guard generation == self.generation else { return }
+            diagnosticsCollector.beginSwiftSpiceDiagnosticsEpoch()
+            diagnosticsReadyGeneration = generation
+            diagnosticsMonitor.publish(diagnosticsCollector.snapshot())
 
-            pointerMode = SpicePointerMode(spiceMouseMode: info.currentMouseMode)
             isInputAvailable = info.channels.contains { $0.type == 3 && $0.id == 0 }
             if isInputAvailable {
                 inputPump = OrderedSpiceInputPump(
@@ -271,7 +341,8 @@ public final class SpiceClient: ObservableObject {
                 }
             }
 
-            if info.channels.contains(where: { $0.type == 5 && $0.id == 0 }) {
+            if playbackSink == nil,
+               info.channels.contains(where: { $0.type == 5 && $0.id == 0 }) {
                 let sink = SpiceAudioPlaybackSink()
                 playbackSink = sink
                 do {
@@ -282,11 +353,45 @@ public final class SpiceClient: ObservableObject {
                 }
             }
 
-            let manager = SpiceAgentManager(
-                automaticallySynchronizesPasteboard: true,
-                pasteboardSynchronizationEnabled: shareClipboard
-            )
-            agentManager = manager
+            guard generation == self.generation else { return }
+            let manager: SpiceAgentManager
+            if let agentManager {
+                manager = agentManager
+            } else {
+                manager = SpiceAgentManager(
+                    automaticallySynchronizesPasteboard: true,
+                    pasteboardSynchronizationEnabled: shareClipboard
+                )
+                agentManager = manager
+                supportTask = Task { [weak self] in
+                    for await support in manager.displayConfigurationSupportEvents {
+                        guard !Task.isCancelled else { return }
+                        guard let self, self.agentManager === manager else { return }
+                        self.consumeAgentSupport(support)
+                    }
+                }
+                clipboardTask = Task { [weak self] in
+                    for await event in manager.events {
+                        guard !Task.isCancelled else { return }
+                        guard let self, self.agentManager === manager else { return }
+                        self.consumeClipboardEvent(event)
+                    }
+                }
+                displayConfigurationTask = Task { [weak self] in
+                    for await event in manager.displayConfigurationEvents {
+                        guard !Task.isCancelled else { return }
+                        guard let self, self.agentManager === manager else { return }
+                        self.consumeDisplayConfigurationEvent(event)
+                    }
+                }
+                do {
+                    try await manager.start(session: session)
+                } catch {
+                    diagnosticsCollector.recordAgentManagerStartFailure()
+                    NSLog("Maspice: guest-agent services unavailable: \(String(describing: error))")
+                }
+            }
+            guard generation == self.generation else { return }
             agentConnected = info.agentConnected
             let initialSupport = SpiceDisplayConfigurationSupport(
                 agentConnected: info.agentConnected,
@@ -303,48 +408,17 @@ public final class SpiceClient: ObservableObject {
                 support: initialSupport,
                 clipboardState: latestClipboardState
             )
-            supportTask = Task { [weak self] in
-                for await support in manager.displayConfigurationSupportEvents {
-                    guard !Task.isCancelled else { return }
-                    self?.consumeAgentSupport(support, generation: generation)
-                }
-            }
-            clipboardTask = Task { [weak self] in
-                for await event in manager.events {
-                    guard !Task.isCancelled else { return }
-                    self?.consumeClipboardEvent(event, generation: generation)
-                }
-            }
-            displayConfigurationTask = Task { [weak self] in
-                for await event in manager.displayConfigurationEvents {
-                    guard !Task.isCancelled else { return }
-                    self?.consumeDisplayConfigurationEvent(event, generation: generation)
-                }
-            }
-            do {
-                try await manager.start(session: session)
-            } catch {
-                diagnosticsCollector.recordAgentManagerStartFailure()
-                NSLog("Maspice: guest-agent services unavailable: \(String(describing: error))")
-            }
-
-            guard generation == self.generation else { return }
-            status = .connected
-            connectionTask = nil
+            completeEstablishment(generation: generation)
         } catch is CancellationError {
             return
         } catch let error as SpiceError {
-            fail(error.description, generation: generation)
+            await handleSessionFailure(error, generation: generation)
         } catch {
             fail(String(describing: error), generation: generation)
         }
     }
 
-    private func consumeAgentSupport(
-        _ support: SpiceDisplayConfigurationSupport,
-        generation: UInt64
-    ) {
-        guard generation == self.generation else { return }
+    private func consumeAgentSupport(_ support: SpiceDisplayConfigurationSupport) {
         latestAgentSupport = support
         agentConnected = support.agentConnected
         supportsDynamicResolution = support.agentConnected
@@ -357,11 +431,7 @@ public final class SpiceClient: ObservableObject {
         diagnosticsCollector.recordAgentSupport(support)
     }
 
-    private func consumeClipboardEvent(
-        _ event: SpiceClipboardEvent,
-        generation: UInt64
-    ) {
-        guard generation == self.generation else { return }
+    private func consumeClipboardEvent(_ event: SpiceClipboardEvent) {
         switch event {
         case .ready:
             latestClipboardState = .ready
@@ -375,33 +445,24 @@ public final class SpiceClient: ObservableObject {
         diagnosticsCollector.recordClipboardEvent(event)
     }
 
-    private func consumeDisplayConfigurationEvent(
-        _ event: SpiceDisplayConfigurationEvent,
-        generation: UInt64
-    ) {
-        guard generation == self.generation else { return }
+    private func consumeDisplayConfigurationEvent(_ event: SpiceDisplayConfigurationEvent) {
         diagnosticsCollector.recordDisplayConfigurationEvent(event)
     }
 
-    private func consume(_ event: SpiceSessionEvent, generation: UInt64) {
-        guard generation == self.generation else { return }
+    private func consume(_ event: SpiceSessionEvent) async {
+        let eventGeneration = generation
         switch event {
-        case let .frame(frame):
-            let sequence = frameSequence &+ 1
-            diagnosticsCollector.recordClientFrameEvent(
-                sequence: sequence
-            )
-            self.frame = frame
-            frameSequence = sequence
-        case let .surfaceDestroyed(surfaceID):
-            if frame?.surfaceID == surfaceID { frame = nil }
-        case let .cursor(cursor):
-            self.cursor = cursor
-        case let .mouseMode(_, current):
-            pointerMode = SpicePointerMode(spiceMouseMode: current)
         case let .failed(error):
-            fail(error.description, generation: generation)
+            await handleSessionFailure(error, generation: eventGeneration)
         case .disconnected:
+            // The fallback sequence explicitly disconnects before reconnecting,
+            // so this old-lifecycle event is guaranteed to be queued before
+            // any event from the replacement connection. Ignore it instead of
+            // closing the session window while the MJPEG retry is pending.
+            guard !codecFallbackPolicy.consumeExpectedDisconnect(
+                generation: eventGeneration
+            ) else { return }
+            diagnosticsReadyGeneration = nil
             setDiagnosticsEnabled(false)
             resetRuntimeState()
             status = .disconnected
@@ -412,11 +473,71 @@ public final class SpiceClient: ObservableObject {
         }
     }
 
-    public func recordDesktopViewUpdate(sequence: UInt64) {
-        diagnosticsCollector.recordDesktopViewUpdate(sequence: sequence)
+    private func handleSessionFailure(_ error: SpiceError, generation: UInt64) async {
+        guard generation == self.generation else { return }
+        guard case .videoCodecUnavailable = error else {
+            fail(error.description, generation: generation)
+            return
+        }
+
+        let diagnostics = await session.diagnosticsSnapshot()
+        guard generation == self.generation else { return }
+        let hasPresentedAdvancedVideo = diagnostics.advancedVideoPresentedFrames > 0
+        if codecFallbackPolicy.shouldReconnect(
+            after: error,
+            hasPresentedAdvancedVideo: hasPresentedAdvancedVideo
+        ) {
+            NSLog("Maspice: hardware video unavailable; reconnecting once with MJPEG")
+            reconnectUsingMJPEG(generation: generation)
+        } else {
+            fail(error.description, generation: generation)
+        }
     }
 
-    private func makeEndpoint() throws -> SpiceEndpoint {
+    private func reconnectUsingMJPEG(generation failedGeneration: UInt64) {
+        guard failedGeneration == generation,
+              codecFallbackPolicy.didReconnect
+        else { return }
+        diagnosticsCollector.recordVideoCodecFallbackReconnect()
+        generation &+= 1
+        let retryGeneration = generation
+        codecFallbackPolicy.expectFailedAttemptDisconnect(
+            generation: retryGeneration
+        )
+        diagnosticsReadyGeneration = nil
+        diagnosticsCollector.beginSwiftSpiceDiagnosticsEpoch()
+        diagnosticsMonitor.publish(diagnosticsCollector.snapshot())
+
+        connectionTask?.cancel()
+        connectionTask = nil
+
+        let oldInputPump = inputPump
+        resetRuntimeState(stoppingInput: false)
+        status = .connecting
+        let retrySession = session
+
+        connectionTask = Task { [weak self] in
+            if let oldInputPump { await oldInputPump.shutdown() }
+            // SpiceSession failures publish `.failed` rather than a trailing
+            // `.disconnected`. Make teardown explicit so the event suppressed
+            // above is guaranteed to exist and precede the replacement
+            // lifecycle in the session mailbox.
+            await retrySession.disconnect()
+            if let manager = self?.agentManager {
+                await manager.waitForSessionReconnectBoundary()
+            }
+            guard let self, retryGeneration == self.generation else { return }
+            await self.establish(
+                retrySession,
+                generation: retryGeneration,
+                videoCodecPolicy: .mjpegOnly
+            )
+        }
+    }
+
+    private func makeEndpoint(
+        videoCodecPolicy: SpiceVideoCodecPolicy
+    ) throws -> SpiceEndpoint {
         let selectedPort = parameters.tlsPort ?? parameters.port
         guard let selectedPort, let port = UInt16(exactly: selectedPort) else {
             throw SpiceError.connectionFailed("connection file has no valid port")
@@ -441,27 +562,82 @@ public final class SpiceClient: ObservableObject {
         return SpiceEndpoint(
             host: parameters.host,
             port: port,
-            tlsPolicy: tlsPolicy
+            tlsPolicy: tlsPolicy,
+            videoCodecPolicy: videoCodecPolicy
         )
     }
 
-    private func fail(_ message: String, generation: UInt64) {
+    private func completeEstablishment(generation: UInt64) {
         guard generation == self.generation else { return }
-        setDiagnosticsEnabled(false)
+        status = .connected
         connectionTask = nil
-        resetRuntimeState()
+    }
+
+    package func completeEstablishmentForTesting(generation: UInt64) {
+        completeEstablishment(generation: generation)
+    }
+
+    package func fail(_ message: String, generation: UInt64) {
+        guard generation == self.generation else { return }
+        // Establishment remains suspended while audio and Agent services
+        // start. Advance the epoch before cancelling it so none of those old
+        // continuations can publish `.connected` after this terminal failure.
+        self.generation &+= 1
+        codecFallbackPolicy.cancelExpectedDisconnect()
+        diagnosticsReadyGeneration = nil
+        setDiagnosticsEnabled(false)
+        connectionTask?.cancel()
+        connectionTask = nil
+        eventTask?.cancel()
+        eventTask = nil
+        supportTask?.cancel()
+        supportTask = nil
+        clipboardTask?.cancel()
+        clipboardTask = nil
+        displayConfigurationTask?.cancel()
+        displayConfigurationTask = nil
+
+        let oldInputPump = inputPump
+        let oldManager = agentManager
+        let oldSink = playbackSink
+        inputPump = nil
+        agentManager = nil
+        playbackSink = nil
+        resetRuntimeState(stoppingInput: false)
         status = .failed(message)
+
+        let session = self.session
+        Task {
+            if let oldInputPump { await oldInputPump.shutdown() }
+            if let oldManager { await oldManager.stop() }
+            if let oldSink { await oldSink.stop() }
+            await session.disconnect()
+        }
     }
 
     private func resetRuntimeState(stoppingInput: Bool = true) {
         if stoppingInput { inputPump?.stop() }
         inputPump = nil
-        frame = nil
-        cursor = nil
         isInputAvailable = false
         agentConnected = false
         supportsDynamicResolution = false
         latestAgentSupport = nil
         latestClipboardState = shareClipboard ? .unknown : .disabled
+    }
+
+    static func canStartConnection(
+        status: Status,
+        hasConnectionTask: Bool
+    ) -> Bool {
+        status == .idle && !hasConnectionTask
+    }
+
+    static func canRecordUpstreamDiagnostics(
+        sampledGeneration: UInt64,
+        currentGeneration: UInt64,
+        readyGeneration: UInt64?
+    ) -> Bool {
+        sampledGeneration == currentGeneration
+            && readyGeneration == sampledGeneration
     }
 }

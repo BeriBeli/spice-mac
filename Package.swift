@@ -20,7 +20,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/BeriBeli/spice-swift.git",
-            exact: "0.1.10"
+            exact: "0.2.2"
         ),
     ],
     targets: [

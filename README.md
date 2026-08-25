@@ -76,10 +76,12 @@ explicitly instead of falling back to a different transport or trust policy.
 Session Diagnostics is a support aid rather than an end-to-end profiler. Input
 send duration ends when the local SwiftSpice send path completes and is not a
 server round-trip time. Motion acknowledgements are aggregate signals rather
-than per-event RTT samples. Display frame events are observed before final
-presentation, and the current snapshot does not measure transport, server,
-event-mailbox, or presentation latency. Advanced-video counters cover the
-opt-in H.264/H.265 path, not the default MJPEG path.
+than per-event RTT samples. Desktop diagnostics cover canonical mutation,
+demand-suppressed snapshots, display-link selection, GPU back-pressure, and
+actual drawable presentation; they still do not measure transport or server
+latency. Video counters distinguish the default hardware VideoToolbox path from
+the persistent TurboJPEG/IOSurface path. Maspice falls back to MJPEG at most
+once when H.264 is unavailable before its first successful presentation.
 
 Intermittent remote-session stalls may not reproduce during release testing.
 Release acceptance therefore verifies that Diagnostics remains inactive when
@@ -122,7 +124,7 @@ The release builder checks dependency install names and runtime search paths in
 every Mach-O file before and after app assembly. `/opt/homebrew`, `/usr/local`,
 build-tree paths, and other absolute host paths fail the build; Maspice never
 uses `install_name_tool` to disguise them. SwiftSpice supplies the arm64 static
-XCFrameworks and Metal resource bundle. Sparkle is embedded as a signed,
+XCFrameworks and Metal resource bundles. Sparkle is embedded as a signed,
 self-contained framework, and release ZIPs are authenticated with the public
 EdDSA key bundled in Maspice.
 

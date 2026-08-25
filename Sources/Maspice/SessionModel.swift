@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 import AppKit
-import Combine
 import Observation
 import SpiceController
 import SpiceSessionLogic
@@ -21,7 +20,6 @@ final class SessionModel {
     private(set) var shouldReturnToLauncher = false
     private(set) var terminalFailureMessage: String?
 
-    @ObservationIgnored private var cancellables = Set<AnyCancellable>()
     @ObservationIgnored private var lifecycle = SessionLifecycle()
     @ObservationIgnored private var shouldTrashAfterStart = false
     @ObservationIgnored private var shouldRemoveAfterStart = false
@@ -43,21 +41,7 @@ final class SessionModel {
             )
             shouldRemoveAfterStart = request.removesFileAfterStart
 
-            client.$status
-                .receive(on: RunLoop.main)
-                .sink { [weak self] status in
-                    MainActor.assumeIsolated {
-                        self?.status = status
-                        self?.handleTerminalStatus(status)
-                    }
-                }
-                .store(in: &cancellables)
-            client.$isInputAvailable
-                .receive(on: RunLoop.main)
-                .sink { [weak self] available in
-                    MainActor.assumeIsolated { self?.isInputAvailable = available }
-                }
-                .store(in: &cancellables)
+            observe(client)
         } catch {
             client = nil
             baseTitle = request.url.deletingPathExtension().lastPathComponent
@@ -149,6 +133,21 @@ final class SessionModel {
         isInputAvailable = false
         terminalFailureMessage = failureMessage
         shouldReturnToLauncher = true
+    }
+
+    private func observe(_ client: SpiceClient) {
+        withObservationTracking {
+            _ = client.status
+            _ = client.isInputAvailable
+        } onChange: { [weak self, weak client] in
+            Task { @MainActor in
+                guard let self, let client, self.client === client else { return }
+                self.status = client.status
+                self.isInputAvailable = client.isInputAvailable
+                self.handleTerminalStatus(self.status)
+                self.observe(client)
+            }
+        }
     }
 
     private func trashConnectionFile() {

@@ -6,6 +6,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Migrated the desktop pipeline to SwiftSpice 0.2.2's demand-driven source,
+  keeping frame, cursor, and pointer updates outside SwiftUI Observation and
+  using AppKit display-link scheduling for visible presentation.
+- Replaced the obsolete session-mailbox and client-frame diagnostics with
+  desktop demand/coalescing, display-link, texture-cache, GPU back-pressure,
+  VideoToolbox, and persistent-MJPEG allocation counters.
+- Enabled H.264 with MJPEG fallback by default and bounded automatic fallback
+  to one MJPEG-only reconnect when VideoToolbox cannot create a supported
+  hardware session.
+- Reused the same SwiftSpice session across codec fallback only after its exact
+  disconnect lifecycle and queued Agent work have drained.
+
+### Performance
+
+- Suppressed IOSurface snapshots and Metal work while session windows are
+  occluded, and removed per-frame SwiftUI layout/cursor invalidation.
+
 ## [0.3.8] — 2026-08-21
 
 ### Fixed
