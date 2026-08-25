@@ -56,6 +56,7 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
     var revisionedBackingEnabled: Bool { latest.revisionedBackingEnabled }
     var cpuMaterializations: UInt64 { delta(\.cpuMaterializations) }
     var cpuMaterializationBytes: UInt64 { delta(\.cpuMaterializationBytes) }
+    var directIOSurfaceWriteBytes: UInt64 { delta(\.directIOSurfaceWriteBytes) }
     var poolExhaustions: UInt64 { delta(\.poolExhaustions) }
     var gpuErrors: UInt64 { delta(\.gpuErrors) }
 
@@ -78,6 +79,9 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
     var revisionSelectionToMetalCommit: SpiceLatencySummary {
         Self.clientSummary(latest.viewUpdateToMetalCommit)
     }
+    var desktopReadyToDisplayLink: SpiceLatencySummary {
+        Self.clientSummary(latest.desktopReadyToDisplayLink)
+    }
     var metalCommitToCompletion: SpiceLatencySummary {
         Self.clientSummary(latest.metalCommitToCompletion)
     }
@@ -92,6 +96,9 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
     var mjpegIOSurfaceAllocations: UInt64 { delta(\.mjpegIOSurfaceAllocations) }
     var mjpegPeakBuffersInUse: Int { latest.mjpegPeakBuffersInUse }
     var mjpegPeakConcurrentDecodes: Int { latest.mjpegPeakConcurrentDecodes }
+    var mjpegFramesSupersededBeforeDecode: UInt64 {
+        delta(\.mjpegFramesSupersededBeforeDecode)
+    }
 
     var nativeVideoFrames: UInt64 {
         counterDelta(latest.nativeVideoFrames, from: baseline.nativeVideoFrames)
@@ -173,6 +180,7 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
             || mjpegIOSurfaceFrames != 0
             || mjpegDataFallbacks != 0
             || mjpegIOSurfaceAllocations != 0
+            || mjpegFramesSupersededBeforeDecode != 0
     }
 
     var summaryLines: [String] {
@@ -204,6 +212,7 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
             "swiftspice_revisioned_backing_observed=\(revisionedBackingEnabled)",
             "swiftspice_cpu_materializations_delta=\(cpuMaterializations)",
             "swiftspice_cpu_materialization_bytes_delta=\(cpuMaterializationBytes)",
+            "swiftspice_direct_iosurface_write_bytes_delta=\(directIOSurfaceWriteBytes)",
             "swiftspice_pool_exhaustions_delta=\(poolExhaustions)",
             "swiftspice_in_flight_leases_observed_max=\(latest.inFlightLeases)",
             "swiftspice_gpu_errors_delta=\(gpuErrors)",
@@ -225,6 +234,10 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
             latencySummary(
                 name: "swiftspice_revision_selection_to_metal_commit",
                 value: revisionSelectionToMetalCommit
+            ),
+            latencySummary(
+                name: "swiftspice_desktop_ready_to_display_link",
+                value: desktopReadyToDisplayLink
             ),
             latencySummary(name: "swiftspice_metal_commit_to_completion", value: metalCommitToCompletion),
             latencySummary(name: "swiftspice_metal_request_to_presented", value: metalRequestToPresented),
@@ -257,6 +270,7 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
                 "swiftspice_mjpeg_iosurface_allocations_delta=\(mjpegIOSurfaceAllocations)",
                 "swiftspice_mjpeg_peak_buffers_in_use_sample=\(mjpegPeakBuffersInUse)",
                 "swiftspice_mjpeg_peak_concurrent_decodes_sample=\(mjpegPeakConcurrentDecodes)",
+                "swiftspice_mjpeg_superseded_before_decode_delta=\(mjpegFramesSupersededBeforeDecode)",
             ])
         }
 

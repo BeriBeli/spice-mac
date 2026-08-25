@@ -40,6 +40,24 @@ private actor ControlledInputSender {
 @Suite("Ordered SPICE input pump")
 @MainActor
 struct OrderedSpiceInputPumpTests {
+    @Test("key send starts while MainActor remains busy")
+    func keySendBypassesMainActorScheduling() async {
+        let recorder = InputRecorder()
+        let pump = OrderedSpiceInputPump(
+            send: { await recorder.append($0) },
+            onFailure: { _ in Issue.record("unexpected send failure") }
+        )
+
+        pump.submit(.keyDown(scanCode: 0x1d))
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .milliseconds(30))
+        while clock.now < deadline {}
+
+        let inputs = await recorder.inputs
+        #expect(inputs.count == 1)
+        await pump.waitUntilIdle()
+    }
+
     @Test("key and button edges preserve FIFO order")
     func preservesEdges() async {
         let recorder = InputRecorder()
