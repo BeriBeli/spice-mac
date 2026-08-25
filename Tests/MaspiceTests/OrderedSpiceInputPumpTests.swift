@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MIT
+import Darwin
+import Synchronization
 import Testing
 @testable import SpiceController
 import SwiftSpice
@@ -40,6 +42,31 @@ private actor ControlledInputSender {
 @Suite("Ordered SPICE input pump")
 @MainActor
 struct OrderedSpiceInputPumpTests {
+    @Test("key send starts while MainActor remains busy")
+    func keySendBypassesMainActorScheduling() async {
+        let recorder = InputRecorder()
+        let sendStarted = Mutex(false)
+        let pump = OrderedSpiceInputPump(
+            send: {
+                sendStarted.withLock { $0 = true }
+                await recorder.append($0)
+            },
+            onFailure: { _ in Issue.record("unexpected send failure") }
+        )
+
+        pump.submit(.keyDown(scanCode: 0x1d))
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(1))
+        while !sendStarted.withLock({ $0 }), clock.now < deadline {
+            sched_yield()
+        }
+
+        #expect(sendStarted.withLock { $0 })
+        await pump.waitUntilIdle()
+        let inputs = await recorder.inputs
+        #expect(inputs.count == 1)
+    }
+
     @Test("key and button edges preserve FIFO order")
     func preservesEdges() async {
         let recorder = InputRecorder()

@@ -376,6 +376,15 @@ struct SwiftUICommandRegistrationTests {
         #expect(!sessionViewSource.contains("@State private var presentationWasAuthorized"))
         #expect(sessionBridgeSource.contains("NSWindow.didBecomeKeyNotification"))
         #expect(sessionBridgeSource.contains("NSWindow.didResignKeyNotification"))
+        #expect(sessionBridgeSource.contains(
+            "dynamicResolutionEnabled: model.client?.supportsDynamicResolution == true"
+        ))
+        #expect(sessionBridgeSource.contains(
+            "dynamicResolutionEnabled && !self.dynamicResolutionEnabled"
+        ))
+        #expect(sessionBridgeSource.contains(
+            "guard dynamicResolutionEnabled,"
+        ))
         #expect(sessionBridgeSource.contains("handleKeyWindowChange"))
         #expect(sessionBridgeSource.contains("window.firstResponder"))
         #expect(sessionBridgeSource.contains("releaseSpicePointerCapture:"))

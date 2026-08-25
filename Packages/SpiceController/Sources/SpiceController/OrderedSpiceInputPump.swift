@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import Dispatch
 import SwiftSpice
 
 /// Serializes AppKit-produced input before it crosses the SwiftSpice actor boundary.
@@ -14,6 +15,11 @@ final class OrderedSpiceInputPump {
     }
 
     private let send: @Sendable (SpiceClientInput) async throws -> Void
+    private let sendExecutor = DispatchQueue(
+        label: "io.github.beribeli.Maspice.input-send",
+        qos: .userInteractive,
+        autoreleaseFrequency: .workItem
+    )
     private let onFailure: @MainActor (SpiceError) -> Void
     private let diagnostics: SpiceClientDiagnosticsCollector?
     private var pending: [PendingInput] = []
@@ -92,7 +98,9 @@ final class OrderedSpiceInputPump {
     }
 
     func waitUntilIdle() async {
-        await drainTask?.value
+        while let drainTask {
+            await drainTask.value
+        }
     }
 
     @discardableResult
@@ -146,65 +154,91 @@ final class OrderedSpiceInputPump {
     }
 
     private func startDrainIfNeeded() {
-        guard drainTask == nil else { return }
-        drainTask = Task { [weak self] in
-            await self?.drain()
+        guard drainTask == nil, !pending.isEmpty else { return }
+        if isMotion(pending[0].input) {
+            // Give pointer samples from the same AppKit turn one coalescing
+            // opportunity. Key and button edges bypass this yield entirely.
+            drainTask = Task { [weak self] in
+                await Task.yield()
+                self?.beginSend()
+            }
+            return
+        }
+        beginSend()
+    }
+
+    private func beginSend() {
+        guard !pending.isEmpty else {
+            drainTask = nil
+            return
+        }
+        let pendingInput = pending.removeFirst()
+        let measurementToken = pendingInput.measurementToken
+        adjustPendingCount(for: measurementToken, by: -1)
+        diagnostics?.recordPendingInputCount(
+            measurementToken.flatMap { pendingCountByMeasurement[$0] } ?? 0,
+            token: measurementToken
+        )
+        let send = self.send
+        drainTask = Task.detached(
+            executorPreference: sendExecutor,
+            priority: .high
+        ) { [weak self] in
+            guard !Task.isCancelled else { return }
+            let sendStartedAt = ContinuousClock().now
+            let result: Result<Void, SpiceError>
+            do {
+                try await send(pendingInput.input)
+                result = .success(())
+            } catch let error as SpiceError {
+                result = .failure(error)
+            } catch {
+                result = .failure(.protocolError(String(describing: error)))
+            }
+            guard !Task.isCancelled else { return }
+            await self?.finishSend(
+                pendingInput,
+                startedAt: sendStartedAt,
+                completedAt: ContinuousClock().now,
+                result: result
+            )
         }
     }
 
-    private func drain() async {
-        while !pending.isEmpty, !Task.isCancelled {
-            let pendingInput = pending.removeFirst()
-            let measurementToken = pendingInput.measurementToken
-            adjustPendingCount(for: measurementToken, by: -1)
-            diagnostics?.recordPendingInputCount(
-                measurementToken.flatMap { pendingCountByMeasurement[$0] } ?? 0,
+    private func finishSend(
+        _ pendingInput: PendingInput,
+        startedAt: ContinuousClock.Instant,
+        completedAt: ContinuousClock.Instant,
+        result: Result<Void, SpiceError>
+    ) {
+        guard !stopped else { return }
+        let measurementToken = pendingInput.measurementToken
+        let measuresLatency = diagnostics?.isCurrentMeasurement(measurementToken) == true
+        if measuresLatency, let enqueuedAt = pendingInput.enqueuedAt {
+            diagnostics?.recordInputDequeued(
+                queueWait: enqueuedAt.duration(to: startedAt),
                 token: measurementToken
             )
-            let measuresLatency = diagnostics?.isCurrentMeasurement(measurementToken) == true
-                && pendingInput.enqueuedAt != nil
-            let sendStartedAt: ContinuousClock.Instant? = measuresLatency
-                ? ContinuousClock().now
-                : nil
-            if let enqueuedAt = pendingInput.enqueuedAt, let sendStartedAt {
-                diagnostics?.recordInputDequeued(
-                    queueWait: enqueuedAt.duration(to: sendStartedAt),
+        }
+        switch result {
+        case .success:
+            if measuresLatency {
+                diagnostics?.recordInputSent(
+                    isMotion: isMotion(pendingInput.input),
+                    sendDuration: startedAt.duration(to: completedAt),
                     token: measurementToken
                 )
             }
-            do {
-                try await send(pendingInput.input)
-                if let sendStartedAt,
-                   diagnostics?.isCurrentMeasurement(measurementToken) == true {
-                    diagnostics?.recordInputSent(
-                        isMotion: isMotion(pendingInput.input),
-                        sendDuration: sendStartedAt.duration(to: ContinuousClock().now),
-                        token: measurementToken
-                    )
-                }
-            } catch let error as SpiceError {
-                if let sendStartedAt,
-                   diagnostics?.isCurrentMeasurement(measurementToken) == true {
-                    diagnostics?.recordSendFailure(
-                        sendDuration: sendStartedAt.duration(to: ContinuousClock().now),
-                        token: measurementToken
-                    )
-                }
-                stop()
-                onFailure(error)
-                return
-            } catch {
-                if let sendStartedAt,
-                   diagnostics?.isCurrentMeasurement(measurementToken) == true {
-                    diagnostics?.recordSendFailure(
-                        sendDuration: sendStartedAt.duration(to: ContinuousClock().now),
-                        token: measurementToken
-                    )
-                }
-                stop()
-                onFailure(.protocolError(String(describing: error)))
-                return
+        case let .failure(error):
+            if measuresLatency {
+                diagnostics?.recordSendFailure(
+                    sendDuration: startedAt.duration(to: completedAt),
+                    token: measurementToken
+                )
             }
+            stop()
+            onFailure(error)
+            return
         }
         drainTask = nil
         if !pending.isEmpty { startDrainIfNeeded() }

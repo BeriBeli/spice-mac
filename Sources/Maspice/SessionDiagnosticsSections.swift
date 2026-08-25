@@ -240,6 +240,10 @@ struct SessionDiagnosticsRendererSection: View {
                     + "\(diagnosticValue(metrics?.gpuErrors))"
             )
             SessionDiagnosticsMetricRow(
+                label: "Direct IOSurface write bytes",
+                value: diagnosticValue(metrics?.directIOSurfaceWriteBytes)
+            )
+            SessionDiagnosticsMetricRow(
                 label: "Metal presented / committed / superseded",
                 value: "\(diagnosticValue(metrics?.metalPresentedFrames)) / "
                     + "\(diagnosticValue(metrics?.metalCommandBuffersCommitted)) / "
@@ -273,6 +277,10 @@ struct SessionDiagnosticsRendererSection: View {
                 value: "\(codecFallbackReconnects)"
             )
             if let metrics {
+                SessionDiagnosticsLatencyRow(
+                    label: "Desktop ready → display-link p95 / max",
+                    latency: metrics.desktopReadyToDisplayLink
+                )
                 SessionDiagnosticsLatencyRow(
                     label: "Revision selection → Metal commit p95 / max",
                     latency: metrics.revisionSelectionToMetalCommit
@@ -334,6 +342,10 @@ struct SessionDiagnosticsVideoCodecSection: View {
                 value: "\(metrics.mjpegDecoderHandleCreations) / "
                     + "\(metrics.mjpegIOSurfaceAllocations) / "
                     + "\(metrics.mjpegPeakConcurrentDecodes)"
+            )
+            SessionDiagnosticsMetricRow(
+                label: "MJPEG superseded before decode",
+                value: "\(metrics.mjpegFramesSupersededBeforeDecode)"
             )
         }
     }
