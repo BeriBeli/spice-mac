@@ -268,6 +268,10 @@ struct SessionDiagnosticsRendererSection: View {
                     + "\(diagnosticValue(metrics?.desktopDisplayLinkIdlePauses))"
             )
             SessionDiagnosticsMetricRow(
+                label: "Immediate desktop selections",
+                value: diagnosticValue(metrics?.desktopImmediateSelections)
+            )
+            SessionDiagnosticsMetricRow(
                 label: "CPU presentation fallback / command failure",
                 value: "\(diagnosticValue(metrics?.cpuFallbackFrames)) / "
                     + "\(diagnosticValue(metrics?.metalCommandCreationFailures))"
@@ -278,8 +282,8 @@ struct SessionDiagnosticsRendererSection: View {
             )
             if let metrics {
                 SessionDiagnosticsLatencyRow(
-                    label: "Desktop ready → display-link p95 / max",
-                    latency: metrics.desktopReadyToDisplayLink
+                    label: "Desktop ready → revision selection p95 / max",
+                    latency: metrics.desktopReadyToRevisionSelection
                 )
                 SessionDiagnosticsLatencyRow(
                     label: "Revision selection → Metal commit p95 / max",

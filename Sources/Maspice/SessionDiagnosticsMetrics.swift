@@ -74,12 +74,13 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
     var desktopDisplayLinkWakeups: UInt64 { delta(\.desktopDisplayLinkWakeups) }
     var desktopDisplayLinkTicks: UInt64 { delta(\.desktopDisplayLinkTicks) }
     var desktopDisplayLinkIdlePauses: UInt64 { delta(\.desktopDisplayLinkIdlePauses) }
+    var desktopImmediateSelections: UInt64 { delta(\.desktopImmediateSelections) }
     var cpuFallbackFrames: UInt64 { delta(\.cpuFallbackFrames) }
 
     var revisionSelectionToMetalCommit: SpiceLatencySummary {
         Self.clientSummary(latest.viewUpdateToMetalCommit)
     }
-    var desktopReadyToDisplayLink: SpiceLatencySummary {
+    var desktopReadyToRevisionSelection: SpiceLatencySummary {
         Self.clientSummary(latest.desktopReadyToDisplayLink)
     }
     var metalCommitToCompletion: SpiceLatencySummary {
@@ -230,14 +231,15 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
             "swiftspice_desktop_display_link_wakeups_delta=\(desktopDisplayLinkWakeups)",
             "swiftspice_desktop_display_link_ticks_delta=\(desktopDisplayLinkTicks)",
             "swiftspice_desktop_display_link_idle_pauses_delta=\(desktopDisplayLinkIdlePauses)",
+            "swiftspice_desktop_immediate_selections_delta=\(desktopImmediateSelections)",
             "swiftspice_cpu_fallback_frames_delta=\(cpuFallbackFrames)",
             latencySummary(
                 name: "swiftspice_revision_selection_to_metal_commit",
                 value: revisionSelectionToMetalCommit
             ),
             latencySummary(
-                name: "swiftspice_desktop_ready_to_display_link",
-                value: desktopReadyToDisplayLink
+                name: "swiftspice_desktop_ready_to_revision_selection",
+                value: desktopReadyToRevisionSelection
             ),
             latencySummary(name: "swiftspice_metal_commit_to_completion", value: metalCommitToCompletion),
             latencySummary(name: "swiftspice_metal_request_to_presented", value: metalRequestToPresented),

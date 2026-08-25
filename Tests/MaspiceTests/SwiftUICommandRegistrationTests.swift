@@ -130,6 +130,10 @@ struct SwiftUICommandRegistrationTests {
         #expect(diagnosticsViewSource.contains("Desktop delivered / stream coalesced / handler"))
         #expect(diagnosticsViewSource.contains("Readbacks / pool exhausted / GPU errors"))
         #expect(diagnosticsViewSource.contains("Display-link wake / tick / idle pause"))
+        #expect(diagnosticsViewSource.contains("Immediate desktop selections"))
+        #expect(diagnosticsViewSource.contains(
+            "Desktop ready → revision selection p95 / max"
+        ))
         #expect(diagnosticsViewSource.contains("Texture cache hit / miss / eviction"))
         #expect(diagnosticsViewSource.contains("VDAgent"))
         #expect(diagnosticsViewSource.contains("Monitor supported / requests / blocked"))
