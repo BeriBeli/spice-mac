@@ -199,6 +199,14 @@ struct SwiftUICommandRegistrationTests {
         #expect(clientSource.components(separatedBy: "for await event in session.events").count == 2)
         #expect(clientSource.contains("self.agentManager === manager"))
         #expect(reconnectSource.contains("await manager.waitForSessionReconnectBoundary()"))
+        let explicitDisconnect = try #require(
+            reconnectSource.range(of: "await retrySession.disconnect()")
+        )
+        let agentBoundary = try #require(
+            reconnectSource.range(of: "await manager.waitForSessionReconnectBoundary()")
+        )
+        #expect(explicitDisconnect.lowerBound < agentBoundary.lowerBound)
+        #expect(clientSource.contains("codecFallbackPolicy.consumeExpectedDisconnect"))
         #expect(!reconnectSource.contains("await oldManager.stop()"))
         #expect(!reconnectSource.contains("await oldSink.stop()"))
     }

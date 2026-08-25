@@ -6,9 +6,11 @@ import VVConfig
 
 struct SpiceVideoCodecFallbackPolicy {
     private(set) var didReconnect = false
+    private var expectedDisconnectGeneration: UInt64?
 
     mutating func reset() {
         didReconnect = false
+        expectedDisconnectGeneration = nil
     }
 
     mutating func shouldReconnect(
@@ -20,6 +22,21 @@ struct SpiceVideoCodecFallbackPolicy {
               case .videoCodecUnavailable = error
         else { return false }
         didReconnect = true
+        return true
+    }
+
+    mutating func expectFailedAttemptDisconnect(generation: UInt64) {
+        guard expectedDisconnectGeneration == nil else { return }
+        expectedDisconnectGeneration = generation
+    }
+
+    mutating func cancelExpectedDisconnect() {
+        expectedDisconnectGeneration = nil
+    }
+
+    mutating func consumeExpectedDisconnect(generation: UInt64) -> Bool {
+        guard expectedDisconnectGeneration == generation else { return false }
+        expectedDisconnectGeneration = nil
         return true
     }
 }
@@ -131,6 +148,7 @@ public final class SpiceClient {
         setDiagnosticsEnabled(false)
         guard status != .idle || connectionTask != nil else { return }
         generation &+= 1
+        codecFallbackPolicy.cancelExpectedDisconnect()
         diagnosticsReadyGeneration = nil
         connectionTask?.cancel()
         connectionTask = nil
@@ -437,6 +455,13 @@ public final class SpiceClient {
         case let .failed(error):
             await handleSessionFailure(error, generation: eventGeneration)
         case .disconnected:
+            // The fallback sequence explicitly disconnects before reconnecting,
+            // so this old-lifecycle event is guaranteed to be queued before
+            // any event from the replacement connection. Ignore it instead of
+            // closing the session window while the MJPEG retry is pending.
+            guard !codecFallbackPolicy.consumeExpectedDisconnect(
+                generation: eventGeneration
+            ) else { return }
             diagnosticsReadyGeneration = nil
             setDiagnosticsEnabled(false)
             resetRuntimeState()
@@ -476,6 +501,9 @@ public final class SpiceClient {
         diagnosticsCollector.recordVideoCodecFallbackReconnect()
         generation &+= 1
         let retryGeneration = generation
+        codecFallbackPolicy.expectFailedAttemptDisconnect(
+            generation: retryGeneration
+        )
         diagnosticsReadyGeneration = nil
         diagnosticsCollector.beginSwiftSpiceDiagnosticsEpoch()
         diagnosticsMonitor.publish(diagnosticsCollector.snapshot())
@@ -490,6 +518,11 @@ public final class SpiceClient {
 
         connectionTask = Task { [weak self] in
             if let oldInputPump { await oldInputPump.shutdown() }
+            // SpiceSession failures publish `.failed` rather than a trailing
+            // `.disconnected`. Make teardown explicit so the event suppressed
+            // above is guaranteed to exist and precede the replacement
+            // lifecycle in the session mailbox.
+            await retrySession.disconnect()
             if let manager = self?.agentManager {
                 await manager.waitForSessionReconnectBoundary()
             }
@@ -550,6 +583,7 @@ public final class SpiceClient {
         // start. Advance the epoch before cancelling it so none of those old
         // continuations can publish `.connected` after this terminal failure.
         self.generation &+= 1
+        codecFallbackPolicy.cancelExpectedDisconnect()
         diagnosticsReadyGeneration = nil
         setDiagnosticsEnabled(false)
         connectionTask?.cancel()

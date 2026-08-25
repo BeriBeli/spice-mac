@@ -144,6 +144,39 @@ struct SpiceVideoCodecFallbackPolicyTests {
         #expect(!policy.didReconnect)
     }
 
+    @Test func `Explicit failed-attempt disconnect is suppressed once in retry generation`() {
+        var policy = SpiceVideoCodecFallbackPolicy()
+        let incompatibility = SpiceError.videoCodecUnavailable(
+            SpiceVideoCodecFailure(
+                codec: .h264,
+                reason: .hardwareUnavailable(status: nil)
+            )
+        )
+
+        let shouldReconnect = policy.shouldReconnect(
+            after: incompatibility,
+            hasPresentedAdvancedVideo: false
+        )
+        #expect(shouldReconnect)
+        policy.expectFailedAttemptDisconnect(generation: 8)
+
+        let wrongAttempt = policy.consumeExpectedDisconnect(generation: 7)
+        #expect(!wrongAttempt)
+        let expectedGeneration = policy.consumeExpectedDisconnect(generation: 8)
+        let duplicate = policy.consumeExpectedDisconnect(generation: 8)
+        #expect(expectedGeneration)
+        #expect(!duplicate)
+    }
+
+    @Test func `Cancelling retry cannot suppress a later disconnect`() {
+        var policy = SpiceVideoCodecFallbackPolicy()
+        policy.expectFailedAttemptDisconnect(generation: 8)
+        policy.cancelExpectedDisconnect()
+
+        let laterDisconnect = policy.consumeExpectedDisconnect(generation: 8)
+        #expect(!laterDisconnect)
+    }
+
     @Test func `A presented hardware video stream is never replaced mid-session`() {
         var policy = SpiceVideoCodecFallbackPolicy()
         let unsupportedProfile = SpiceError.videoCodecUnavailable(
