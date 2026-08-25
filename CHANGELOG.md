@@ -8,9 +8,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Updated SwiftSpice to 0.2.4 so explicit Metal presentation never reuses an
-  already-presented `CAMetalLayerDrawable`, and overlapping GLZ alpha expansion
-  uses Apple Silicon NEON while preserving the BGRA color lanes.
+- Updated SwiftSpice to 0.2.6 so sparse desktop updates select the latest
+  revision immediately while retaining display-link pacing for continuous
+  producers; explicit Metal presentation also avoids drawable reuse and GLZ
+  alpha expansion uses Apple Silicon NEON.
 - Migrated the desktop pipeline to SwiftSpice 0.2.2's demand-driven source,
   keeping frame, cursor, and pointer updates outside SwiftUI Observation and
   using AppKit display-link scheduling for visible presentation.
