@@ -46,33 +46,16 @@ private struct SessionDiagnosticsContent: View {
             Divider()
             SessionDiagnosticsAgentSection(metrics: snapshot.agent)
             Divider()
-            SessionDiagnosticsDisplaySection(
-                publisherSubmissions: swiftSpiceMetrics?.publisherSubmissions,
-                publisherEmittedFrames: swiftSpiceMetrics?.publisherEmittedFrames,
-                publisherStaleSnapshots: swiftSpiceMetrics?.publisherStaleSnapshots,
-                publisherPendingEvictions: swiftSpiceMetrics?.publisherPendingEvictions,
-                publisherPendingSurfaces: swiftSpiceMetrics?.publisherPendingSurfaces,
-                publisherFramedReceiveBatchStartGap:
-                    swiftSpiceMetrics?.publisherFramedReceiveBatchStartGap,
-                publisherMessageReceiveToSurfaceReady:
-                    swiftSpiceMetrics?.publisherMessageReceiveToSurfaceReady,
-                publisherSurfaceReadyToSubmit:
-                    swiftSpiceMetrics?.publisherSurfaceReadyToSubmit,
-                mailboxFramesSent: swiftSpiceMetrics?.mailboxFramesSent,
-                mailboxFramesDelivered: swiftSpiceMetrics?.mailboxFramesDelivered,
-                mailboxFramesCoalesced: swiftSpiceMetrics?.mailboxFramesCoalesced,
-                mailboxFramesEvicted: swiftSpiceMetrics?.mailboxFramesEvicted,
-                clientFrameEvents: "\(snapshot.clientFrameEvents)",
-                clientFrameEventGap: snapshot.clientFrameEventGap,
-                desktopViewUpdates: "\(snapshot.desktopViewUpdates)",
-                clientFramesSupersededBeforeDesktopView:
-                    "\(snapshot.clientFramesSupersededBeforeDesktopView)"
-            )
+            SessionDiagnosticsDisplaySection(metrics: swiftSpiceMetrics)
             Divider()
-            SessionDiagnosticsRendererSection(metrics: swiftSpiceMetrics)
-            if let swiftSpiceMetrics, swiftSpiceMetrics.hasAdvancedVideoActivity {
+            SessionDiagnosticsRendererSection(
+                metrics: swiftSpiceMetrics,
+                codecFallbackReconnects: snapshot.videoCodecFallbackReconnects
+            )
+            if let swiftSpiceMetrics,
+               swiftSpiceMetrics.hasAdvancedVideoActivity || swiftSpiceMetrics.hasMJPEGActivity {
                 Divider()
-                SessionDiagnosticsAdvancedVideoSection(metrics: swiftSpiceMetrics)
+                SessionDiagnosticsVideoCodecSection(metrics: swiftSpiceMetrics)
             }
             Divider()
             SessionDiagnosticsNotice()

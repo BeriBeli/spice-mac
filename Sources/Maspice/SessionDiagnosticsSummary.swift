@@ -24,16 +24,16 @@ extension SpiceClientDiagnosticsSnapshot {
             "display_timing_epoch=current_swiftspice_session",
             "input_send_scope=local_completion_not_rtt",
             "motion_ack_scope=aggregate_not_per_event_rtt",
-            "publisher_emit_scope=through_session_mailbox_send_not_client_consumption",
+            "desktop_delivery_scope=demand_driven_latest_revision_without_swiftui_observation",
             "display_receive_scope=channel_connection_framed_message_completion",
             "display_decode_scope=receive_completion_through_surface_apply_before_ack",
             "publisher_submit_scope=display_actor_to_publisher_actor_entry",
-            "video_scope=advanced_h264_h265_not_mjpeg",
+            "video_scope=videotoolbox_h264_h265_and_persistent_turbojpeg_mjpeg",
             "channel_state_scope=active_plus_retired_last_observation",
             "agent_scope=state_and_content_free_event_counts",
             "agent_snapshot_counter_epoch=current_agent_manager_lifetime",
             "agent_event_counter_epoch=diagnostics_enable",
-            "unmeasured=server_to_framed_receive_async_stream_resume_to_client_and_display_vsync_timing",
+            "unmeasured=server_to_framed_receive",
             "input_submitted=\(inputSubmitted)",
             "input_sent=\(inputSent)",
             "input_coalesced=\(inputCoalesced)",
@@ -44,22 +44,12 @@ extension SpiceClientDiagnosticsSnapshot {
             "input_queue_maximum=\(maximumPendingInputCount)",
             Self.latencySummary(name: "input_queue_wait", value: inputQueueWait),
             Self.latencySummary(name: "input_send", value: inputSendDuration),
-            "client_frame_events=\(clientFrameEvents)",
-            Self.latencySummary(
-                name: "client_frame_event_gap",
-                value: clientFrameEventGap
-            ),
             Self.latencySummary(
                 name: "main_actor_scheduling_delay",
                 value: mainActorSchedulingDelay
             ),
-            "desktop_view_updates=\(desktopViewUpdates)",
-            "client_frames_superseded_before_desktop_view=\(clientFramesSupersededBeforeDesktopView)",
-            Self.latencySummary(
-                name: "client_to_desktop_view_update",
-                value: clientToDesktopViewUpdate
-            ),
             "send_failures=\(sendFailures)",
+            "video_codec_fallback_reconnects=\(videoCodecFallbackReconnects)",
             "agent_support_observed=\(agent.supportObserved)",
             "agent_connected=\(agent.agentConnected)",
             "agent_capability_announcement_received=\(agent.capabilityAnnouncementReceived)",

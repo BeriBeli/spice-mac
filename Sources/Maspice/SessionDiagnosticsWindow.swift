@@ -41,7 +41,7 @@ struct SessionDiagnosticsWindow: View {
 }
 
 private struct SessionDiagnosticsMonitorView: View {
-    @ObservedObject var monitor: SpiceClientDiagnosticsMonitor
+    let monitor: SpiceClientDiagnosticsMonitor
     let onCopy: () -> Void
 
     var body: some View {

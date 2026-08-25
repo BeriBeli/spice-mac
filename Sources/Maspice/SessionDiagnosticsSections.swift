@@ -166,74 +166,65 @@ struct SessionDiagnosticsAgentSection: View {
 }
 
 struct SessionDiagnosticsDisplaySection: View {
-    let publisherSubmissions: UInt64?
-    let publisherEmittedFrames: UInt64?
-    let publisherStaleSnapshots: UInt64?
-    let publisherPendingEvictions: UInt64?
-    let publisherPendingSurfaces: Int?
-    let publisherFramedReceiveBatchStartGap: SpiceLatencySummary?
-    let publisherMessageReceiveToSurfaceReady: SpiceLatencySummary?
-    let publisherSurfaceReadyToSubmit: SpiceLatencySummary?
-    let mailboxFramesSent: UInt64?
-    let mailboxFramesDelivered: UInt64?
-    let mailboxFramesCoalesced: UInt64?
-    let mailboxFramesEvicted: UInt64?
-    let clientFrameEvents: String
-    let clientFrameEventGap: SpiceLatencySummary
-    let desktopViewUpdates: String
-    let clientFramesSupersededBeforeDesktopView: String
+    let metrics: SessionDiagnosticsSwiftSpiceMetrics?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             SessionDiagnosticsSectionHeader(title: "Display pipeline")
             SessionDiagnosticsMetricRow(
-                label: "Publisher submit / emit / client",
-                value: "\(diagnosticValue(publisherSubmissions)) / "
-                    + "\(diagnosticValue(publisherEmittedFrames)) / \(clientFrameEvents)"
+                label: "Mutation submit / snapshot / emit",
+                value: "\(diagnosticValue(metrics?.publisherSubmissions)) / "
+                    + "\(diagnosticValue(metrics?.publisherSnapshotAttempts)) / "
+                    + "\(diagnosticValue(metrics?.publisherEmittedFrames))"
             )
             SessionDiagnosticsMetricRow(
-                label: "Publisher stale / evicted / pending sample",
-                value: "\(diagnosticValue(publisherStaleSnapshots)) / "
-                    + "\(diagnosticValue(publisherPendingEvictions)) / "
-                    + "\(diagnosticValue(publisherPendingSurfaces))"
+                label: "Demand suppressed / pending / prepared coalesces",
+                value: "\(diagnosticValue(metrics?.publisherDemandSuppressedSubmissions)) / "
+                    + "\(diagnosticValue(metrics?.publisherPendingRevisionCoalesces)) / "
+                    + "\(diagnosticValue(metrics?.publisherPreparedFrameCoalesces))"
             )
-            if let publisherFramedReceiveBatchStartGap,
-               let publisherMessageReceiveToSurfaceReady,
-               let publisherSurfaceReadyToSubmit {
+            SessionDiagnosticsMetricRow(
+                label: "Pending / demanded / prepared surfaces",
+                value: "\(diagnosticValue(metrics?.publisherPendingSurfaces)) / "
+                    + "\(diagnosticValue(metrics?.publisherDemandedSurfaces)) / "
+                    + "\(diagnosticValue(metrics?.publisherPreparedFrames))"
+            )
+            SessionDiagnosticsMetricRow(
+                label: "Desktop delivered / stream coalesced / handler",
+                value: "\(diagnosticValue(metrics?.desktopDeliveredSnapshots)) / "
+                    + "\(diagnosticValue(metrics?.desktopStreamCoalesces)) / "
+                    + "\(diagnosticValue(metrics?.desktopHandlerDeliveries))"
+            )
+            SessionDiagnosticsMetricRow(
+                label: "Desktop subscriptions / visible",
+                value: "\(diagnosticValue(metrics?.desktopSubscriptions)) / "
+                    + "\(diagnosticValue(metrics?.desktopVisibleSubscriptions))"
+            )
+            if let metrics {
                 SessionDiagnosticsLatencyRow(
                     label: "Framed-receive batch gap p95 / max",
-                    latency: publisherFramedReceiveBatchStartGap
+                    latency: metrics.publisherFramedReceiveBatchStartGap
                 )
                 SessionDiagnosticsLatencyRow(
                     label: "Receive → surface ready p95 / max",
-                    latency: publisherMessageReceiveToSurfaceReady
+                    latency: metrics.publisherMessageReceiveToSurfaceReady
                 )
                 SessionDiagnosticsLatencyRow(
                     label: "Surface ready → publisher p95 / max",
-                    latency: publisherSurfaceReadyToSubmit
+                    latency: metrics.publisherSurfaceReadyToSubmit
+                )
+                SessionDiagnosticsLatencyRow(
+                    label: "Snapshot preparation p95 / max",
+                    latency: metrics.publisherSnapshotDuration
                 )
             }
-            SessionDiagnosticsMetricRow(
-                label: "Mailbox sent / delivered / coalesced / evicted",
-                value: "\(diagnosticValue(mailboxFramesSent)) / "
-                    + "\(diagnosticValue(mailboxFramesDelivered)) / "
-                    + "\(diagnosticValue(mailboxFramesCoalesced)) / "
-                    + "\(diagnosticValue(mailboxFramesEvicted))"
-            )
-            SessionDiagnosticsLatencyRow(
-                label: "Client frame-event gap p95 / max",
-                latency: clientFrameEventGap
-            )
-            SessionDiagnosticsMetricRow(
-                label: "Desktop updates / superseded client frames",
-                value: "\(desktopViewUpdates) / \(clientFramesSupersededBeforeDesktopView)"
-            )
         }
     }
 }
 
 struct SessionDiagnosticsRendererSection: View {
     let metrics: SessionDiagnosticsSwiftSpiceMetrics?
+    let codecFallbackReconnects: UInt64
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -249,24 +240,50 @@ struct SessionDiagnosticsRendererSection: View {
                     + "\(diagnosticValue(metrics?.gpuErrors))"
             )
             SessionDiagnosticsMetricRow(
-                label: "Metal presented / superseded / errors",
+                label: "Metal presented / committed / superseded",
                 value: "\(diagnosticValue(metrics?.metalPresentedFrames)) / "
-                    + "\(diagnosticValue(metrics?.metalFramesSupersededBeforeDraw)) / "
+                    + "\(diagnosticValue(metrics?.metalCommandBuffersCommitted)) / "
+                    + "\(diagnosticValue(metrics?.metalFramesSupersededBeforeDraw))"
+            )
+            SessionDiagnosticsMetricRow(
+                label: "Drawable miss / GPU busy / presentation error",
+                value: "\(diagnosticValue(metrics?.metalDrawableMisses)) / "
+                    + "\(diagnosticValue(metrics?.metalGPUBusySkips)) / "
                     + "\(diagnosticValue(metrics?.metalPresentationErrors))"
             )
             SessionDiagnosticsMetricRow(
-                label: "Drawable misses / command failures",
-                value: "\(diagnosticValue(metrics?.metalDrawableMisses)) / "
+                label: "Texture cache hit / miss / eviction",
+                value: "\(diagnosticValue(metrics?.metalTextureCacheHits)) / "
+                    + "\(diagnosticValue(metrics?.metalTextureCacheMisses)) / "
+                    + "\(diagnosticValue(metrics?.metalTextureCacheEvictions))"
+            )
+            SessionDiagnosticsMetricRow(
+                label: "Display-link wake / tick / idle pause",
+                value: "\(diagnosticValue(metrics?.desktopDisplayLinkWakeups)) / "
+                    + "\(diagnosticValue(metrics?.desktopDisplayLinkTicks)) / "
+                    + "\(diagnosticValue(metrics?.desktopDisplayLinkIdlePauses))"
+            )
+            SessionDiagnosticsMetricRow(
+                label: "CPU presentation fallback / command failure",
+                value: "\(diagnosticValue(metrics?.cpuFallbackFrames)) / "
                     + "\(diagnosticValue(metrics?.metalCommandCreationFailures))"
+            )
+            SessionDiagnosticsMetricRow(
+                label: "Codec fallback reconnects",
+                value: "\(codecFallbackReconnects)"
             )
             if let metrics {
                 SessionDiagnosticsLatencyRow(
-                    label: "View update → Metal commit p95 / max",
-                    latency: metrics.viewUpdateToMetalCommit
+                    label: "Revision selection → Metal commit p95 / max",
+                    latency: metrics.revisionSelectionToMetalCommit
                 )
                 SessionDiagnosticsLatencyRow(
                     label: "Metal commit → completion p95 / max",
                     latency: metrics.metalCommitToCompletion
+                )
+                SessionDiagnosticsLatencyRow(
+                    label: "Revision request → presented p95 / max",
+                    latency: metrics.metalRequestToPresented
                 )
             }
         }
@@ -274,20 +291,20 @@ struct SessionDiagnosticsRendererSection: View {
 
     private var backingAndVideoPolicy: String {
         guard let metrics, metrics.latest.displayChannelCount > 0 else {
-            return "— / MJPEG only"
+            return "— / H.264 + MJPEG fallback"
         }
         return metrics.revisionedBackingEnabled
-            ? "Revisioned IOSurface / MJPEG only"
-            : "Data / MJPEG only"
+            ? "Revisioned IOSurface / H.264 + MJPEG fallback"
+            : "Data / H.264 + MJPEG fallback"
     }
 }
 
-struct SessionDiagnosticsAdvancedVideoSection: View {
+struct SessionDiagnosticsVideoCodecSection: View {
     let metrics: SessionDiagnosticsSwiftSpiceMetrics
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            SessionDiagnosticsSectionHeader(title: "Advanced video")
+            SessionDiagnosticsSectionHeader(title: "Video codecs")
             SessionDiagnosticsMetricRow(
                 label: "VT decoded / dropped",
                 value: "\(metrics.videoDecodedFrames) / \(metrics.videoDroppedFrames)"
@@ -297,10 +314,26 @@ struct SessionDiagnosticsAdvancedVideoSection: View {
                 value: "\(metrics.videoHardwareSessions) / \(metrics.videoSoftwareSessions)"
             )
             SessionDiagnosticsMetricRow(
+                label: "Advanced video Metal-presented",
+                value: "\(metrics.advancedVideoPresentedFrames)"
+            )
+            SessionDiagnosticsMetricRow(
                 label: "Native / CPU fallback / Metal disabled",
                 value: "\(metrics.nativeVideoFrames) / "
                     + "\(metrics.advancedCPUFallbackFrames) / "
                     + "\(metrics.metalGenerationDisableCount)"
+            )
+            SessionDiagnosticsMetricRow(
+                label: "MJPEG decoded / IOSurface / Data fallback",
+                value: "\(metrics.mjpegDecodedFrames) / "
+                    + "\(metrics.mjpegIOSurfaceFrames) / "
+                    + "\(metrics.mjpegDataFallbacks)"
+            )
+            SessionDiagnosticsMetricRow(
+                label: "MJPEG handles / IOSurface allocations / peak decode",
+                value: "\(metrics.mjpegDecoderHandleCreations) / "
+                    + "\(metrics.mjpegIOSurfaceAllocations) / "
+                    + "\(metrics.mjpegPeakConcurrentDecodes)"
             )
         }
     }
@@ -381,7 +414,7 @@ private struct SessionDiagnosticsMetricRow: View {
 
 struct SessionDiagnosticsNotice: View {
     var body: some View {
-        Text("VDAgent metrics never contain clipboard text. Agent snapshot counters and fixed failure categories cover the current Agent manager lifetime; UI event counters begin when Diagnostics is enabled. Send completion is local only; Motion ACK is aggregate, not per-event RTT. Display counters rebase at the first best-effort SwiftSpice sample; timing summaries cover the current SwiftSpice session. Sample age shows possible terminal staleness. Channel-state samples include the last observation from retired channels. SwiftSpice coalesces publisher work on a 16 ms interval; receive timing begins only after ChannelConnection returns a complete framed message. Mailbox and Metal counters expose later-stage coalescing and presentation. VideoToolbox counters cover advanced video, not MJPEG. Server-to-framed-receive timing, AsyncStream resume-to-client scheduling, and display-vsync completion remain unmeasured. MainActor is 100 ms timer scheduling delay.")
+        Text("VDAgent metrics never contain clipboard text. Agent snapshot counters and fixed failure categories cover the current Agent manager lifetime; UI event counters begin when Diagnostics is enabled. Send completion is local only; Motion ACK is aggregate, not per-event RTT. Display counters rebase at the first best-effort SwiftSpice sample; timing summaries cover the current SwiftSpice session. Sample age shows possible terminal staleness. Channel-state samples include the last observation from retired channels. SwiftSpice coalesces desktop revisions on display demand and suppresses snapshots while hidden; frame and cursor traffic bypass SwiftUI Observation. Receive timing begins only after ChannelConnection returns a complete framed message. Source, display-link, Metal, VideoToolbox, and MJPEG counters expose coalescing, GPU back-pressure, buffer reuse, and actual presentation. Server-to-framed-receive timing remains unmeasured. MainActor is 100 ms timer scheduling delay.")
             .font(.caption2)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)

@@ -207,13 +207,9 @@ public struct SpiceClientDiagnosticsSnapshot: Sendable, Equatable {
     public let maximumPendingInputCount: Int
     public let inputQueueWait: SpiceLatencySummary
     public let inputSendDuration: SpiceLatencySummary
-    public let clientFrameEvents: UInt64
-    public let clientFrameEventGap: SpiceLatencySummary
     public let mainActorSchedulingDelay: SpiceLatencySummary
     public let sendFailures: UInt64
-    public let desktopViewUpdates: UInt64
-    public let clientFramesSupersededBeforeDesktopView: UInt64
-    public let clientToDesktopViewUpdate: SpiceLatencySummary
+    public let videoCodecFallbackReconnects: UInt64
     public let agent: SpiceClientAgentDiagnostics
     public let swiftSpiceDiagnostics: SpiceClientSwiftSpiceDiagnostics?
 
@@ -229,13 +225,9 @@ public struct SpiceClientDiagnosticsSnapshot: Sendable, Equatable {
         maximumPendingInputCount: Int,
         inputQueueWait: SpiceLatencySummary,
         inputSendDuration: SpiceLatencySummary,
-        clientFrameEvents: UInt64,
-        clientFrameEventGap: SpiceLatencySummary,
         mainActorSchedulingDelay: SpiceLatencySummary,
         sendFailures: UInt64,
-        desktopViewUpdates: UInt64 = 0,
-        clientFramesSupersededBeforeDesktopView: UInt64 = 0,
-        clientToDesktopViewUpdate: SpiceLatencySummary = .empty,
+        videoCodecFallbackReconnects: UInt64 = 0,
         agent: SpiceClientAgentDiagnostics = .empty,
         swiftSpiceDiagnostics: SpiceClientSwiftSpiceDiagnostics? = nil
     ) {
@@ -250,14 +242,9 @@ public struct SpiceClientDiagnosticsSnapshot: Sendable, Equatable {
         self.maximumPendingInputCount = maximumPendingInputCount
         self.inputQueueWait = inputQueueWait
         self.inputSendDuration = inputSendDuration
-        self.clientFrameEvents = clientFrameEvents
-        self.clientFrameEventGap = clientFrameEventGap
         self.mainActorSchedulingDelay = mainActorSchedulingDelay
         self.sendFailures = sendFailures
-        self.desktopViewUpdates = desktopViewUpdates
-        self.clientFramesSupersededBeforeDesktopView =
-            clientFramesSupersededBeforeDesktopView
-        self.clientToDesktopViewUpdate = clientToDesktopViewUpdate
+        self.videoCodecFallbackReconnects = videoCodecFallbackReconnects
         self.agent = agent
         self.swiftSpiceDiagnostics = swiftSpiceDiagnostics
     }
@@ -274,8 +261,6 @@ public struct SpiceClientDiagnosticsSnapshot: Sendable, Equatable {
         maximumPendingInputCount: 0,
         inputQueueWait: .empty,
         inputSendDuration: .empty,
-        clientFrameEvents: 0,
-        clientFrameEventGap: .empty,
         mainActorSchedulingDelay: .empty,
         sendFailures: 0,
         agent: .empty,
@@ -300,20 +285,11 @@ final class SpiceClientDiagnosticsCollector {
         var maximumPendingInputCount = 0
         var inputQueueWait = FixedLatencyHistogram()
         var inputSendDuration = FixedLatencyHistogram()
-        var clientFrameEvents: UInt64 = 0
-        var clientFrameEventGap = FixedLatencyHistogram()
-        var desktopViewUpdates: UInt64 = 0
-        var clientFramesSupersededBeforeDesktopView: UInt64 = 0
-        var clientToDesktopViewUpdate = FixedLatencyHistogram()
         var mainActorSchedulingDelay = FixedLatencyHistogram()
         var sendFailures: UInt64 = 0
+        var videoCodecFallbackReconnects: UInt64 = 0
         var agent: SpiceClientAgentDiagnostics = .empty
         var previousAgentConnected: Bool?
-        var previousFrameInstant: ContinuousClock.Instant?
-        var latestFrameSequence: UInt64?
-        var latestFrameInstant: ContinuousClock.Instant?
-        var firstObservedFrameSequence: UInt64?
-        var previousDesktopViewSequence: UInt64?
         var swiftSpiceDiagnostics: SpiceClientSwiftSpiceDiagnostics?
         var swiftSpiceLatestSampleInstant: ContinuousClock.Instant?
     }
@@ -336,11 +312,6 @@ final class SpiceClientDiagnosticsCollector {
         guard self.enabled != enabled else { return }
         measurementGeneration &+= 1
         self.enabled = enabled
-        metrics.previousFrameInstant = nil
-        metrics.latestFrameSequence = nil
-        metrics.latestFrameInstant = nil
-        metrics.firstObservedFrameSequence = nil
-        metrics.previousDesktopViewSequence = nil
     }
 
     func reset() {
@@ -380,14 +351,9 @@ final class SpiceClientDiagnosticsCollector {
             maximumPendingInputCount: metrics.maximumPendingInputCount,
             inputQueueWait: metrics.inputQueueWait.summary,
             inputSendDuration: metrics.inputSendDuration.summary,
-            clientFrameEvents: metrics.clientFrameEvents,
-            clientFrameEventGap: metrics.clientFrameEventGap.summary,
             mainActorSchedulingDelay: metrics.mainActorSchedulingDelay.summary,
             sendFailures: metrics.sendFailures,
-            desktopViewUpdates: metrics.desktopViewUpdates,
-            clientFramesSupersededBeforeDesktopView:
-                metrics.clientFramesSupersededBeforeDesktopView,
-            clientToDesktopViewUpdate: metrics.clientToDesktopViewUpdate.summary,
+            videoCodecFallbackReconnects: metrics.videoCodecFallbackReconnects,
             agent: metrics.agent,
             swiftSpiceDiagnostics: swiftSpiceDiagnostics
         )
@@ -434,56 +400,14 @@ final class SpiceClientDiagnosticsCollector {
         metrics.sendFailures &+= 1
     }
 
-    func recordClientFrameEvent(sequence: UInt64) {
-        guard enabled else { return }
-        recordClientFrameEvent(
-            sequence: sequence,
-            at: ContinuousClock().now
-        )
-    }
-
-    func recordClientFrameEvent(
-        sequence: UInt64 = 0,
-        at instant: ContinuousClock.Instant
-    ) {
-        guard enabled else { return }
-        metrics.clientFrameEvents &+= 1
-        if let previous = metrics.previousFrameInstant {
-            metrics.clientFrameEventGap.record(previous.duration(to: instant))
-        }
-        metrics.previousFrameInstant = instant
-        if metrics.firstObservedFrameSequence == nil {
-            metrics.firstObservedFrameSequence = sequence
-        }
-        metrics.latestFrameSequence = sequence
-        metrics.latestFrameInstant = instant
-    }
-
-    func recordDesktopViewUpdate(
-        sequence: UInt64,
-        at instant: ContinuousClock.Instant = ContinuousClock().now
-    ) {
-        guard enabled,
-              metrics.latestFrameSequence == sequence,
-              let frameInstant = metrics.latestFrameInstant,
-              metrics.previousDesktopViewSequence != sequence
-        else { return }
-        metrics.desktopViewUpdates &+= 1
-        if let previous = metrics.previousDesktopViewSequence {
-            if sequence > previous {
-                metrics.clientFramesSupersededBeforeDesktopView &+= sequence - previous - 1
-            }
-        } else if let first = metrics.firstObservedFrameSequence,
-                  sequence >= first {
-            metrics.clientFramesSupersededBeforeDesktopView &+= sequence - first
-        }
-        metrics.previousDesktopViewSequence = sequence
-        metrics.clientToDesktopViewUpdate.record(frameInstant.duration(to: instant))
-    }
-
     func recordMouseMotionAcknowledged() {
         guard enabled else { return }
         metrics.mouseMotionAcknowledgements &+= 1
+    }
+
+    func recordVideoCodecFallbackReconnect() {
+        guard enabled else { return }
+        metrics.videoCodecFallbackReconnects &+= 1
     }
 
     func recordMainActorSchedulingDelay(_ duration: Duration) {
@@ -637,17 +561,20 @@ final class SpiceClientDiagnosticsCollector {
             )
         } else {
             // The upstream baseline may arrive after diagnostics were enabled,
-            // especially when the HUD is opened while connecting. Rebase the
-            // downstream frame-event metrics here so the display-pipeline
-            // counters share the same best-effort epoch.
-            metrics.clientFrameEvents = 0
-            metrics.clientFrameEventGap = FixedLatencyHistogram()
-            metrics.previousFrameInstant = nil
+            // especially when the diagnostics window opens while connecting.
             metrics.swiftSpiceDiagnostics = SpiceClientSwiftSpiceDiagnostics(
                 baseline: diagnostics,
                 latest: diagnostics
             )
         }
+    }
+
+    /// Starts a fresh upstream-counter window after SwiftSpice reconnects.
+    /// Maspice-owned counters remain continuous across the one-time fallback.
+    func beginSwiftSpiceDiagnosticsEpoch() {
+        guard enabled else { return }
+        metrics.swiftSpiceDiagnostics = nil
+        metrics.swiftSpiceLatestSampleInstant = nil
     }
 }
 

@@ -45,12 +45,17 @@ cp "$PLIST" "$APP/Contents/Info.plist"
 cp "$BINARY" "$APP/Contents/MacOS/$EXECUTABLE_NAME"
 ditto "$SPARKLE_FRAMEWORK" "$APP/Contents/Frameworks/Sparkle.framework"
 
-METAL_BUNDLE="$BIN_PATH/SwiftSpice_SpiceMetalCompositor.bundle"
-if [ ! -f "$METAL_BUNDLE/SpiceVideoCompositor.metallib" ] \
-    && [ ! -f "$METAL_BUNDLE/Contents/Resources/SpiceVideoCompositor.metallib" ]; then
-    die "SwiftSpice Metal resource bundle is missing from the SwiftPM build"
-fi
-cp -R "$METAL_BUNDLE" "$APP/Contents/Resources/"
+METAL_BUNDLES=(
+    "$BIN_PATH/SwiftSpice_SpiceMetalCompositor.bundle"
+    "$BIN_PATH/SwiftSpice_SwiftSpice.bundle"
+)
+for metal_bundle in "${METAL_BUNDLES[@]}"; do
+    if [ ! -f "$metal_bundle/SpiceVideoCompositor.metallib" ] \
+        && [ ! -f "$metal_bundle/Contents/Resources/SpiceVideoCompositor.metallib" ]; then
+        die "SwiftSpice Metal resource bundle is missing from the SwiftPM build: $metal_bundle"
+    fi
+    cp -R "$metal_bundle" "$APP/Contents/Resources/"
+done
 
 ICON_SOURCE="$ROOT/Resources/AppIcon.icon"
 ICON_OUTPUT="$WORK/icon-assets"

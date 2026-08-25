@@ -141,42 +141,13 @@ struct OrderedSpiceInputPumpTests {
     @Test("collector records session counters and reset keeps enablement")
     func recordsSessionCountersAndResets() {
         let diagnostics = SpiceClientDiagnosticsCollector(enabled: true)
-        let firstFrame = ContinuousClock().now
-
-        diagnostics.recordClientFrameEvent(
-            sequence: 1,
-            at: firstFrame
-        )
-        diagnostics.recordDesktopViewUpdate(
-            sequence: 1,
-            at: firstFrame.advanced(by: .milliseconds(3))
-        )
-        diagnostics.recordClientFrameEvent(
-            sequence: 2,
-            at: firstFrame.advanced(by: .milliseconds(20))
-        )
-        diagnostics.recordClientFrameEvent(
-            sequence: 3,
-            at: firstFrame.advanced(by: .milliseconds(22))
-        )
-        diagnostics.recordDesktopViewUpdate(
-            sequence: 3,
-            at: firstFrame.advanced(by: .milliseconds(26))
-        )
         diagnostics.recordMouseMotionAcknowledged()
+        diagnostics.recordVideoCodecFallbackReconnect()
         diagnostics.recordMainActorSchedulingDelay(.milliseconds(75))
 
         let snapshot = diagnostics.snapshot()
-        #expect(snapshot.clientFrameEvents == 3)
-        #expect(snapshot.clientFrameEventGap.sampleCount == 2)
-        #expect(snapshot.clientFrameEventGap.p95Milliseconds == 20)
-        #expect(snapshot.clientFrameEventGap.maximumMilliseconds == 20)
-        #expect(snapshot.desktopViewUpdates == 2)
-        #expect(snapshot.clientFramesSupersededBeforeDesktopView == 1)
-        #expect(snapshot.clientToDesktopViewUpdate.sampleCount == 2)
-        #expect(snapshot.clientToDesktopViewUpdate.p95Milliseconds == 4)
-        #expect(snapshot.clientToDesktopViewUpdate.maximumMilliseconds == 4)
         #expect(snapshot.mouseMotionAcknowledgements == 1)
+        #expect(snapshot.videoCodecFallbackReconnects == 1)
         #expect(snapshot.mainActorSchedulingDelay.sampleCount == 1)
         #expect(snapshot.mainActorSchedulingDelay.p95Milliseconds == 75)
         #expect(snapshot.mainActorSchedulingDelay.maximumMilliseconds == 75)
@@ -184,12 +155,8 @@ struct OrderedSpiceInputPumpTests {
         diagnostics.reset()
         let reset = diagnostics.snapshot()
         #expect(reset.isEnabled)
-        #expect(reset.clientFrameEvents == 0)
-        #expect(reset.clientFrameEventGap == .empty)
-        #expect(reset.desktopViewUpdates == 0)
-        #expect(reset.clientFramesSupersededBeforeDesktopView == 0)
-        #expect(reset.clientToDesktopViewUpdate == .empty)
         #expect(reset.mouseMotionAcknowledgements == 0)
+        #expect(reset.videoCodecFallbackReconnects == 0)
         #expect(reset.mainActorSchedulingDelay == .empty)
     }
 
@@ -278,9 +245,6 @@ struct OrderedSpiceInputPumpTests {
         let diagnostics = SpiceClientDiagnosticsCollector(enabled: true)
         let firstFrame = ContinuousClock().now
 
-        diagnostics.recordClientFrameEvent(at: firstFrame)
-        diagnostics.recordClientFrameEvent(at: firstFrame.advanced(by: .milliseconds(20)))
-
         diagnostics.recordSwiftSpiceDiagnostics(.empty, sampledAt: firstFrame)
         let baseline = diagnostics.snapshot(
             at: firstFrame.advanced(by: .milliseconds(250))
@@ -288,18 +252,11 @@ struct OrderedSpiceInputPumpTests {
         #expect(baseline?.baseline == .empty)
         #expect(baseline?.latest == .empty)
         #expect(baseline?.latestSampleAgeMilliseconds == 250)
-        #expect(diagnostics.snapshot().clientFrameEvents == 0)
-        #expect(diagnostics.snapshot().clientFrameEventGap == .empty)
-
-        diagnostics.recordClientFrameEvent(at: firstFrame.advanced(by: .milliseconds(40)))
-        #expect(diagnostics.snapshot().clientFrameEvents == 1)
-        #expect(diagnostics.snapshot().clientFrameEventGap == .empty)
 
         diagnostics.recordSwiftSpiceDiagnostics(.empty)
         let updated = diagnostics.snapshot().swiftSpiceDiagnostics
         #expect(updated?.baseline == baseline?.baseline)
         #expect(updated?.latest == .empty)
-        #expect(diagnostics.snapshot().clientFrameEvents == 1)
 
         diagnostics.reset()
         let reset = diagnostics.snapshot()
@@ -309,6 +266,23 @@ struct OrderedSpiceInputPumpTests {
         diagnostics.setEnabled(false)
         diagnostics.recordSwiftSpiceDiagnostics(.empty)
         #expect(diagnostics.snapshot().swiftSpiceDiagnostics == nil)
+    }
+
+    @Test("SwiftSpice reconnect rebases upstream counters but preserves local metrics")
+    func rebasesSwiftSpiceDiagnosticsEpoch() {
+        let diagnostics = SpiceClientDiagnosticsCollector(enabled: true)
+        diagnostics.recordVideoCodecFallbackReconnect()
+        diagnostics.recordSwiftSpiceDiagnostics(.empty)
+
+        diagnostics.beginSwiftSpiceDiagnosticsEpoch()
+        let rebased = diagnostics.snapshot()
+        #expect(rebased.videoCodecFallbackReconnects == 1)
+        #expect(rebased.swiftSpiceDiagnostics == nil)
+
+        diagnostics.recordSwiftSpiceDiagnostics(.empty)
+        let nextEpoch = diagnostics.snapshot().swiftSpiceDiagnostics
+        #expect(nextEpoch?.baseline == .empty)
+        #expect(nextEpoch?.latest == .empty)
     }
 
     @Test("send failures are counted without marking the input sent")

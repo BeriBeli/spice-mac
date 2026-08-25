@@ -7,19 +7,14 @@ import SwiftUI
 /// SwiftSpice owns the Metal/AppKit desktop surface. This view only adds the
 /// narrow NSWindow lifecycle bridge needed for focus release and guest resize.
 struct SwiftSpiceDesktop: View {
-    @ObservedObject var client: SpiceClient
+    let desktop: SpiceDesktopSource
+    let onInput: @MainActor @Sendable (SpiceClientInput) -> Void
     let model: SessionModel
 
     var body: some View {
         SpiceDesktopView(
-            frame: client.frame,
-            cursor: client.cursor,
-            pointerMode: client.pointerMode,
-            presentationDiagnostics: client.presentationDiagnostics,
-            onFrameUpdate: {
-                client.recordDesktopViewUpdate(sequence: client.frameSequence)
-            },
-            onInput: client.submit(_:)
+            desktop: desktop,
+            onInput: onInput
         )
         .background {
             SpiceWindowBridge(
