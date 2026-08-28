@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-28
+
 ### Changed
 
 - Updated SwiftSpice to 0.3.0.
@@ -408,7 +410,8 @@ CocoaSpice.
   QEMU frameworks are no longer shipped (app size 443 MB → 23 MB).
 - See [SECURITY.md](SECURITY.md) for the threat model and residual risks.
 
-[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/BeriBeli/spice-mac/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/BeriBeli/spice-mac/compare/v0.3.8...v0.4.0
 [0.3.8]: https://github.com/BeriBeli/spice-mac/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/BeriBeli/spice-mac/compare/v0.3.6...v0.3.7
