@@ -9,7 +9,7 @@ let package = Package(
     name: "Maspice",
     platforms: [.macOS(.v26)],
     products: [
-        .executable(name: "Maspice", targets: ["Maspice"]),
+        .executable(name: "Maspice", targets: ["Maspice"])
     ],
     dependencies: [
         .package(path: "Packages/VVConfig"),
@@ -20,7 +20,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/BeriBeli/spice-swift.git",
-            exact: "0.3.0"
+            exact: "0.4.0"
         ),
     ],
     targets: [
@@ -48,7 +48,7 @@ let package = Package(
                 .unsafeFlags([
                     "-Xlinker", "-rpath",
                     "-Xlinker", "@loader_path/../Frameworks",
-                ]),
+                ])
             ]
         ),
         .testTarget(

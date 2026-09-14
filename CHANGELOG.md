@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- Updated SwiftSpice to 0.4.0.
+
 ## [0.5.0] — 2026-08-28
 
 ### Changed
