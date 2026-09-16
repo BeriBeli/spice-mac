@@ -118,6 +118,21 @@ command registration. `make build` embeds Sparkle and creates an ad-hoc signed
 SwiftSpice changes belong in its upstream repository. Update Maspice only after
 publishing and pinning a reviewed upstream release.
 
+For local verification of an upstream fix, use SwiftPM's editable dependency
+mode with a SwiftSpice checkout based on the pinned release:
+
+```sh
+swift package edit spice-swift --path /path/to/spice-swift
+PACKAGE=0 make build
+make run
+```
+
+The builder uses that checkout's notices and artifacts and rejects ZIP packaging
+while the dependency is editable. Run `swift package unedit spice-swift` and
+`swift package resolve` to return to the pinned release before publishing.
+The exact requirement in `Package.swift` remains unchanged; SwiftPM may
+temporarily omit the editable dependency from `Package.resolved`.
+
 ## Distribution gates
 
 The release builder checks dependency install names and runtime search paths in

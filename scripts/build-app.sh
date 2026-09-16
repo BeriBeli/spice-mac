@@ -26,6 +26,12 @@ BIN_PATH="$(swift build --disable-sandbox -c "$CONFIG" --show-bin-path)"
 BINARY="$BIN_PATH/$EXECUTABLE_NAME"
 [ -x "$BINARY" ] || die "built executable not found at $BINARY"
 SWIFTSPICE_SOURCE="$ROOT/.build/checkouts/spice-swift"
+if [ -f "$ROOT/Packages/spice-swift/Package.swift" ]; then
+    [ "${PACKAGE:-1}" = "0" ] \
+        || die "editable SwiftSpice is for local testing; use PACKAGE=0 or swift package unedit spice-swift"
+    SWIFTSPICE_SOURCE="$ROOT/Packages/spice-swift"
+    log "using editable SwiftSpice for this local test build"
+fi
 [ -f "$SWIFTSPICE_SOURCE/Package.swift" ] \
     || die "resolved SwiftSpice release checkout not found at $SWIFTSPICE_SOURCE"
 SPARKLE_ROOT="$ROOT/.build/artifacts/sparkle/Sparkle"

@@ -1,5 +1,7 @@
 .build/
 .swiftpm/
+# SwiftPM's local editable dependency link; never include it in a release.
+/Packages/spice-swift
 DerivedData/
 *.xcodeproj/xcuserdata/
 *.app
