@@ -116,8 +116,12 @@ private final class RavadaPortalModel {
     }
 
     func loadInitialPage() {
+        navigationDecider.prepareCookies()
+        guard !Task.isCancelled else { return }
         guard page.url == nil else { return }
-        page.load(initialURL)
+        // The first response supplies the portal's clock; do not sample a stale
+        // HTTP Date from the local response cache.
+        page.load(URLRequest(url: initialURL, cachePolicy: .reloadIgnoringLocalCacheData))
     }
 
     var pageTitle: String {

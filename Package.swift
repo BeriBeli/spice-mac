@@ -53,7 +53,7 @@ let package = Package(
         ),
         .testTarget(
             name: "MaspiceTests",
-            dependencies: ["SpiceController"],
+            dependencies: ["SpiceController", "Maspice"],
             path: "Tests/MaspiceTests"
         ),
     ],

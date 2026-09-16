@@ -6,6 +6,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Correct Ravada session-cookie expiration when the portal's clock differs
+  from the Mac's clock, preventing a newly authenticated embedded portal from
+  losing its session before Start downloads the connection file. Cookie values,
+  server-side authentication, and logout expiration remain unchanged.
+
+### Validation
+
+- Verified Ravada login, Start, and a live SPICE connection on macOS 27. The
+  reported fullscreen display stall did not reproduce during this retest;
+  this release does not claim a fullscreen rendering fix.
+- Local parser, session-policy, and application tests passed. Clean-machine
+  macOS 26 app acceptance and the complete audio/clipboard/resize acceptance
+  matrix were not repeated for this patch.
+
 ## [0.5.3] — 2026-09-16
 
 ### Fixed

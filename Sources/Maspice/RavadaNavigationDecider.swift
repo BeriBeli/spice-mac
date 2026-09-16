@@ -8,6 +8,7 @@ import WebKit
 final class RavadaNavigationDecider: WebPage.NavigationDeciding {
     private let dataStore: WKWebsiteDataStore
     private let portalHost: String
+    private let cookieClock: PortalCookieClock
     private let trustCoordinator: PortalTrustCoordinator
     private let onConnectionFile: @MainActor (URL) -> Void
     private let onError: @MainActor (String) -> Void
@@ -24,6 +25,7 @@ final class RavadaNavigationDecider: WebPage.NavigationDeciding {
     ) {
         self.dataStore = dataStore
         portalHost = portalURL.host?.lowercased() ?? ""
+        cookieClock = PortalCookieClock(store: dataStore.httpCookieStore, portalURL: portalURL)
         self.trustCoordinator = trustCoordinator
         self.onConnectionFile = onConnectionFile
         self.onError = onError
@@ -80,6 +82,7 @@ final class RavadaNavigationDecider: WebPage.NavigationDeciding {
     func decidePolicy(
         for response: WebPage.NavigationResponse
     ) async -> WKNavigationResponsePolicy {
+        cookieClock.observe(response.response)
         guard Self.isConnectionFile(response.response.url)
                 || Self.isConnectionFileName(response.response.suggestedFilename) else {
             return .allow
@@ -93,9 +96,14 @@ final class RavadaNavigationDecider: WebPage.NavigationDeciding {
     }
 
     func cancelDownload() {
+        cookieClock.stop()
         downloadTask?.cancel()
         downloadTask = nil
         downloadInFlight = false
+    }
+
+    func prepareCookies() {
+        cookieClock.start()
     }
 
     private func downloadConnectionFile(_ originalRequest: URLRequest) async {
