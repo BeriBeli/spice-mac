@@ -6,6 +6,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Update SwiftSpice to 0.4.2 so an unmodified synthetic period sent with the
+  keypad-decimal key code produces `.` when guest Num Lock is off, instead of
+  being interpreted as Delete. Physical keypad input and modified shortcuts
+  retain their existing key mapping.
+
 ## [0.5.2] — 2026-09-16
 
 ### Fixed
