@@ -6,6 +6,38 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Always restore the launcher's 520×300 content size when returning from the
+  portal in one frame change, centered in the current screen's usable area
+  without briefly showing the native Zoom restore size.
+- Process clock-skewed Ravada password submissions before following the login
+  redirect, so a cookie already expired on the Mac can be corrected before the
+  next request. Also recover renewed cookies from page response headers instead
+  of relying solely on the post-storage cookie observer. Preserve the signed
+  values, server-side lifetime, logout, and same-origin HTTPS boundary.
+
+### Changed
+
+- Show a configured portal address as selectable text on the launcher. Keep
+  first-time address entry editable until the user opens the portal. Double-click
+  a saved address to edit it; Return saves and Escape cancels. Portal settings
+  also remain available for address changes.
+- Tag older Ravada login fields with standard username/current-password
+  autocomplete hints for system Password AutoFill. Maspice does not maintain
+  a separate password store or submit an autofilled form automatically.
+- Show native portal loading and login submission progress, with cancellation
+  and recovery after network failures. Avoid replaying password submissions or
+  machine-start URLs automatically.
+
+### Validation
+
+- Full parser, session-policy, and application tests passed, including 55
+  application tests covering login redirects, cookie expiration, navigation
+  recovery, AutoFill field semantics, and launcher window transitions.
+- System Password AutoFill credential selection and filling remain unverified
+  end-to-end; this release adds login-field hints rather than a password store.
+
 ## [0.5.4] — 2026-09-16
 
 ### Fixed

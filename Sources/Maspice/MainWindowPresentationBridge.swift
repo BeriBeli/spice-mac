@@ -105,13 +105,18 @@ struct MainWindowPresentationBridge: NSViewRepresentable {
             switch destination {
             case .launcher:
                 window.contentMinSize = NSSize(width: 520, height: 300)
-                if window.isZoomed {
-                    window.zoom(nil)
-                } else {
-                    window.setContentSize(NSSize(width: 520, height: 300))
-                }
+                window.contentView?.layoutSubtreeIfNeeded()
+                // Set the final frame directly. Calling zoom first would
+                // briefly display AppKit's saved user size before this one.
+                let visibleFrame = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
+                var frame = window.frameRect(forContentRect: NSRect(
+                    origin: .zero, size: NSSize(width: 520, height: 300)))
+                frame.origin = NSPoint(
+                    x: visibleFrame.midX - frame.width / 2,
+                    y: visibleFrame.midY - frame.height / 2)
+                window.setFrame(frame, display: true, animate: false)
             case .portal:
-                window.contentMinSize = NSSize(width: 900, height: 650)
+                window.contentMinSize = NSSize(width: 640, height: 480)
                 if !window.isZoomed {
                     window.zoom(nil)
                 }

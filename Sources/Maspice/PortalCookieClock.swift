@@ -14,12 +14,20 @@ struct PortalCookieExpirationPolicy {
         self.portalURL = portalURL
     }
 
+    var needsClockCorrection: Bool { clockOffset.map { abs($0) > 60 } ?? false }
+
+    func isPortalOrigin(_ url: URL) -> Bool {
+        url.scheme?.lowercased() == "https"
+            && url.user == nil && url.password == nil
+            && url.host?.lowercased() == portalURL.host?.lowercased()
+            && (url.port ?? 443) == (portalURL.port ?? 443)
+    }
+
     mutating func observe(_ response: HTTPURLResponse, receivedAt: Date) {
-        guard clockOffset == nil,
-              let url = response.url,
-              url.scheme?.lowercased() == "https",
-              url.host?.lowercased() == portalURL.host?.lowercased(),
-              (url.port ?? 443) == (portalURL.port ?? 443),
+        // The initial portal load bypasses the response cache. Keep that sample:
+        // later history/cache responses must not move the clock or revive a
+        // server-expired session from an old Set-Cookie header.
+        guard clockOffset == nil, let url = response.url, isPortalOrigin(url),
               let header = response.value(forHTTPHeaderField: "Date") else { return }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -28,6 +36,32 @@ struct PortalCookieExpirationPolicy {
         guard let serverDate = formatter.date(from: header) else { return }
         let age = max(0, TimeInterval(response.value(forHTTPHeaderField: "Age") ?? "") ?? 0)
         clockOffset = receivedAt.timeIntervalSince(serverDate) - age
+    }
+
+    /// Parse the response before WebKit can discard an already locally expired
+    /// cookie. In particular, login cookies often arrive on a 302 response.
+    mutating func cookies(from response: HTTPURLResponse, receivedAt: Date) -> [HTTPCookie] {
+        guard let url = response.url, isPortalOrigin(url) else { return [] }
+        observe(response, receivedAt: receivedAt)
+        return responseCookies(response, url: url).map {
+            corrections(for: [$0], now: receivedAt).first ?? $0
+        }
+    }
+
+    mutating func correctedCookies(from response: HTTPURLResponse, receivedAt: Date) -> [HTTPCookie] {
+        guard let url = response.url, isPortalOrigin(url) else { return [] }
+        observe(response, receivedAt: receivedAt)
+        return corrections(for: responseCookies(response, url: url), now: receivedAt)
+    }
+
+    private func responseCookies(_ response: HTTPURLResponse, url: URL) -> [HTTPCookie] {
+        let headers = response.allHeaderFields.reduce(into: [String: String]()) {
+            if let key = $1.key as? String, let value = $1.value as? String { $0[key] = value }
+        }
+        return HTTPCookie.cookies(withResponseHeaderFields: headers, for: url).filter {
+            $0.domain.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+                .lowercased() == portalURL.host?.lowercased()
+        }
     }
 
     func corrections(for cookies: [HTTPCookie], now: Date) -> [HTTPCookie] {
@@ -83,6 +117,13 @@ final class PortalCookieClock: NSObject, WKHTTPCookieStoreObserver {
         policy = PortalCookieExpirationPolicy(portalURL: portalURL)
     }
 
+    var needsClockCorrection: Bool { policy.needsClockCorrection }
+
+    func storeCookies(from response: HTTPURLResponse) async {
+        let cookies = policy.cookies(from: response, receivedAt: Date())
+        await store.setCookies(cookies)
+    }
+
     func start() {
         guard !isObserving else { return }
         store.add(self)
@@ -94,9 +135,14 @@ final class PortalCookieClock: NSObject, WKHTTPCookieStoreObserver {
         synchronization?.cancel()
     }
 
-    func observe(_ response: URLResponse) {
+    func observe(_ response: URLResponse) async {
         guard isObserving, let response = response as? HTTPURLResponse else { return }
-        policy.observe(response, receivedAt: Date())
+        let now = Date()
+        // WebKit may already have discarded the response's cookie. Recover only
+        // skew-corrected session cookies directly from this response, never an
+        // old cached session. Native login handles otherwise invisible redirects.
+        let corrected = policy.correctedCookies(from: response, receivedAt: now)
+        if !corrected.isEmpty { await store.setCookies(corrected) }
         scheduleSynchronization()
     }
 

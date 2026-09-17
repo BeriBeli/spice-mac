@@ -13,14 +13,13 @@ struct LauncherView: View {
     var body: some View {
         LauncherContent(
             portalURLText: $ravadaPortalURL,
-            canOpenPortal: portalURL != nil,
             isDropTargeted: isDropTargeted,
             diagnosticsSummary: applicationModel.lastSessionDiagnosticsSummary,
             onOpenPortal: openPortal,
             onOpenFile: chooseAndOpen,
             onCopyDiagnostics: SessionDiagnosticsClipboard.copy)
         .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first(where: \.isFileURL) else { return false }
+            guard let url = urls.first(where: \.isFileURL), url.pathExtension.lowercased() == "vv" else { return false }
             openSession(SessionRequest(url: url))
             return true
         } isTargeted: {
@@ -29,10 +28,14 @@ struct LauncherView: View {
         .onChange(of: appDelegate.pendingRequests, initial: true) {
             routePendingRequests()
         }
-        .alert("Connection Failed", isPresented: sessionFailureIsPresented) {
-            Button("OK") { applicationModel.clearSessionFailure() }
+        .alert("Remote Connection Failed", isPresented: sessionFailureIsPresented) {
+            if portalURL != nil {
+                Button("Open Portal") { applicationModel.clearSessionFailure(); openPortal() }
+            }
+            Button("Open Connection File…") { applicationModel.clearSessionFailure(); chooseAndOpen() }
+            Button("Cancel", role: .cancel) { applicationModel.clearSessionFailure() }
         } message: {
-            Text(applicationModel.sessionFailureMessage ?? "The connection could not be opened.")
+            Text((applicationModel.sessionFailureMessage ?? "The connection could not be opened.") + "\nOpen the portal or a new connection file to reconnect.")
         }
     }
 
@@ -72,28 +75,61 @@ struct LauncherView: View {
 
 private struct LauncherContent: View {
     @Binding var portalURLText: String
-    let canOpenPortal: Bool
     let isDropTargeted: Bool
     let diagnosticsSummary: String?
     let onOpenPortal: () -> Void
     let onOpenFile: () -> Void
     let onCopyDiagnostics: (String) -> Void
+    @State private var draftPortalURL = ""
+    @State private var isEditingAddress = false
+    @FocusState private var addressIsFocused: Bool
+
+    private var savedPortalURL: URL? {
+        Preferences.ravadaPortalURL(from: portalURLText)
+    }
+
+    private var draftURL: URL? {
+        Preferences.ravadaPortalURL(from: draftPortalURL)
+    }
+
+    private var showsAddressEditor: Bool {
+        isEditingAddress || savedPortalURL == nil
+    }
 
     var body: some View {
         VStack(spacing: 18) {
             LauncherHeader()
 
-            TextField(
-                "Ravada portal URL",
-                text: $portalURLText,
-                prompt: Text("https://vdi.example.com/")
-            )
-            .textContentType(.URL)
-            .frame(maxWidth: 380)
+            if let savedPortalURL, !isEditingAddress {
+                Text(savedPortalURL.absoluteString)
+                    .font(.system(.body, design: .monospaced).weight(.medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+                    .help("\(savedPortalURL.absoluteString)\nDouble-click to edit.")
+                    .frame(maxWidth: 380)
+                    .highPriorityGesture(TapGesture(count: 2).onEnded { beginEditingAddress() })
+                    .accessibilityAction(named: Text("Edit Address")) { beginEditingAddress() }
+            } else {
+                TextField(
+                    "Ravada portal URL",
+                    text: $draftPortalURL,
+                    prompt: Text("https://vdi.example.com/")
+                )
+                .textContentType(.URL)
+                .frame(maxWidth: 380)
+                .focused($addressIsFocused)
+                .onAppear { if isEditingAddress { addressIsFocused = true } }
+                .onSubmit {
+                    if isEditingAddress { _ = saveAddress() } else { openPortal() }
+                }
+                .onExitCommand(perform: cancelEditingAddress)
+            }
 
             LauncherActions(
-                canOpenPortal: canOpenPortal,
-                onOpenPortal: onOpenPortal,
+                canOpenPortal: showsAddressEditor ? draftURL != nil : savedPortalURL != nil,
+                onOpenPortal: openPortal,
                 onOpenFile: onOpenFile)
 
             if let diagnosticsSummary {
@@ -117,6 +153,34 @@ private struct LauncherContent: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.accentColor.opacity(isDropTargeted ? 1 : 0), lineWidth: 2)
         }
+        .onChange(of: portalURLText, initial: true) {
+            draftPortalURL = portalURLText
+            isEditingAddress = false
+        }
+    }
+
+    private func beginEditingAddress() {
+        draftPortalURL = portalURLText
+        isEditingAddress = true
+    }
+
+    private func cancelEditingAddress() {
+        draftPortalURL = portalURLText
+        isEditingAddress = false
+        addressIsFocused = false
+    }
+
+    private func saveAddress() -> Bool {
+        guard let draftURL else { return false }
+        portalURLText = draftURL.absoluteString
+        isEditingAddress = false
+        addressIsFocused = false
+        return true
+    }
+
+    private func openPortal() {
+        if showsAddressEditor, !saveAddress() { return }
+        onOpenPortal()
     }
 }
 

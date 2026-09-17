@@ -7,6 +7,7 @@ struct RavadaPortalWindow: View {
     @Environment(ApplicationModel.self) private var applicationModel
     @AppStorage(Preferences.ravadaPortalURLKey) private var ravadaPortalURL = ""
     @State private var isHandingOffConnection = false
+    @State private var portalError: String?
 
     var body: some View {
         Group {
@@ -19,7 +20,7 @@ struct RavadaPortalWindow: View {
                     description: Text("Return to the launcher and enter a valid portal URL."))
             }
         }
-        .frame(minWidth: 900, minHeight: 650)
+        .frame(minWidth: 640, minHeight: 480)
         .navigationTitle("Ravada Portal")
         .toolbar {
             ToolbarItem(placement: .navigation) {
@@ -29,10 +30,11 @@ struct RavadaPortalWindow: View {
                 .help("Close the portal and return to the launcher")
             }
         }
-        .alert("Connection Failed", isPresented: sessionFailureIsPresented) {
-            Button("OK") { applicationModel.clearSessionFailure() }
+        .alert("Portal Action Failed", isPresented: Binding(
+            get: { portalError != nil }, set: { if !$0 { portalError = nil } })) {
+            Button("OK") { portalError = nil }
         } message: {
-            Text(applicationModel.sessionFailureMessage ?? "The connection could not be opened.")
+            Text(portalError ?? "The portal action could not be completed.")
         }
     }
 
@@ -59,16 +61,11 @@ struct RavadaPortalWindow: View {
 
     private func presentPortalError(_ message: String) {
         guard !isHandingOffConnection else { return }
-        applicationModel.presentSessionFailure(message)
+        portalError = message
     }
 
     private var portalURL: URL? {
         Preferences.ravadaPortalURL(from: ravadaPortalURL)
     }
 
-    private var sessionFailureIsPresented: Binding<Bool> {
-        Binding(
-            get: { applicationModel.sessionFailureMessage != nil },
-            set: { if !$0 { applicationModel.clearSessionFailure() } })
-    }
 }

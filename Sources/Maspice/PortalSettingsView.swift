@@ -20,13 +20,13 @@ struct PortalSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.red)
                 } else {
-                    Text("Maspice keeps portal credentials in the embedded browser and only handles downloaded .vv files.")
+                    Text("Use your organization’s Ravada portal address. Connections use HTTPS.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
 
-            Section("Certificate") {
+            Section("Certificate Trust") {
                 CertificateSettingsView(
                     portalHost: portalHost,
                     savedCertificateHost: savedCertificateHost,

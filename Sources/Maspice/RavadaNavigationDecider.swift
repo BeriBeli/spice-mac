@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: MIT
 import Foundation
+import Observation
 import Security
 import VVConfig
 import WebKit
 
 @MainActor
+@Observable
 final class RavadaNavigationDecider: WebPage.NavigationDeciding {
     private let dataStore: WKWebsiteDataStore
     private let portalHost: String
     private let cookieClock: PortalCookieClock
+    let loginCoordinator: PortalLoginCoordinator
     private let trustCoordinator: PortalTrustCoordinator
     private let onConnectionFile: @MainActor (URL) -> Void
     private let onError: @MainActor (String) -> Void
@@ -25,7 +28,11 @@ final class RavadaNavigationDecider: WebPage.NavigationDeciding {
     ) {
         self.dataStore = dataStore
         portalHost = portalURL.host?.lowercased() ?? ""
-        cookieClock = PortalCookieClock(store: dataStore.httpCookieStore, portalURL: portalURL)
+        let clock = PortalCookieClock(store: dataStore.httpCookieStore, portalURL: portalURL)
+        cookieClock = clock
+        loginCoordinator = PortalLoginCoordinator(
+            portalURL: portalURL, store: dataStore.httpCookieStore, clock: clock,
+            trust: trustCoordinator, onError: onError)
         self.trustCoordinator = trustCoordinator
         self.onConnectionFile = onConnectionFile
         self.onError = onError
@@ -35,6 +42,8 @@ final class RavadaNavigationDecider: WebPage.NavigationDeciding {
         for action: WebPage.NavigationAction,
         preferences: inout WebPage.NavigationPreferences
     ) async -> WKNavigationActionPolicy {
+        if await loginCoordinator.intercept(action) { return .cancel }
+        if action.source.isMainFrame { loginCoordinator.cancel() }
         guard Self.isConnectionFile(action.request.url) else { return .allow }
         guard isAllowedConnectionURL(action.request.url) else {
             onError("The portal tried to open a connection file from an untrusted address. No connection was made.")
@@ -82,7 +91,7 @@ final class RavadaNavigationDecider: WebPage.NavigationDeciding {
     func decidePolicy(
         for response: WebPage.NavigationResponse
     ) async -> WKNavigationResponsePolicy {
-        cookieClock.observe(response.response)
+        await cookieClock.observe(response.response)
         guard Self.isConnectionFile(response.response.url)
                 || Self.isConnectionFileName(response.response.suggestedFilename) else {
             return .allow
@@ -96,6 +105,7 @@ final class RavadaNavigationDecider: WebPage.NavigationDeciding {
     }
 
     func cancelDownload() {
+        loginCoordinator.cancel()
         cookieClock.stop()
         downloadTask?.cancel()
         downloadTask = nil
@@ -134,6 +144,10 @@ final class RavadaNavigationDecider: WebPage.NavigationDeciding {
                 delegateQueue: nil)
             defer { session.finishTasksAndInvalidate() }
             let (bytes, response) = try await session.bytes(for: request)
+            if (response as? HTTPURLResponse)?.statusCode == 401 {
+                onError("Sign in on the portal and choose the machine again to download a new connection file.")
+                return
+            }
             guard let httpResponse = response as? HTTPURLResponse,
                   (200..<300).contains(httpResponse.statusCode),
                   httpResponse.expectedContentLength <= Int64(VVConfig.maxFileBytes)
@@ -220,7 +234,7 @@ final class RavadaNavigationDecider: WebPage.NavigationDeciding {
         }
     }
 
-    private static func cookie(_ cookie: HTTPCookie, appliesTo url: URL) -> Bool {
+    static func cookie(_ cookie: HTTPCookie, appliesTo url: URL) -> Bool {
         guard let host = url.host?.lowercased() else { return false }
         let isDomainCookie = cookie.domain.hasPrefix(".")
         let cookieDomain = cookie.domain

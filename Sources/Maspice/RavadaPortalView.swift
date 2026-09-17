@@ -5,7 +5,7 @@ import SwiftUI
 import WebKit
 
 /// macOS 26 native SwiftUI WebKit surface. `WebPage` owns navigation, cookies,
-/// title, and progress; the navigation decider only intercepts `.vv` links.
+/// title, and progress; the navigation decider also repairs skewed login cookies.
 struct RavadaPortalView: View {
     @State private var model: RavadaPortalModel
 
@@ -40,25 +40,40 @@ struct RavadaPortalView: View {
                 }
 
                 ToolbarItem(placement: .status) {
-                    if model.page.isLoading {
-                        ProgressView(value: model.page.estimatedProgress)
+                    if model.isLoading {
+                        ProgressView(value: model.isSubmitting ? nil : model.page.estimatedProgress)
                             .frame(width: 100)
-                            .help("Loading portal")
+                            .help(model.isSubmitting ? "Signing in to portal" : "Loading portal")
                     }
                 }
 
                 ToolbarItem(placement: .primaryAction) {
                     Button(
-                        model.page.isLoading ? "Stop Loading" : "Reload",
-                        systemImage: model.page.isLoading ? "xmark" : "arrow.clockwise"
+                        model.isLoading ? "Stop Loading" : "Reload",
+                        systemImage: model.isLoading ? "xmark" : "arrow.clockwise"
                     ) {
                         model.reloadOrStop()
                     }
-                    .help(model.page.isLoading ? "Stop loading this page" : "Reload this page")
+                    .help(model.isLoading ? "Stop loading this page" : "Reload this page")
                 }
             }
-        .task {
-            model.loadInitialPage()
+        .overlay {
+            if let failure = model.loadFailure {
+                ContentUnavailableView {
+                    Label("Could Not Load Portal", systemImage: "network.slash")
+                } description: {
+                    Text("Check your network connection and try opening the portal again.")
+                    DisclosureGroup("Details") { Text(failure).textSelection(.enabled) }
+                        .frame(maxWidth: 420)
+                } actions: {
+                    Button("Retry Portal") { model.retryPortal() }.keyboardShortcut(.defaultAction)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.background)
+            }
+        }
+        .task(id: model.observationID) {
+            await model.observeNavigations()
         }
         .onDisappear {
             model.cancelPendingWork()
@@ -87,22 +102,69 @@ struct RavadaPortalView: View {
 
 @MainActor
 @Observable
-private final class RavadaPortalModel {
+final class RavadaPortalModel {
     let page: WebPage
 
     private let initialURL: URL
     private let trustCoordinator: PortalTrustCoordinator
     private let navigationDecider: RavadaNavigationDecider
+    var loadFailure: String?
+    var observationID = 0
+    var isSubmitting: Bool { navigationDecider.loginCoordinator.isSubmitting }
+    var isLoading: Bool { page.isLoading || isSubmitting }
+    private var shouldOpenPortal = false
+    private var hasRequestedInitialPage = false
+
+
+    func observeNavigations() async {
+        let events = page.navigations
+        if shouldOpenPortal {
+            shouldOpenPortal = false
+            page.load(URLRequest(url: initialURL, cachePolicy: .reloadIgnoringLocalCacheData))
+        } else {
+            loadInitialPage()
+        }
+        do {
+            for try await event in events {
+                if Task.isCancelled { return }
+                if event == .startedProvisionalNavigation { loadFailure = nil }
+            }
+        } catch {
+            guard !Task.isCancelled else { return }
+            if case WebPage.NavigationError.failedProvisionalNavigation(let underlying) = error {
+                let failure = underlying as NSError
+                // Stop, downloads, and intercepted login requests cancel WebKit
+                // navigation deliberately; none indicates a network failure.
+                if failure.domain == NSURLErrorDomain && failure.code == NSURLErrorCancelled {
+                    observationID += 1
+                    return
+                }
+                loadFailure = underlying.localizedDescription
+            } else {
+                loadFailure = error.localizedDescription
+            }
+            // A thrown event ends this subscription, not the WebPage. Reattach
+            // before a subsequent toolbar action or website navigation starts.
+            if case WebPage.NavigationError.pageClosed = error { return }
+            observationID += 1
+        }
+    }
+
+    func retryPortal() {
+        loadFailure = nil
+        shouldOpenPortal = true
+        observationID += 1
+    }
 
     init(
         initialURL: URL,
+        dataStore: WKWebsiteDataStore = .default(),
         onConnectionFile: @escaping @MainActor (URL) -> Void,
         onError: @escaping @MainActor (String) -> Void
     ) {
         self.initialURL = initialURL
         let trustCoordinator = PortalTrustCoordinator()
         self.trustCoordinator = trustCoordinator
-        let dataStore = WKWebsiteDataStore.default()
         let decider = RavadaNavigationDecider(
             dataStore: dataStore,
             portalURL: initialURL,
@@ -112,13 +174,19 @@ private final class RavadaPortalModel {
         navigationDecider = decider
         var configuration = WebPage.Configuration()
         configuration.websiteDataStore = dataStore
+        configuration.userContentController.addUserScript(PortalLoginCoordinator.captureScript)
+        if let autofillHints = PortalAutofillHints.script(for: initialURL) {
+            configuration.userContentController.addUserScript(autofillHints)
+        }
         page = WebPage(configuration: configuration, navigationDecider: decider)
+        decider.loginCoordinator.page = page
     }
 
     func loadInitialPage() {
         navigationDecider.prepareCookies()
         guard !Task.isCancelled else { return }
-        guard page.url == nil else { return }
+        guard !hasRequestedInitialPage else { return }
+        hasRequestedInitialPage = true
         // The first response supplies the portal's clock; do not sample a stale
         // HTTP Date from the local response cache.
         page.load(URLRequest(url: initialURL, cachePolicy: .reloadIgnoringLocalCacheData))
@@ -127,6 +195,8 @@ private final class RavadaPortalModel {
     var pageTitle: String {
         page.title.isEmpty ? "Ravada Portal" : page.title
     }
+
+    var portalURL: URL { initialURL }
 
     var pageAddress: String {
         page.url?.host() ?? initialURL.host() ?? initialURL.absoluteString
@@ -141,18 +211,28 @@ private final class RavadaPortalModel {
     }
 
     func goBack() {
+        loadFailure = nil
+        navigationDecider.loginCoordinator.cancel()
         guard let item = page.backForwardList.backList.last else { return }
         page.load(item)
     }
 
     func goForward() {
+        loadFailure = nil
+        navigationDecider.loginCoordinator.cancel()
         guard let item = page.backForwardList.forwardList.first else { return }
         page.load(item)
     }
 
     func reloadOrStop() {
-        if page.isLoading {
+        let wasLoading = isLoading
+        loadFailure = nil
+        navigationDecider.loginCoordinator.cancel()
+        if wasLoading {
             page.stopLoading()
+        } else if page.url == nil {
+            // A failed first navigation leaves no history item to reload.
+            page.load(URLRequest(url: initialURL, cachePolicy: .reloadIgnoringLocalCacheData))
         } else {
             page.reload()
         }
