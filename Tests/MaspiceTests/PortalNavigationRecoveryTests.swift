@@ -5,8 +5,12 @@ import WebKit
 
 @MainActor struct PortalNavigationRecoveryTests {
     @Test func repeatedFailuresRearmObservationAndSuccessfulNavigationClearsRecovery() async throws {
-        // WebKit blocks this restricted port locally, so no external host is used.
-        let model = RavadaPortalModel(initialURL: URL(string: "https://127.0.0.1:1/")!,
+        // A missing local file produces a navigation failure without relying
+        // on OS-specific restricted-port handling or network availability.
+        let missingPage = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            .appendingPathComponent("missing.html")
+        let model = RavadaPortalModel(initialURL: missingPage,
                                       dataStore: .nonPersistent(), onConnectionFile: { _ in }, onError: { _ in })
         var observer = Task { await model.observeNavigations() }
         defer { observer.cancel(); model.page.stopLoading(); model.cancelPendingWork() }
