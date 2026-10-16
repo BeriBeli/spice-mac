@@ -6,6 +6,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Update SwiftSpice to 0.4.3 to fix remote display updates freezing after native
+  full-screen or Space transitions, including full screen on an external
+  display. A resumed desktop now acknowledges a freshly published frame even
+  when its guest revision is unchanged, allowing subsequent updates to proceed.
+
+### Validation
+
+- A regression reproduces the missing frame acknowledgement without the fix;
+  all 897 SwiftSpice tests passed with warnings treated as errors.
+- The user confirmed that clicking the remote desktop in external-display
+  full screen refreshed normally in the corrected test build.
+- Clean-machine macOS 26 acceptance and the complete audio, clipboard, resize,
+  and diagnostics acceptance matrix were not repeated for this patch.
+
 ## [0.5.5] — 2026-09-17
 
 ### Fixed
