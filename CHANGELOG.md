@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.6] — 2026-10-16
+
 ### Fixed
 
 - Update SwiftSpice to 0.4.3 to fix remote display updates freezing after native
@@ -17,6 +19,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - A regression reproduces the missing frame acknowledgement without the fix;
   all 897 SwiftSpice tests passed with warnings treated as errors.
+- Parser, session-policy, and all 55 application tests passed against the exact
+  SwiftSpice 0.4.3 release. App dependency, bundle signature, and version checks
+  passed; the update archive is signed for Sparkle.
 - The user confirmed that clicking the remote desktop in external-display
   full screen refreshed normally in the corrected test build.
 - Clean-machine macOS 26 acceptance and the complete audio, clipboard, resize,
@@ -504,7 +509,8 @@ CocoaSpice.
   QEMU frameworks are no longer shipped (app size 443 MB → 23 MB).
 - See [SECURITY.md](SECURITY.md) for the threat model and residual risks.
 
-[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.5.5...HEAD
+[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.5.6...HEAD
+[0.5.6]: https://github.com/BeriBeli/spice-mac/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/BeriBeli/spice-mac/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/BeriBeli/spice-mac/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/BeriBeli/spice-mac/compare/v0.5.2...v0.5.3
