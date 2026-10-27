@@ -6,6 +6,23 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Update SwiftSpice to 0.4.4 to correct vertically flipped QUIC image tiles and
+  allow admitted MJPEG frames to present when decoding or timer wakeup makes
+  them late. Frame ordering and Surface mutation barriers remain enforced.
+
+### Validation
+
+- All 28 parser checks, 4 session-policy tests, and 55 application tests passed
+  against the exact SwiftSpice 0.4.4 release. Local app assembly, native
+  dependency audits, and ad-hoc bundle signature verification passed.
+- The user confirmed that the previously corrupted guest image displays normally
+  in the local test app using SwiftSpice 0.4.4.
+- Live VDI latency improvement, clean-machine macOS 26 acceptance, and the full
+  audio, clipboard, resize, and diagnostics acceptance matrix were not repeated
+  for this patch.
+
 ## [0.5.6] — 2026-10-16
 
 ### Fixed
