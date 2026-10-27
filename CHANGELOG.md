@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.7] — 2026-10-27
+
 ### Fixed
 
 - Update SwiftSpice to 0.4.4 to correct vertically flipped QUIC image tiles and
@@ -526,7 +528,8 @@ CocoaSpice.
   QEMU frameworks are no longer shipped (app size 443 MB → 23 MB).
 - See [SECURITY.md](SECURITY.md) for the threat model and residual risks.
 
-[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.5.6...HEAD
+[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.5.7...HEAD
+[0.5.7]: https://github.com/BeriBeli/spice-mac/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/BeriBeli/spice-mac/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/BeriBeli/spice-mac/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/BeriBeli/spice-mac/compare/v0.5.3...v0.5.4
