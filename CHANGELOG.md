@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-11-01
+
 ### Fixed
 
 - Update SwiftSpice to 0.4.5 so display-layout requests continue when the guest
@@ -26,6 +28,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - All 28 parser checks, 4 session-policy tests, and 55 application tests passed
   against the exact SwiftSpice 0.4.5 release with Swift 6.4. Native artifact
   provenance and dependency-closure checks passed.
+- Release app assembly, archive extraction, native dependency audits, and ad-hoc
+  bundle signature verification passed. The Sparkle archive signature was
+  independently verified against the application's public key.
 - Live Ravada/standard-QEMU acceptance, clean-machine macOS 26 acceptance, and
   the full audio, clipboard, resize, and diagnostics matrix were not repeated.
 
@@ -551,7 +556,8 @@ CocoaSpice.
   QEMU frameworks are no longer shipped (app size 443 MB → 23 MB).
 - See [SECURITY.md](SECURITY.md) for the threat model and residual risks.
 
-[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.5.7...HEAD
+[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/BeriBeli/spice-mac/compare/v0.5.7...v0.6.0
 [0.5.7]: https://github.com/BeriBeli/spice-mac/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/BeriBeli/spice-mac/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/BeriBeli/spice-mac/compare/v0.5.4...v0.5.5
