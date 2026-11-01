@@ -6,12 +6,28 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Update SwiftSpice to 0.4.5 so display-layout requests continue when the guest
+  omits agent replies, and restore Display stream reports used by the server's
+  adaptive video feedback.
+
 ### Changed
 
 - Require Swift tools 6.4 for the application and both embedded packages; select
   Xcode 27.1 in CI and update environment checks and contributor instructions.
 - Update Sparkle from 2.9.4 to 2.10.1 and actions/checkout from v6 to v7.0.1.
-- Align third-party license references with the pinned SwiftSpice 0.4.4 release.
+- Update the bundled libjpeg-turbo to 3.2.1 with arm64 Neon JPEG/MJPEG decoding,
+  retaining accurate DCT and high-quality chroma upsampling.
+- Align third-party license references with the pinned SwiftSpice 0.4.5 release.
+
+### Validation
+
+- All 28 parser checks, 4 session-policy tests, and 55 application tests passed
+  against the exact SwiftSpice 0.4.5 release with Swift 6.4. Native artifact
+  provenance and dependency-closure checks passed.
+- Live Ravada/standard-QEMU acceptance, clean-machine macOS 26 acceptance, and
+  the full audio, clipboard, resize, and diagnostics matrix were not repeated.
 
 ## [0.5.7] — 2026-10-27
 

@@ -7,10 +7,10 @@ Active dependencies
 -------------------
 
 SwiftSpice (https://github.com/BeriBeli/spice-swift)
-  Version:   v0.4.4 (exact SwiftPM release dependency)
+  Version:   v0.4.5 (exact SwiftPM release dependency)
   License:   MIT
   Copyright: Copyright (c) 2026 BeriBeli
-  Text:      https://github.com/BeriBeli/spice-swift/blob/v0.4.4/LICENSE
+  Text:      https://github.com/BeriBeli/spice-swift/blob/v0.4.5/LICENSE
 
 Sparkle (https://github.com/sparkle-project/Sparkle)
   Version:   2.10.1 (exact SwiftPM binary release dependency)
@@ -24,13 +24,13 @@ Native dependency closure
 SwiftSpice supplies arm64 static XCFrameworks built from pinned,
 checksum-verified sources:
 
-  libjpeg-turbo 3.2.0 ........ IJG, zlib, and BSD-3-Clause
+  libjpeg-turbo 3.2.1 ........ IJG, zlib, and BSD-3-Clause
   spice-common QUIC 0.42 ..... LGPL-2.1-or-later
   usbredir 0.15.0 ............ LGPL-2.1-or-later library components
   libusb 1.0.30 .............. LGPL-2.1-or-later
 
 Source URLs, checksums, and the reproducible build recipe are in
-the v0.4.4 `Scripts/build-native-dependencies.sh`. The precise
+the v0.4.5 `Scripts/build-native-dependencies.sh`. The precise
 upstream license texts are embedded in the XCFrameworks and copied into the app.
 Maspice independently verifies that the final Mach-O closure has no build-host
 absolute dynamic-library paths.
