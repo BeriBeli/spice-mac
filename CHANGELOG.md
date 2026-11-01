@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-11-01
+
 ### Changed
 
 - Open new SPICE sessions, including Ravada connections, in a centered
@@ -575,7 +577,8 @@ CocoaSpice.
   QEMU frameworks are no longer shipped (app size 443 MB → 23 MB).
 - See [SECURITY.md](SECURITY.md) for the threat model and residual risks.
 
-[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/BeriBeli/spice-mac/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/BeriBeli/spice-mac/compare/v0.5.7...v0.6.0
 [0.5.7]: https://github.com/BeriBeli/spice-mac/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/BeriBeli/spice-mac/compare/v0.5.5...v0.5.6
