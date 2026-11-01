@@ -1,4 +1,4 @@
-// swift-tools-version:6.2
+// swift-tools-version:6.4
 import PackageDescription
 
 // Note: tests use a tiny dependency-free runner (the `vvcheck` executable) instead

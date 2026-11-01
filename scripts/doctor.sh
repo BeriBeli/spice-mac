@@ -28,14 +28,14 @@ fi
 
 swift_line="$(swift --version 2>/dev/null | head -1 || true)"
 swift_version="$(printf '%s\n' "$swift_line" | sed -nE 's/.*Swift version ([0-9]+\.[0-9]+).*/\1/p')"
-if [ -n "$swift_version" ] && awk -v v="$swift_version" 'BEGIN { split(v,a,"."); exit !(a[1] > 6 || (a[1] == 6 && a[2] >= 3)) }'; then
-    pass "Swift $swift_version (6.3+)"
-else fail "Swift 6.3+ required (got: ${swift_line:-unknown})" "select Xcode 26.3 or later."; fi
+if [ -n "$swift_version" ] && awk -v v="$swift_version" 'BEGIN { split(v,a,"."); exit !(a[1] > 6 || (a[1] == 6 && a[2] >= 4)) }'; then
+    pass "Swift $swift_version (6.4+)"
+else fail "Swift 6.4+ required (got: ${swift_line:-unknown})" "select Xcode 27.1 or later."; fi
 
 sdk_version="$(xcrun --sdk macosx --show-sdk-version 2>/dev/null || true)"
 sdk_major="${sdk_version%%.*}"
-if [ -n "$sdk_major" ] && [ "$sdk_major" -ge 26 ] 2>/dev/null; then pass "macOS SDK $sdk_version (26+)"
-else fail "macOS 26+ SDK not found" "install and select Xcode 26 or later."; fi
+if [ -n "$sdk_major" ] && [ "$sdk_major" -ge 27 ] 2>/dev/null; then pass "macOS SDK $sdk_version (27+)"
+else fail "macOS 27+ SDK not found" "install and select Xcode 27.1 or later."; fi
 
 metal_path="$(xcrun -f metal 2>/dev/null || true)"
 if [ -x "$metal_path" ]; then pass "Metal toolchain ($metal_path)"

@@ -1,4 +1,4 @@
-// swift-tools-version:6.3
+// swift-tools-version:6.4
 import PackageDescription
 
 // Maspice consumes an exact upstream SwiftSpice release. A Maspice release is
@@ -16,7 +16,7 @@ let package = Package(
         .package(path: "Packages/SpiceSessionLogic"),
         .package(
             url: "https://github.com/sparkle-project/Sparkle",
-            exact: "2.9.4"
+            exact: "2.10.1"
         ),
         .package(
             url: "https://github.com/BeriBeli/spice-swift.git",

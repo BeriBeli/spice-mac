@@ -97,7 +97,7 @@ because an in-process diagnostics view cannot update while the process is stuck.
 Requirements:
 
 - Apple Silicon and macOS 26 or later;
-- full Xcode with Swift 6.3 and the macOS 26 SDK;
+- Xcode 27.1 or later with Swift 6.4 and the macOS 27 SDK;
 - the Xcode Metal Toolchain.
 
 ```sh

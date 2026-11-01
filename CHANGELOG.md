@@ -6,6 +6,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Require Swift tools 6.4 for the application and both embedded packages; select
+  Xcode 27.1 in CI and update environment checks and contributor instructions.
+- Update Sparkle from 2.9.4 to 2.10.1 and actions/checkout from v6 to v7.0.1.
+- Align third-party license references with the pinned SwiftSpice 0.4.4 release.
+
 ## [0.5.7] — 2026-10-27
 
 ### Fixed

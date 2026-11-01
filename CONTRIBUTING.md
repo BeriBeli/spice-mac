@@ -29,7 +29,7 @@ Maspice is a macOS 26+ direct SPICE client for standard QEMU and Ravada.
 
 ## Development
 
-Use full Xcode with Swift 6.3, the macOS 26 SDK, and the Metal Toolchain. Install
+Use Xcode 27.1 or later with Swift 6.4, the macOS 27 SDK, and the Metal Toolchain. Install
 the last component with `xcodebuild -downloadComponent MetalToolchain`.
 
 ```sh

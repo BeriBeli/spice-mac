@@ -11,13 +11,21 @@ on:
 
 jobs:
   swift-tests:
-    name: Swift 6.3 checks
-    runs-on: macos-26
+    name: Swift 6.4 checks
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
 
       - name: Show toolchain
         run: swift --version
+
+      - name: Install Metal shader toolchain
+        run: xcodebuild -downloadComponent MetalToolchain
+
+      - name: Check build environment
+        run: ./scripts/doctor.sh
 
       - name: Test suite
         run: make test
@@ -29,6 +37,6 @@ jobs:
     name: shellcheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
       - name: shellcheck scripts
         run: shellcheck --severity=warning -x scripts/*.sh
