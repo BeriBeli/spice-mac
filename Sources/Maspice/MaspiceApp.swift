@@ -35,7 +35,11 @@ struct MaspiceApp: App {
             }
         }
         .defaultWindowPlacement { _, context in
-            WindowPlacement(size: context.defaultDisplay.visibleRect.size)
+            let available = context.defaultDisplay.visibleRect.size
+            return WindowPlacement(size: CGSize(
+                width: min(1024, available.width * 0.9),
+                height: min(768, available.height * 0.9)
+            ))
         }
         .windowIdealSize(.maximum)
         .restorationBehavior(.disabled)

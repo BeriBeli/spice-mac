@@ -6,6 +6,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Open new SPICE sessions, including Ravada connections, in a centered
+  1024×768-point window capped at 90% of the display's usable size. Connection
+  files no longer trigger automatic full screen; native Zoom and Enter Full
+  Screen remain available.
+- Open the Ravada web portal in a centered 1024×768-point window, capped at
+  90% of the usable screen, instead of automatically zooming it to fill the
+  display. User resizing is preserved while browsing the portal.
+
+### Validation
+
+- All 28 parser checks, 4 session-policy tests, and 55 application tests passed,
+  including portal size, centering, user-resize preservation, and launcher
+  restoration checks. Release app assembly, native dependency audits, and
+  ad-hoc bundle signature verification passed.
+- The new startup layout has not been verified in a live Ravada session or on
+  a clean macOS 26 machine. This release does not add guest-resolution presets.
+
 ## [0.6.0] — 2026-11-01
 
 ### Fixed

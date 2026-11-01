@@ -7,7 +7,7 @@ struct MainWindowPresentationTests {
     @Test(arguments: [false, true])
     func returningFromPortalRestoresLauncherSizeInsteadOfPreviousUserSize(resizePortal: Bool) async throws {
         _ = NSApplication.shared
-        // Exercise real AppKit zoom/restore geometry without presenting a test
+        // Exercise real AppKit window geometry without presenting a test
         // window or touching the user's application windows.
         let window = OffscreenPresentationWindow(
             contentRect: NSRect(x: 100, y: 100, width: 520, height: 300),
@@ -34,10 +34,22 @@ struct MainWindowPresentationTests {
             window.setContentSize(NSSize(width: 800, height: 500))
             coordinator.update(destination: .portal)
             await settlePresentation()
-            try #require(window.isZoomed)
-            if resizePortal { window.setContentSize(NSSize(width: 900, height: 600)) }
-
             let portalScreen = try #require(window.screen)
+            #expect(!window.isZoomed)
+            #expect(!window.styleMask.contains(.fullScreen))
+            #expect(window.frame.width <= portalScreen.visibleFrame.width * 0.9 + 1)
+            #expect(window.frame.height <= portalScreen.visibleFrame.height * 0.9 + 1)
+            #expect(window.contentRect(forFrameRect: window.frame).width <= 1024)
+            #expect(window.contentRect(forFrameRect: window.frame).height <= 768)
+            #expect(abs(window.frame.midX - portalScreen.visibleFrame.midX) < 1)
+            #expect(abs(window.frame.midY - portalScreen.visibleFrame.midY) < 1)
+            if resizePortal {
+                window.setContentSize(NSSize(width: 900, height: 600))
+                NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+                await settlePresentation()
+                #expect(window.contentRect(forFrameRect: window.frame).size == NSSize(width: 900, height: 600))
+            }
+
             window.observedContentSizes.removeAll()
             coordinator.update(destination: .launcher)
             await settlePresentation()

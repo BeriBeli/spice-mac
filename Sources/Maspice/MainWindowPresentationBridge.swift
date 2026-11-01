@@ -3,7 +3,7 @@ import AppKit
 import SwiftUI
 
 /// SwiftUI owns the main window's destination. This narrow bridge only applies
-/// the corresponding native Zoom or restore operation to the existing window.
+/// the destination's initial size to the existing window.
 struct MainWindowPresentationBridge: NSViewRepresentable {
     let destination: MainDestination
 
@@ -117,9 +117,16 @@ struct MainWindowPresentationBridge: NSViewRepresentable {
                 window.setFrame(frame, display: true, animate: false)
             case .portal:
                 window.contentMinSize = NSSize(width: 640, height: 480)
-                if !window.isZoomed {
-                    window.zoom(nil)
-                }
+                window.contentView?.layoutSubtreeIfNeeded()
+                let visibleFrame = (window.screen ?? NSScreen.main)?.visibleFrame ?? window.frame
+                var frame = window.frameRect(forContentRect: NSRect(
+                    origin: .zero, size: NSSize(width: 1024, height: 768)))
+                frame.size.width = min(frame.width, visibleFrame.width * 0.9)
+                frame.size.height = min(frame.height, visibleFrame.height * 0.9)
+                frame.origin = NSPoint(
+                    x: visibleFrame.midX - frame.width / 2,
+                    y: visibleFrame.midY - frame.height / 2)
+                window.setFrame(frame, display: true, animate: false)
             }
         }
 

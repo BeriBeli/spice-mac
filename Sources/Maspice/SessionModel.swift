@@ -12,7 +12,6 @@ final class SessionModel {
     let sourceURL: URL
     let client: SpiceClient?
     let baseTitle: String
-    let prefersFullscreen: Bool
 
     private(set) var status: SpiceClient.Status = .idle
     private(set) var parseFailure: String?
@@ -35,7 +34,6 @@ final class SessionModel {
 
             self.client = client
             baseTitle = client.title ?? request.url.deletingPathExtension().lastPathComponent
-            prefersFullscreen = client.prefersFullscreen
             shouldTrashAfterStart = config.shouldDeleteThisFile(
                 fallback: Preferences.trashConnectionFileAfterUse
             )
@@ -45,7 +43,6 @@ final class SessionModel {
         } catch {
             client = nil
             baseTitle = request.url.deletingPathExtension().lastPathComponent
-            prefersFullscreen = false
             parseFailure = String(describing: error)
             terminalFailureMessage = "Could not open “\(request.url.lastPathComponent)”\n\(error)"
             shouldReturnToLauncher = true

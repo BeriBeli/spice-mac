@@ -356,13 +356,14 @@ struct SwiftUICommandRegistrationTests {
         #expect(
             appSource.components(separatedBy: "context.defaultDisplay.visibleRect.size").count - 1 == 1
         )
-        #expect(!appSource.contains(".defaultSize(width: 1024, height: 768)"))
+        #expect(appSource.contains("width: min(1024, available.width * 0.9)"))
+        #expect(appSource.contains("height: min(768, available.height * 0.9)"))
+        #expect(!sessionBridgeSource.contains("toggleFullScreen"))
         #expect(!FileManager.default.fileExists(atPath: zoomBridgeURL.path))
         #expect(!portalWindowSource.contains("InitialWindowZoomBridge()"))
         #expect(mainBridgeSource.contains("struct MainWindowPresentationBridge: NSViewRepresentable"))
         #expect(mainBridgeSource.contains("window.contentMinSize"))
-        #expect(mainBridgeSource.contains("window.isZoomed"))
-        #expect(mainBridgeSource.contains("window.zoom(nil)"))
+        #expect(!mainBridgeSource.contains("window.zoom(nil)"))
         #expect(mainBridgeSource.contains("window.setFrame(frame, display: true, animate: false)"))
         #expect(mainBridgeSource.contains("NSWindow.didExitFullScreenNotification"))
         #expect(portalWindowSource.contains("RavadaPortalView("))

@@ -18,7 +18,6 @@ struct SwiftSpiceDesktop: View {
         )
         .background {
             SpiceWindowBridge(
-                prefersFullscreen: model.prefersFullscreen,
                 dynamicResolutionEnabled: model.client?.supportsDynamicResolution == true,
                 onReleaseInput: model.releaseAllInput,
                 onResolution: model.requestResolution(width:height:)
@@ -29,14 +28,12 @@ struct SwiftSpiceDesktop: View {
 }
 
 private struct SpiceWindowBridge: NSViewRepresentable {
-    let prefersFullscreen: Bool
     let dynamicResolutionEnabled: Bool
     let onReleaseInput: @MainActor () -> Void
     let onResolution: @MainActor (Int, Int) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
-            prefersFullscreen: prefersFullscreen,
             dynamicResolutionEnabled: dynamicResolutionEnabled,
             onReleaseInput: onReleaseInput,
             onResolution: onResolution
@@ -53,7 +50,6 @@ private struct SpiceWindowBridge: NSViewRepresentable {
 
     func updateNSView(_ nsView: WindowProbeView, context: Context) {
         context.coordinator.update(
-            prefersFullscreen: prefersFullscreen,
             dynamicResolutionEnabled: dynamicResolutionEnabled,
             onReleaseInput: onReleaseInput,
             onResolution: onResolution
@@ -70,47 +66,36 @@ private struct SpiceWindowBridge: NSViewRepresentable {
     final class Coordinator {
         private weak var window: NSWindow?
         private var observers: [NSObjectProtocol] = []
-        private var prefersFullscreen: Bool
         private var dynamicResolutionEnabled: Bool
         private var onReleaseInput: @MainActor () -> Void
         private var onResolution: @MainActor (Int, Int) -> Void
-        private var appliedFullscreen = false
-        private var initialPolicyTask: Task<Void, Never>?
 
         init(
-            prefersFullscreen: Bool,
             dynamicResolutionEnabled: Bool,
             onReleaseInput: @escaping @MainActor () -> Void,
             onResolution: @escaping @MainActor (Int, Int) -> Void
         ) {
-            self.prefersFullscreen = prefersFullscreen
             self.dynamicResolutionEnabled = dynamicResolutionEnabled
             self.onReleaseInput = onReleaseInput
             self.onResolution = onResolution
         }
 
         func update(
-            prefersFullscreen: Bool,
             dynamicResolutionEnabled: Bool,
             onReleaseInput: @escaping @MainActor () -> Void,
             onResolution: @escaping @MainActor (Int, Int) -> Void
         ) {
-            self.prefersFullscreen = prefersFullscreen
             let shouldRetryResolution = dynamicResolutionEnabled && !self.dynamicResolutionEnabled
             self.dynamicResolutionEnabled = dynamicResolutionEnabled
             self.onReleaseInput = onReleaseInput
             self.onResolution = onResolution
-            scheduleInitialWindowPolicy()
             if shouldRetryResolution {
                 requestCurrentResolution()
             }
         }
 
         func attach(to window: NSWindow?) {
-            guard self.window !== window else {
-                scheduleInitialWindowPolicy()
-                return
-            }
+            guard self.window !== window else { return }
             removeObservers()
             self.window = window
             guard let window else { return }
@@ -137,13 +122,10 @@ private struct SpiceWindowBridge: NSViewRepresentable {
                     self?.handleKeyWindowChange(NSApp.keyWindow)
                 }
             })
-            scheduleInitialWindowPolicy()
         }
 
         func stop() {
             releaseWindowInput()
-            initialPolicyTask?.cancel()
-            initialPolicyTask = nil
             removeObservers()
             window = nil
         }
@@ -155,7 +137,6 @@ private struct SpiceWindowBridge: NSViewRepresentable {
             case NSWindow.didEndLiveResizeNotification,
                  NSWindow.didEnterFullScreenNotification,
                  NSWindow.didExitFullScreenNotification:
-                scheduleInitialWindowPolicy()
                 requestCurrentResolution()
             default:
                 break
@@ -164,9 +145,7 @@ private struct SpiceWindowBridge: NSViewRepresentable {
 
         private func handleKeyWindowChange(_ keyWindow: NSWindow?) {
             guard let keyWindow else { return }
-            if keyWindow === window {
-                scheduleInitialWindowPolicy()
-            } else {
+            if keyWindow !== window {
                 releaseWindowInput()
             }
         }
@@ -193,25 +172,6 @@ private struct SpiceWindowBridge: NSViewRepresentable {
                     return
                 }
                 pendingViews.append(contentsOf: view.subviews)
-            }
-        }
-
-        private func applyInitialWindowPolicy() {
-            guard let window, window.isVisible else { return }
-            if prefersFullscreen, !appliedFullscreen,
-               !window.styleMask.contains(.fullScreen) {
-                appliedFullscreen = true
-                window.toggleFullScreen(nil)
-            }
-        }
-
-        private func scheduleInitialWindowPolicy() {
-            guard initialPolicyTask == nil, prefersFullscreen, !appliedFullscreen else { return }
-            initialPolicyTask = Task { @MainActor [weak self] in
-                await Task.yield()
-                guard let self, !Task.isCancelled else { return }
-                initialPolicyTask = nil
-                applyInitialWindowPolicy()
             }
         }
 

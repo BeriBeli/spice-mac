@@ -53,6 +53,9 @@ explicitly instead of falling back to a different transport or trust policy.
 - Choose **Open Connection File…**, press Command-O, drag a `.vv` file onto the
   launcher, or open the file from Finder. User-supplied files are preserved by
   default; Settings can move them to Trash after connecting.
+- The portal and remote desktop start in ordinary 1024×768-point windows,
+  reduced to fit smaller screens. Resize freely or use **View ▸ Enter Full
+  Screen**. Connection-file `fullscreen` hints do not override windowed startup.
 - Clipboard sharing is enabled by default and can be disabled in Settings for
   an untrusted guest.
 - For intermittent input or display lag, use **Session ▸ Show Diagnostics**
