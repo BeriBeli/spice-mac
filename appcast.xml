@@ -1,7 +1,19 @@
-<?xml version="1.0" standalone="yes"?>
+<?xml version='1.0' encoding='utf-8'?>
 <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <title>Maspice</title>
+        <item>
+            <title>0.6.2-beta.1</title>
+            <pubDate>Sun, 15 Nov 2026 12:01:50 +0800</pubDate>
+            <link>https://github.com/BeriBeli/spice-mac/releases/tag/v0.6.2-beta.1</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/BeriBeli/spice-mac/releases/tag/v0.6.2-beta.1</sparkle:fullReleaseNotesLink>
+            <sparkle:channel>beta</sparkle:channel>
+            <sparkle:version>35</sparkle:version>
+            <sparkle:shortVersionString>0.6.2-beta.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/BeriBeli/spice-mac/releases/download/v0.6.2-beta.1/Maspice.app.zip" length="5807375" type="application/octet-stream" sparkle:edSignature="SDOGz+62g0Ze5Xd2myVC88G8YiutAQs9lwvIR81qmEplpHqtb1j279NU+nQ77CCjKZAeuSjQjorB7mAuSQEDDA==" />
+        </item>
         <item>
             <title>0.6.1</title>
             <pubDate>Sun, 01 Nov 2026 17:26:40 +0800</pubDate>
@@ -11,7 +23,7 @@
             <sparkle:shortVersionString>0.6.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/BeriBeli/spice-mac/releases/download/v0.6.1/Maspice.app.zip" length="5733664" type="application/octet-stream" sparkle:edSignature="qIHdaKFfT7clRvWbtGwixVGynQP+MNnKwle2Aer6/PDNQDhRYzZJwOx+n4UChe9VYYsYeBjNhFZta5n4TsBMBA=="/>
+            <enclosure url="https://github.com/BeriBeli/spice-mac/releases/download/v0.6.1/Maspice.app.zip" length="5733664" type="application/octet-stream" sparkle:edSignature="qIHdaKFfT7clRvWbtGwixVGynQP+MNnKwle2Aer6/PDNQDhRYzZJwOx+n4UChe9VYYsYeBjNhFZta5n4TsBMBA==" />
         </item>
     </channel>
 </rss>
