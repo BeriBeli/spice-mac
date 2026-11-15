@@ -26,6 +26,12 @@ than Developer-ID signed or notarized. After verifying the checksum, use
 **System Settings ▸ Privacy & Security ▸ Open Anyway** if Gatekeeper blocks the
 first launch. Never bypass Gatekeeper for an asset whose checksum does not match.
 
+Beta builds are separate GitHub prereleases and do not replace the stable Latest
+release. Install the first beta manually, then enable **Settings → Updates →
+Receive beta updates** to receive subsequent betas as well as stable releases.
+The option defaults to off; turning it off keeps the installed build until a newer
+stable build is available. See [the update feed and release workflow](docs/UPDATES.md).
+
 ## Supported scope
 
 Maspice connects directly to standard-QEMU and Ravada SPICE endpoints:

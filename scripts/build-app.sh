@@ -6,7 +6,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 CONFIG="${CONFIG:-release}"
-SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 PLIST="$ROOT/Resources/Info.plist"
 APP_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$PLIST")"
 EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$PLIST")"
@@ -98,16 +97,8 @@ cp "$ROOT/LICENSE" "$APP/Contents/Resources/LICENSE.txt"
 
 "$ROOT/scripts/audit-dylib-links.sh" "$APP"
 
-SIGN_ARGS=(--force --sign "$SIGN_IDENTITY")
-if [ "$SIGN_IDENTITY" = "-" ]; then SIGN_ARGS+=(--timestamp=none); else SIGN_ARGS+=(--timestamp); fi
-if [ "${HARDENED:-0}" = "1" ]; then
-    SIGN_ARGS+=(--options runtime)
-fi
-log "signing embedded Sparkle framework"
-codesign "${SIGN_ARGS[@]}" --deep "$APP/Contents/Frameworks/Sparkle.framework"
-log "signing app (identity: $SIGN_IDENTITY)"
-codesign "${SIGN_ARGS[@]}" "$APP"
-codesign --verify --deep --strict --verbose=2 "$APP"
+log "signing embedded code and app"
+"$ROOT/scripts/sign-app.sh" "$APP"
 
 if [ "${PACKAGE:-1}" = "1" ]; then
     ZIP="$OUT/$APP_NAME.app.zip"

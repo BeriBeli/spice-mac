@@ -4,6 +4,7 @@ import SwiftUI
 
 struct UpdateSettingsView: View {
     private let updater: SPUUpdater
+    @AppStorage(Preferences.receiveBetaUpdatesKey) private var receiveBetaUpdates = false
     @State private var automaticallyChecksForUpdates: Bool
     @State private var automaticallyDownloadsUpdates: Bool
 
@@ -24,6 +25,14 @@ struct UpdateSettingsView: View {
                     isOn: $automaticallyChecksForUpdates)
                     .onChange(of: automaticallyChecksForUpdates) {
                         updater.automaticallyChecksForUpdates = automaticallyChecksForUpdates
+                    }
+
+                SettingsPreferenceRow(
+                    title: "Receive beta updates",
+                    description: "Include prerelease versions. Turning this off keeps your current version until a newer stable release is available.",
+                    isOn: $receiveBetaUpdates)
+                    .onChange(of: receiveBetaUpdates) {
+                        updater.resetUpdateCycleAfterShortDelay()
                     }
 
                 SettingsPreferenceRow(

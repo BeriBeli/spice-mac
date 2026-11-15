@@ -6,6 +6,33 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.2-beta.1] — 2026-11-15
+
+### Added
+
+- Add **Receive beta updates** in Settings → Updates, off by default. Sparkle
+  always accepts stable updates and accepts the beta channel only when enabled.
+  Turning it off keeps the installed build until a newer stable build is offered.
+- Maintain a shared signed-archive appcast with stable and beta entries; preserve
+  the legacy stable Latest download URL. Beta GitHub releases do not replace Latest.
+- Show the full beta version in About and open the installed version's release
+  notes from **What's New**.
+
+### Changed
+
+- Consume SwiftSpice's bounded native video batching, incremental surface copies,
+  disjoint-write validation and lease-release admission recovery.
+- Extend session diagnostics with display traffic/image/codec counts, GPU copy
+  volume and wait times, native admission recovery, MJPEG lateness and separate
+  drawable acquisition/encoding/commit timings. Show zero codec activity explicitly.
+
+### Known limitations
+
+- Vertical phase boundaries during color transitions remain under investigation.
+  The earlier isolated one-second presentation stall has no confirmed unique root cause.
+- Packaging and deterministic tests do not replace the pending clean-macOS-26
+  acceptance run. Signing and notarization status is recorded in the release notes.
+
 ## [0.6.1] — 2026-11-01
 
 ### Changed
@@ -577,7 +604,8 @@ CocoaSpice.
   QEMU frameworks are no longer shipped (app size 443 MB → 23 MB).
 - See [SECURITY.md](SECURITY.md) for the threat model and residual risks.
 
-[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/BeriBeli/spice-mac/compare/v0.6.2-beta.1...HEAD
+[0.6.2-beta.1]: https://github.com/BeriBeli/spice-mac/compare/v0.6.1...v0.6.2-beta.1
 [0.6.1]: https://github.com/BeriBeli/spice-mac/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/BeriBeli/spice-mac/compare/v0.5.7...v0.6.0
 [0.5.7]: https://github.com/BeriBeli/spice-mac/compare/v0.5.6...v0.5.7

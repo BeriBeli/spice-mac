@@ -172,6 +172,24 @@ struct SessionDiagnosticsDisplaySection: View {
         VStack(alignment: .leading, spacing: 3) {
             SessionDiagnosticsSectionHeader(title: "Display pipeline")
             SessionDiagnosticsMetricRow(
+                label: "Display received bytes / messages / COPY_BITS",
+                value: "\(diagnosticValue(metrics?.displayReceivedBytes)) / "
+                    + "\(diagnosticValue(metrics?.displayMessages)) / "
+                    + "\(diagnosticValue(metrics?.displayCopyBitsMessages))"
+            )
+            SessionDiagnosticsMetricRow(
+                label: "DRAW_COPY Bitmap / QUIC / JPEG / LZ",
+                value: "\(diagnosticValue(metrics?.displayBitmapImages)) / "
+                    + "\(diagnosticValue(metrics?.displayQUICImages)) / "
+                    + "\(diagnosticValue(metrics?.displayJPEGImages)) / "
+                    + "\(diagnosticValue(metrics?.displayLZImages))"
+            )
+            SessionDiagnosticsMetricRow(
+                label: "DRAW_COPY cache / surface references",
+                value: "\(diagnosticValue(metrics?.displayCachedImages)) / "
+                    + "\(diagnosticValue(metrics?.displaySurfaceImages))"
+            )
+            SessionDiagnosticsMetricRow(
                 label: "Mutation submit / snapshot / emit",
                 value: "\(diagnosticValue(metrics?.publisherSubmissions)) / "
                     + "\(diagnosticValue(metrics?.publisherSnapshotAttempts)) / "
@@ -244,6 +262,20 @@ struct SessionDiagnosticsRendererSection: View {
                 value: diagnosticValue(metrics?.directIOSurfaceWriteBytes)
             )
             SessionDiagnosticsMetricRow(
+                label: "GPU copy bytes / synchronization attempts",
+                value: "\(diagnosticValue(metrics?.gpuCopyBytes)) / "
+                    + "\(diagnosticValue(metrics?.gpuCopySynchronizationCount))"
+            )
+            if let metrics {
+                SessionDiagnosticsMetricRow(
+                    label: "GPU copy wait total / mean (ms)",
+                    value: String(format: "%.2f", metrics.gpuCopyWaitMilliseconds)
+                        + " / " + (metrics.gpuCopyMeanWaitMilliseconds.map {
+                            String(format: "%.2f", $0)
+                        } ?? "—")
+                )
+            }
+            SessionDiagnosticsMetricRow(
                 label: "Metal presented / committed / superseded",
                 value: "\(diagnosticValue(metrics?.metalPresentedFrames)) / "
                     + "\(diagnosticValue(metrics?.metalCommandBuffersCommitted)) / "
@@ -290,6 +322,22 @@ struct SessionDiagnosticsRendererSection: View {
                     latency: metrics.revisionSelectionToMetalCommit
                 )
                 SessionDiagnosticsLatencyRow(
+                    label: "Drawable preparation p95 / max",
+                    latency: metrics.metalDrawablePreparation
+                )
+                SessionDiagnosticsLatencyRow(
+                    label: "currentDrawable acquisition p95 / max",
+                    latency: metrics.metalDrawableAcquisition
+                )
+                SessionDiagnosticsLatencyRow(
+                    label: "Drawable → commit p95 / max",
+                    latency: metrics.metalDrawableToCommit
+                )
+                SessionDiagnosticsLatencyRow(
+                    label: "Synchronous commit call p95 / max",
+                    latency: metrics.metalCommitCall
+                )
+                SessionDiagnosticsLatencyRow(
                     label: "Metal commit → completion p95 / max",
                     latency: metrics.metalCommitToCompletion
                 )
@@ -318,6 +366,16 @@ struct SessionDiagnosticsVideoCodecSection: View {
         VStack(alignment: .leading, spacing: 3) {
             SessionDiagnosticsSectionHeader(title: "Video codecs")
             SessionDiagnosticsMetricRow(
+                label: "Stream requests MJPEG / H.264 / H.265",
+                value: "\(metrics.displayMJPEGStreamRequests) / "
+                    + "\(metrics.displayH264StreamRequests) / "
+                    + "\(metrics.displayH265StreamRequests)"
+            )
+            SessionDiagnosticsMetricRow(
+                label: "Stream creates / data messages",
+                value: "\(metrics.displayStreamCreateMessages) / \(metrics.displayStreamDataMessages)"
+            )
+            SessionDiagnosticsMetricRow(
                 label: "VT decoded / dropped",
                 value: "\(metrics.videoDecodedFrames) / \(metrics.videoDroppedFrames)"
             )
@@ -342,6 +400,12 @@ struct SessionDiagnosticsVideoCodecSection: View {
                     + "\(metrics.mjpegDataFallbacks)"
             )
             SessionDiagnosticsMetricRow(
+                label: "Native fallback fragments / pool waits / recovered",
+                value: "\(metrics.nativeVideoFallbacks) / "
+                    + "\(metrics.nativeVideoPoolWaits) / "
+                    + "\(metrics.nativeVideoPoolRecoveries)"
+            )
+            SessionDiagnosticsMetricRow(
                 label: "MJPEG handles / IOSurface allocations / peak decode",
                 value: "\(metrics.mjpegDecoderHandleCreations) / "
                     + "\(metrics.mjpegIOSurfaceAllocations) / "
@@ -350,6 +414,11 @@ struct SessionDiagnosticsVideoCodecSection: View {
             SessionDiagnosticsMetricRow(
                 label: "MJPEG superseded before decode",
                 value: "\(metrics.mjpegFramesSupersededBeforeDecode)"
+            )
+            SessionDiagnosticsMetricRow(
+                label: "MJPEG late before decode / max lateness (ms)",
+                value: "\(metrics.mjpegFramesLateBeforeDecode) / "
+                    + "\(metrics.mjpegMaximumLatenessMilliseconds)"
             )
         }
     }
@@ -430,7 +499,7 @@ private struct SessionDiagnosticsMetricRow: View {
 
 struct SessionDiagnosticsNotice: View {
     var body: some View {
-        Text("VDAgent metrics never contain clipboard text. Agent snapshot counters and fixed failure categories cover the current Agent manager lifetime; UI event counters begin when Diagnostics is enabled. Send completion is local only; Motion ACK is aggregate, not per-event RTT. Display counters rebase at the first best-effort SwiftSpice sample; timing summaries cover the current SwiftSpice session. Sample age shows possible terminal staleness. Channel-state samples include the last observation from retired channels. SwiftSpice coalesces desktop revisions on display demand and suppresses snapshots while hidden; frame and cursor traffic bypass SwiftUI Observation. Receive timing begins only after ChannelConnection returns a complete framed message. Source, display-link, Metal, VideoToolbox, and MJPEG counters expose coalescing, GPU back-pressure, buffer reuse, and actual presentation. Server-to-framed-receive timing remains unmeasured. MainActor is 100 ms timer scheduling delay.")
+        Text("VDAgent metrics never contain clipboard text. Agent snapshot counters and fixed failure categories cover the current Agent manager lifetime; UI event counters begin when Diagnostics is enabled. Send completion is local only; Motion ACK is aggregate, not per-event RTT. Display counters rebase at the first best-effort SwiftSpice sample; timing summaries cover the current SwiftSpice session. Received bytes include SPICE headers and read-ahead after authentication, excluding TLS/TCP overhead. Image and stream counts describe decoded requests before execution; image types cover DRAW_COPY sources. GPU copy wait includes queue, completion, and actor resumption for distinct canonical slots, including failed attempts. Sample age shows possible terminal staleness. Channel-state samples include the last observation from retired channels. SwiftSpice coalesces desktop revisions on display demand and suppresses snapshots while hidden; frame and cursor traffic bypass SwiftUI Observation. Receive timing begins only after ChannelConnection returns a complete framed message. Source, display-link, Metal, VideoToolbox, and MJPEG counters expose coalescing, GPU back-pressure, buffer reuse, and actual presentation. Server-to-framed-receive timing remains unmeasured. MainActor is 100 ms timer scheduling delay.")
             .font(.caption2)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)

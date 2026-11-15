@@ -2,6 +2,7 @@
 import Foundation
 
 enum Preferences {
+    static let receiveBetaUpdatesKey = "ReceiveBetaUpdates"
     static let shareClipboardKey = "ShareClipboard"
     static let trashConnectionFileAfterUseKey = "TrashConnectionFileAfterUse"
     static let ravadaPortalURLKey = "RavadaPortalURL"

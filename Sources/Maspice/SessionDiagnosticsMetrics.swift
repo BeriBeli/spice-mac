@@ -40,6 +40,21 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
     var desktopSubscriptions: Int { latest.desktopSubscriptions }
     var desktopVisibleSubscriptions: Int { latest.desktopVisibleSubscriptions }
 
+    var displayReceivedBytes: UInt64 { delta(\.displayReceivedBytes) }
+    var displayMessages: UInt64 { delta(\.displayMessages) }
+    var displayCopyBitsMessages: UInt64 { delta(\.displayCopyBitsMessages) }
+    var displayBitmapImages: UInt64 { delta(\.displayBitmapImages) }
+    var displayQUICImages: UInt64 { delta(\.displayQUICImages) }
+    var displayJPEGImages: UInt64 { delta(\.displayJPEGImages) }
+    var displayLZImages: UInt64 { delta(\.displayLZImages) }
+    var displayCachedImages: UInt64 { delta(\.displayCachedImages) }
+    var displaySurfaceImages: UInt64 { delta(\.displaySurfaceImages) }
+    var displayStreamCreateMessages: UInt64 { delta(\.displayStreamCreateMessages) }
+    var displayMJPEGStreamRequests: UInt64 { delta(\.displayMJPEGStreamRequests) }
+    var displayH264StreamRequests: UInt64 { delta(\.displayH264StreamRequests) }
+    var displayH265StreamRequests: UInt64 { delta(\.displayH265StreamRequests) }
+    var displayStreamDataMessages: UInt64 { delta(\.displayStreamDataMessages) }
+
     var publisherFramedReceiveBatchStartGap: SpiceLatencySummary {
         Self.clientSummary(latest.publisherFramedReceiveBatchStartGap)
     }
@@ -57,6 +72,18 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
     var cpuMaterializations: UInt64 { delta(\.cpuMaterializations) }
     var cpuMaterializationBytes: UInt64 { delta(\.cpuMaterializationBytes) }
     var directIOSurfaceWriteBytes: UInt64 { delta(\.directIOSurfaceWriteBytes) }
+    var gpuCopyBytes: UInt64 { delta(\.gpuCopyBytes) }
+    var gpuCopySynchronizationCount: UInt64 { delta(\.gpuCopySynchronizationCount) }
+    var gpuCopySynchronizationNanoseconds: UInt64 {
+        delta(\.gpuCopySynchronizationNanoseconds)
+    }
+    var gpuCopyWaitMilliseconds: Double {
+        Double(gpuCopySynchronizationNanoseconds) / 1_000_000
+    }
+    var gpuCopyMeanWaitMilliseconds: Double? {
+        guard gpuCopySynchronizationCount > 0 else { return nil }
+        return gpuCopyWaitMilliseconds / Double(gpuCopySynchronizationCount)
+    }
     var poolExhaustions: UInt64 { delta(\.poolExhaustions) }
     var gpuErrors: UInt64 { delta(\.gpuErrors) }
 
@@ -89,6 +116,18 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
     var metalRequestToPresented: SpiceLatencySummary {
         Self.clientSummary(latest.metalRequestToPresented)
     }
+    var metalDrawablePreparation: SpiceLatencySummary {
+        Self.clientSummary(latest.metalDrawablePreparation)
+    }
+    var metalDrawableAcquisition: SpiceLatencySummary {
+        Self.clientSummary(latest.metalDrawableAcquisition)
+    }
+    var metalDrawableToCommit: SpiceLatencySummary {
+        Self.clientSummary(latest.metalDrawableToCommit)
+    }
+    var metalCommitCall: SpiceLatencySummary {
+        Self.clientSummary(latest.metalCommitCall)
+    }
 
     var mjpegDecoderHandleCreations: UInt64 { delta(\.mjpegDecoderHandleCreations) }
     var mjpegDecodedFrames: UInt64 { delta(\.mjpegDecodedFrames) }
@@ -100,6 +139,8 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
     var mjpegFramesSupersededBeforeDecode: UInt64 {
         delta(\.mjpegFramesSupersededBeforeDecode)
     }
+    var mjpegFramesLateBeforeDecode: UInt64 { delta(\.mjpegFramesLateBeforeDecode) }
+    var mjpegMaximumLatenessMilliseconds: UInt32 { latest.mjpegMaximumLatenessMilliseconds }
 
     var nativeVideoFrames: UInt64 {
         counterDelta(latest.nativeVideoFrames, from: baseline.nativeVideoFrames)
@@ -108,6 +149,9 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
     var nativeVideoFallbacks: UInt64 {
         counterDelta(latest.nativeVideoFallbacks, from: baseline.nativeVideoFallbacks)
     }
+
+    var nativeVideoPoolWaits: UInt64 { delta(\.nativeVideoPoolWaits) }
+    var nativeVideoPoolRecoveries: UInt64 { delta(\.nativeVideoPoolRecoveries) }
 
     var videoDecoderSessionCreations: UInt64 {
         counterDelta(
@@ -182,12 +226,27 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
             || mjpegDataFallbacks != 0
             || mjpegIOSurfaceAllocations != 0
             || mjpegFramesSupersededBeforeDecode != 0
+            || mjpegFramesLateBeforeDecode != 0
     }
 
     var summaryLines: [String] {
         var lines = [
             "swiftspice_display_channel_instances=\(latest.displayChannelCount)",
             "swiftspice_latest_sample_age_ms=\(stableSampleAgeMilliseconds)",
+            "swiftspice_display_received_bytes_delta=\(displayReceivedBytes)",
+            "swiftspice_display_messages_delta=\(displayMessages)",
+            "swiftspice_display_copy_bits_messages_delta=\(displayCopyBitsMessages)",
+            "swiftspice_display_bitmap_images_delta=\(displayBitmapImages)",
+            "swiftspice_display_quic_images_delta=\(displayQUICImages)",
+            "swiftspice_display_jpeg_images_delta=\(displayJPEGImages)",
+            "swiftspice_display_lz_images_delta=\(displayLZImages)",
+            "swiftspice_display_cached_images_delta=\(displayCachedImages)",
+            "swiftspice_display_surface_images_delta=\(displaySurfaceImages)",
+            "swiftspice_display_stream_create_messages_delta=\(displayStreamCreateMessages)",
+            "swiftspice_display_mjpeg_stream_requests_delta=\(displayMJPEGStreamRequests)",
+            "swiftspice_display_h264_stream_requests_delta=\(displayH264StreamRequests)",
+            "swiftspice_display_h265_stream_requests_delta=\(displayH265StreamRequests)",
+            "swiftspice_display_stream_data_messages_delta=\(displayStreamDataMessages)",
             "swiftspice_publisher_submissions_delta=\(publisherSubmissions)",
             "swiftspice_publisher_snapshot_attempts_delta=\(publisherSnapshotAttempts)",
             "swiftspice_publisher_emitted_frames_delta=\(publisherEmittedFrames)",
@@ -214,6 +273,10 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
             "swiftspice_cpu_materializations_delta=\(cpuMaterializations)",
             "swiftspice_cpu_materialization_bytes_delta=\(cpuMaterializationBytes)",
             "swiftspice_direct_iosurface_write_bytes_delta=\(directIOSurfaceWriteBytes)",
+            "swiftspice_gpu_copy_bytes_delta=\(gpuCopyBytes)",
+            "swiftspice_gpu_copy_synchronization_count_delta=\(gpuCopySynchronizationCount)",
+            "swiftspice_gpu_copy_synchronization_ns_delta=\(gpuCopySynchronizationNanoseconds)",
+            "swiftspice_gpu_copy_wait_mean_ms=\(stableMilliseconds(gpuCopyMeanWaitMilliseconds))",
             "swiftspice_pool_exhaustions_delta=\(poolExhaustions)",
             "swiftspice_in_flight_leases_observed_max=\(latest.inFlightLeases)",
             "swiftspice_gpu_errors_delta=\(gpuErrors)",
@@ -243,14 +306,20 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
             ),
             latencySummary(name: "swiftspice_metal_commit_to_completion", value: metalCommitToCompletion),
             latencySummary(name: "swiftspice_metal_request_to_presented", value: metalRequestToPresented),
+            latencySummary(name: "swiftspice_metal_drawable_preparation", value: metalDrawablePreparation),
+            latencySummary(name: "swiftspice_metal_drawable_acquisition", value: metalDrawableAcquisition),
+            latencySummary(name: "swiftspice_metal_drawable_to_commit", value: metalDrawableToCommit),
+            latencySummary(name: "swiftspice_metal_commit_call", value: metalCommitCall),
             "swiftspice_surface_allocated_bytes_gauge=\(latest.surfaceAllocatedBytes)",
             "swiftspice_surface_budget_bytes_limit=\(latest.maximumSurfaceBytes)",
         ]
 
-        if hasAdvancedVideoActivity {
+        if latest.displayChannelCount > 0 || hasAdvancedVideoActivity {
             lines.append(contentsOf: [
                 "swiftspice_native_video_frames_delta=\(nativeVideoFrames)",
                 "swiftspice_native_video_fallbacks_delta=\(nativeVideoFallbacks)",
+                "swiftspice_native_video_pool_waits_delta=\(nativeVideoPoolWaits)",
+                "swiftspice_native_video_pool_recoveries_delta=\(nativeVideoPoolRecoveries)",
                 "swiftspice_vt_session_creations_delta=\(videoDecoderSessionCreations)",
                 "swiftspice_vt_hardware_sessions_delta=\(videoHardwareSessions)",
                 "swiftspice_vt_software_sessions_delta=\(videoSoftwareSessions)",
@@ -263,7 +332,7 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
             ])
         }
 
-        if hasMJPEGActivity {
+        if latest.displayChannelCount > 0 || hasMJPEGActivity {
             lines.append(contentsOf: [
                 "swiftspice_mjpeg_decoder_handle_creations_delta=\(mjpegDecoderHandleCreations)",
                 "swiftspice_mjpeg_decoded_frames_delta=\(mjpegDecodedFrames)",
@@ -273,6 +342,8 @@ struct SessionDiagnosticsSwiftSpiceMetrics {
                 "swiftspice_mjpeg_peak_buffers_in_use_sample=\(mjpegPeakBuffersInUse)",
                 "swiftspice_mjpeg_peak_concurrent_decodes_sample=\(mjpegPeakConcurrentDecodes)",
                 "swiftspice_mjpeg_superseded_before_decode_delta=\(mjpegFramesSupersededBeforeDecode)",
+                "swiftspice_mjpeg_late_before_decode_delta=\(mjpegFramesLateBeforeDecode)",
+                "swiftspice_mjpeg_maximum_lateness_ms=\(mjpegMaximumLatenessMilliseconds)",
             ])
         }
 

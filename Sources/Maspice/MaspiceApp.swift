@@ -6,10 +6,21 @@ import SwiftUI
 struct MaspiceApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var applicationModel = ApplicationModel()
-    private let updaterController = SPUStandardUpdaterController(
-        startingUpdater: true,
-        updaterDelegate: nil,
-        userDriverDelegate: nil)
+    // SPUUpdater holds its delegate weakly; retain it for the app's lifetime.
+    private let updaterDelegate: UpdateChannelDelegate
+    private let updaterController: SPUStandardUpdaterController
+
+    init() {
+        let delegate = UpdateChannelDelegate()
+        updaterDelegate = delegate
+        updaterController = SPUStandardUpdaterController(
+            startingUpdater: false,
+            updaterDelegate: delegate,
+            userDriverDelegate: nil)
+        // Prefer the feed shipped in Info.plist over a legacy defaults override.
+        updaterController.updater.clearFeedURLFromUserDefaults()
+        updaterController.startUpdater()
+    }
 
     var body: some Scene {
         WindowGroup("Maspice", id: "main", for: MainWindowID.self) { _ in

@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "codex/beta-*"]
+    tags: ["v*"]
   pull_request:
 
 # CI runs the Swift package and policy tests against the exact SwiftSpice release
@@ -29,6 +30,9 @@ jobs:
 
       - name: Test suite
         run: make test
+
+      - name: Stable and beta feed invariants
+        run: python3 -B scripts/test-update-appcast.py
 
       - name: Version consistency (Info.plist / CHANGELOG / links)
         run: ./scripts/check-version.sh

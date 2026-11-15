@@ -53,7 +53,8 @@ private struct SessionDiagnosticsContent: View {
                 codecFallbackReconnects: snapshot.videoCodecFallbackReconnects
             )
             if let swiftSpiceMetrics,
-               swiftSpiceMetrics.hasAdvancedVideoActivity || swiftSpiceMetrics.hasMJPEGActivity {
+               swiftSpiceMetrics.latest.displayChannelCount > 0
+                || swiftSpiceMetrics.hasAdvancedVideoActivity || swiftSpiceMetrics.hasMJPEGActivity {
                 Divider()
                 SessionDiagnosticsVideoCodecSection(metrics: swiftSpiceMetrics)
             }

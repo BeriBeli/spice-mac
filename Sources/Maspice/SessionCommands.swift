@@ -20,8 +20,11 @@ struct SpiceCommands: Commands {
     let applicationModel: ApplicationModel
     let updater: SPUUpdater
 
-    private let latestReleaseURL = URL(
-        string: "https://github.com/BeriBeli/spice-mac/releases/latest")!
+    private var releaseNotesURL: URL {
+        let version = Bundle.main.object(forInfoDictionaryKey: "MaspiceReleaseVersion") as? String
+        let path = version.map { "tag/v\($0)" } ?? "latest"
+        return URL(string: "https://github.com/BeriBeli/spice-mac/releases/\(path)")!
+    }
     private let newIssueURL = URL(
         string: "https://github.com/BeriBeli/spice-mac/issues/new/choose")!
 
@@ -30,6 +33,17 @@ struct SpiceCommands: Commands {
     @FocusedValue(\.sessionActions) private var sessionActions
 
     var body: some Commands {
+        CommandGroup(replacing: .appInfo) {
+            Button("About Maspice") {
+                let version = Bundle.main.object(forInfoDictionaryKey: "MaspiceReleaseVersion") as? String
+                    ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+                    ?? ""
+                NSApplication.shared.orderFrontStandardAboutPanel(options: [
+                    .applicationVersion: version,
+                ])
+            }
+        }
+
         CommandGroup(after: .appInfo) {
             CheckForUpdatesCommand(updater: updater)
         }
@@ -53,7 +67,7 @@ struct SpiceCommands: Commands {
         CommandGroup(replacing: .toolbar) {}
         CommandGroup(replacing: .sidebar) {}
         CommandGroup(replacing: .help) {
-            Link("What's New", destination: latestReleaseURL)
+            Link("What's New", destination: releaseNotesURL)
             Link("Report an Issue…", destination: newIssueURL)
         }
 
